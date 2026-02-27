@@ -13,6 +13,8 @@ import {
 	Globe,
 } from "lucide-react";
 
+import { useToast } from "../context/Toast";
+
 const PLACEHOLDER_IMAGE =
 	"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'%3E%3Crect fill='%231f2937' width='400' height='600'/%3E%3Ctext fill='%236b7280' font-family='sans-serif' font-size='30' dy='10.5' font-weight='bold' x='50%25' y='50%25' text-anchor='middle'%3ENo Poster%3C/text%3E%3C/svg%3E";
 
@@ -85,12 +87,14 @@ const DownloadStatus = ({ queueItem }) => {
 
 const MediaCard = ({
 	item,
-	onSearch,
-	isSearching,
 	queueItem,
+	onSearch,
 	onDeepSearch,
+	isSearching,
 	mutate,
 }) => {
+	const { toast } = useToast();
+
 	const [imgSrc, setImgSrc] = useState(item.posterUrl || PLACEHOLDER_IMAGE);
 
 	const formatDate = (dateString) => {
@@ -118,10 +122,11 @@ const MediaCard = ({
 					serviceId: item.serviceId,
 				}),
 			});
+			toast.success("Unmonitored");
 			mutate();
 		} catch (err) {
 			console.error(err);
-			alert("Failed to unmonitor");
+			toast.error("Failed to unmonitor");
 		}
 	};
 
