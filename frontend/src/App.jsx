@@ -38,7 +38,7 @@ function App() {
 		{ refreshInterval: 10000 },
 	);
 
-	const handleSearchTrigger = async (service, id, itemId) => {
+	const handleTriggerSearch = async (service, id, itemId) => {
 		setSearchingId(itemId);
 		try {
 			await fetch("/api/v1/search", {
@@ -46,13 +46,14 @@ function App() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ service, id }),
 			});
-			toast.success("");
+			toast.success(`Search Triggered for ${service} | ${id}`);
 			setTimeout(() => {
 				mutate();
 				setSearchingId(null);
 			}, 5000);
 		} catch (err) {
 			console.error("Search failed", err);
+			toast.error("Search failed");
 			setSearchingId(null);
 		}
 	};
@@ -63,47 +64,15 @@ function App() {
 		const query = item.title;
 		// Clean up title (optional, e.g. remove " - S01E01 - Episode Name" if searching whole show)
 		setModalData({
-			isOpen: true,
-			query: query,
-			type: item.type,
 			service: item.service,
 			serviceId: item.serviceId,
+			query: query,
+			type: item.type,
+			isOpen: true,
 		});
 	};
 
-	const handleForceGrab = async (service, serviceId, title, downloadUrl) => {
-		try {
-			const payload = {
-				service,
-				serviceId,
-				title,
-				downloadUrl,
-			};
-
-			const res = await fetch("/api/v1/forcegrab", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-
-			const data = await res.json();
-
-			if (data.success) {
-				setTimeout(() => {
-					mutate();
-				}, 5000);
-				setModalData(null);
-				alert(`✅ ${data.message}`);
-			} else {
-				alert(`❌ Failed: ${data.message}`);
-			}
-		} catch (err) {
-			console.error(err);
-			alert("Failed to connect to backend");
-		}
-	};
-
-	const getQueueItem = (item) => {
+	const handleGetQueueItem = (item) => {
 		return (data?.queue || []).find(
 			(q) => q.service === item.service && q.serviceId === item.serviceId,
 		);
@@ -287,8 +256,8 @@ function App() {
 								<MediaCard
 									key={item.id}
 									item={item}
-									queueItem={getQueueItem(item)}
-									onSearch={handleSearchTrigger}
+									queueItem={handleGetQueueItem(item)}
+									onSearch={handleTriggerSearch}
 									onDeepSearch={() => handleOpenDeepSearch(item)}
 									isSearching={searchingId === item.id}
 									mutate={mutate}
@@ -303,13 +272,11 @@ function App() {
 				<ResultsModal
 					service={modalData.service}
 					serviceId={modalData.serviceId}
-					isOpen={modalData.isOpen}
-					onClose={() => setModalData(null)}
 					query={modalData.query}
 					type={modalData.type}
-					onForceGrab={(title, url) =>
-						handleForceGrab(modalData.service, modalData.serviceId, title, url)
-					}
+					isOpen={modalData.isOpen}
+					onClose={() => setModalData(null)}
+          mutate={mutate}
 				/>
 			)}
 
