@@ -16,7 +16,7 @@ export const downloadHttpFile = async (url, filename) => {
 
 	if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-	console.log(`📥 Starting HTTP Download: ${url}`);
+	console.log(`[DOWNLOADER] 📥 Starting HTTP Download: ${url}`);
 
 	const response = await axios({
 		url,
@@ -40,7 +40,7 @@ export const downloadHttpFile = async (url, filename) => {
 
 		writer.on("close", () => {
 			if (!error) {
-				console.log(`✅ Download Complete: ${outputPath}`);
+				console.log(`[DOWNLOADER] ✅ Download Complete: ${outputPath}`);
 				resolve({ path: outputDir, filePath: outputPath });
 			}
 		});

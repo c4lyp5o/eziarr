@@ -42,19 +42,20 @@ export const fetchQueue = async (serviceName, idKey) => {
 			headers: { "X-Api-Key": conf.apiKey },
 		});
 
-		return res.data.records.map((item) => ({
+		return res.data.records
+    .filter((item) => item.status !== "completed")
+    .map((item) => ({
 			serviceId: item[idKey], // movieId, episodeId, or albumId
 			service: serviceName,
-			status: item.status, // 'Downloading', 'Queued', 'Paused'
-			trackStatus: item.trackedDownloadStatus, // 'Ok', 'Warning', 'Error'
+			status: item.status,
+			trackStatus: item.trackedDownloadStatus,
 			quality: item.quality?.quality?.name,
 			timeleft: item.timeleft, // '00:05:30'
 			indexer: item.indexer,
 			title: item.title,
 		}));
 	} catch (err) {
-		console.log(err);
-		console.error(`Failed to fetch ${serviceName} queue`);
+		console.error(`[UTILS] Failed to fetch ${serviceName} queue`, err);
 		return [];
 	}
 };

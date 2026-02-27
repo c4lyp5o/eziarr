@@ -45,7 +45,7 @@ export const getTelegramClient = async () => {
 	try {
 		await tClient.connect();
 	} catch (err) {
-		console.error("Telegram connection failed", err);
+		console.error("[TELEGRAM] Telegram connection failed", err);
 	}
 
 	return tClient;
@@ -138,7 +138,7 @@ const resolveEntity = async (client, identifier) => {
 		if (match?.entity) return match.entity;
 
 		console.error(
-			`Failed to resolve Telegram entity for identifier: "${identifier}"`,
+			`[TELEEGRAM] Failed to resolve Telegram entity for identifier: "${identifier}"`,
 			err,
 		);
 		throw new Error(`Could not find channel with identifier: "${identifier}"`);
@@ -149,7 +149,7 @@ export const searchChannel = async (channelIdentifier, query) => {
 	const tClient = await getTelegramClient();
 
 	if (!(await tClient.checkAuthorization())) {
-		console.error("❌ Telegram client not authorized");
+		console.error("[TELEGRAM] Telegram client not authorized");
 		throw new Error("Not authorized");
 	}
 
@@ -157,7 +157,7 @@ export const searchChannel = async (channelIdentifier, query) => {
 		const entity = await resolveEntity(tClient, channelIdentifier);
 
 		console.log(
-			`🔍 Searching "${entity.title || channelIdentifier}" for "${query}"...`,
+			`[TELEGRAM] 🔍 Searching "${entity.title || channelIdentifier}" for "${query}"...`,
 		);
 
 		const result = await tClient.invoke(
@@ -208,7 +208,7 @@ export const searchChannel = async (channelIdentifier, query) => {
 			})
 			.filter(Boolean);
 	} catch (err) {
-		console.error("Telegram Search Error", err);
+		console.error("[TELEGRAM] Telegram Search Error", err);
 		throw new Error(`Failed to search Telegram channel. ${err.message}`);
 	}
 };
@@ -231,12 +231,12 @@ export const downloadMedia = async (channel, messageId, filename) => {
 
 	if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-	console.log(`📥 Downloading ${filename}...`);
+	console.log(`[TELEGRAM] 📥 Downloading ${filename}...`);
 	await tClient.downloadMedia(message.media, {
 		outputFile: outputPath,
 		workers: 4,
 	});
 
-	console.log(`✅ Downloaded to dir: ${outputDir} and file: ${outputPath}`);
+	console.log(`[TELEGRAM] ✅ Downloaded to dir: ${outputDir} and file: ${outputPath}`);
 	return { path: outputDir, filePath: outputPath };
 };

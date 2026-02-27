@@ -80,7 +80,7 @@ export const scanOpenDir = async (dirUrl) => {
 
 		return files;
 	} catch (err) {
-		console.error("OD Scan Error:", err);
+		console.error("[OPENDIR] OD Scan Error:", err);
 		throw new Error("Failed to scan directory. Is the URL correct?");
 	}
 };

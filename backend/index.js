@@ -289,7 +289,7 @@ const app = new Elysia()
 	.post(
 		"/api/v1/search",
 		async ({ body: { service, id } }) => {
-			console.log(`Received search request for ${service} item with ID ${id}`);
+			console.log(`[SERVER] 🔍 [${service}] Received search request with ID ${id}`);
 
 			let endpoint = "";
 			let payload = {};
@@ -411,7 +411,7 @@ const app = new Elysia()
 				return { success: true, message: "Grabbed successfully" };
 
 			const rejections = res.data[0].rejections.join(" ").toLowerCase();
-			console.log(`[${service}] Grab Rejected: ${rejections}`);
+			console.warn(`[SERVER] ⚠️ [${service}] Grab Rejected: ${rejections}`);
 			let actionsTaken = false;
 
 			if (
@@ -419,7 +419,7 @@ const app = new Elysia()
 				rejections.includes("cutoff") ||
 				rejections.includes("wanted")
 			) {
-				console.log(`[${service}] Fix: Switching Profile to "Any"...`);
+				console.log(`[SERVER] 🔄 [${service}] Switching Profile to "Any"...`);
 
 				// 1. Get "Any" Profile
 				const profilesRes = await axios.get(
@@ -459,7 +459,7 @@ const app = new Elysia()
 						headers: { "X-Api-Key": config.apiKey },
 					});
 					actionsTaken = true;
-					console.log(`[${service}] Profile switched for "${item.title}"`);
+					console.log(`[SERVER] 🔄 [${service}] Profile switched for "${item.title}"`);
 				}
 			}
 
@@ -467,7 +467,7 @@ const app = new Elysia()
 				rejections.includes("queue") ||
 				rejections.includes("equal or higher preference")
 			) {
-				console.log(`[${service}] Fix: Removing blocking item from Queue...`);
+				console.log(`[SERVER] 🔄 [${service}] Removing blocking item from Queue...`);
 
 				// Get Queue
 				// Note: Lidarr uses v1, others v3. But queue endpoint is generally consistent in structure.
@@ -500,7 +500,7 @@ const app = new Elysia()
 								headers: { "X-Api-Key": config.apiKey },
 							},
 						);
-						console.log(`[${service}] Deleted queue item: ${item.id}`);
+						console.log(`[SERVER] 🔄 [${service}] Deleted queue item: ${item.id}`);
 						actionsTaken = true;
 					} catch (err) {
 						console.error(`[${service}] Failed to delete queue item`, err);
@@ -729,20 +729,20 @@ const app = new Elysia()
 
 			// 1. Download from Telegram (Async - don't await if you want to return immediately)
 			// ideally, we should use a queue/worker for this. For now, we await.
-			console.log(`[Telegram] Starting import for ${filename}...`);
+			console.log(`[SERVER] 📥 [Telegram] Starting import for ${filename}...`);
 			const { path, filePath } = await downloadMedia(
 				channel,
 				messageId,
 				filename,
 			);
-			console.log("[Telegram] Download completed", { path, filePath });
+			console.log("[SERVER] 📥 [Telegram] Download completed", { path, filePath });
 
 			const commandName =
 				service === "radarr"
 					? "DownloadedMoviesScan"
 					: "DownloadedEpisodesScan";
 			const arrPath = translatePath(filePath);
-			console.log(`[Path Map] Local: ${filePath} -> Remote: ${arrPath}`);
+			console.log(`[SERVER] 📥 [Path Map] Local: ${filePath} -> Remote: ${arrPath}`);
 
 			const commandPayload = {
 				name: commandName,
@@ -869,7 +869,7 @@ const app = new Elysia()
 		async ({ body: { service, serviceId, url, filename } }) => {
 			const config = SERVICES[service];
 
-			console.log(`[HTTP] Starting download: ${filename}`);
+			console.log(`[SERVER] 📥 [HTTP] Starting download: ${filename}`);
 			const { path: downloadPath } = await downloadHttpFile(url, filename);
 
 			const commandName =
@@ -878,7 +878,7 @@ const app = new Elysia()
 					: "DownloadedEpisodesScan";
 			const arrPath = translatePath(downloadPath);
 
-			console.log(`[Path Map] Local: ${downloadPath} -> Remote: ${arrPath}`);
+			console.log(`[SERVER] 📥 [Path Map] Local: ${downloadPath} -> Remote: ${arrPath}`);
 
 			const commandPayload = {
 				name: commandName,
@@ -928,9 +928,9 @@ const app = new Elysia()
 
 try {
 	app.listen(process.env.PORT || 5000);
-	console.log("📘 OpenAPI UI enabled at /openapi");
-	console.log(`🦊 Eziarr at ${app.server?.hostname}:${app.server?.port}`);
+	console.log("[SERVER] 📘 OpenAPI UI enabled at /openapi");
+	console.log(`[SERVER] 🦊 Eziarr at ${app.server?.hostname}:${app.server?.port}`);
 } catch (err) {
-	console.error(err);
+	console.error('[SERVER] Failed to start server', err);
 	process.exit(1);
 }

@@ -12,7 +12,7 @@ import {
 import { SERVICES, getPosterUrl } from "./utils";
 
 const syncMissingItems = async () => {
-	console.log("🔄 Worker: Syncing missing items...");
+	console.log("[WORKER] 🔄 Syncing missing items...");
 
 	const activeIds = new Set();
 
@@ -41,7 +41,7 @@ const syncMissingItems = async () => {
 				});
 			});
 		} catch (err) {
-			console.error("Radarr Sync Error", err);
+			console.error("[WORKER] Radarr Sync Error", err);
 		}
 
 		// 2. SONARR
@@ -74,7 +74,7 @@ const syncMissingItems = async () => {
 				});
 			});
 		} catch (err) {
-			console.error("Sonarr Sync Error", err);
+			console.error("[WORKER] Sonarr Sync Error", err);
 		}
 
 		// 3. LIDARR
@@ -106,7 +106,7 @@ const syncMissingItems = async () => {
 				});
 			});
 		} catch (err) {
-			console.error("Lidarr Sync Error", err);
+			console.error("[WORKER] Lidarr Sync Error", err);
 		}
 
 		// 4. CLEANUP (Soft Sync)
@@ -115,28 +115,28 @@ const syncMissingItems = async () => {
 
 		if (idsToDelete.length > 0) {
 			console.log(
-				`🧹 Cleaning up ${idsToDelete.length} downloaded/removed items...`,
+				`[WORKER] 🧹 Cleaning up ${idsToDelete.length} downloaded/removed items...`,
 			);
 			idsToDelete.forEach((id) => {
 				deleteItem(id);
 			});
 		}
 
-		console.log("✅ Worker: Sync Complete");
+		console.log("[WORKER] ✅ Worker: Sync Complete");
 	} catch (err) {
-		console.error("Worker Sync Failed:", err);
+		console.error("[WORKER] Worker Sync Failed:", err);
 	}
 };
 
 const runHunter = async () => {
 	const item = getNextItemToSearch();
 	if (!item) {
-		console.log("💤 Hunter: No eligible old items to search.");
+		console.log("[WORKER] 💤 Hunter: No eligible old items to search.");
 		return;
 	}
 
 	console.log(
-		`🎯 Hunter: Triggering search for [${item.service}] ${item.title}`,
+		`[WORKER] 🎯 Hunter: Triggering search for [${item.service}] ${item.title}`,
 	);
 
 	const serviceConfig = SERVICES[item.service];
@@ -158,9 +158,9 @@ const runHunter = async () => {
 			headers: { "X-Api-Key": serviceConfig.apiKey },
 		});
 		markAsSearched(item.id);
-		console.log(`✅ Hunter: Search started for ${item.title}`);
+		console.log(`[WORKER] ✅ Hunter: Search started for ${item.title}`);
 	} catch (err) {
-		console.error(`❌ Hunter: Failed to search ${item.title}`, err);
+		console.error(`[WORKER] ❌ Hunter: Failed to search ${item.title}`, err);
 	}
 };
 
@@ -181,7 +181,7 @@ const applySettings = async (settings) => {
 		return;
 	}
 
-	console.log("🔄 Settings changed. Reconfiguring worker...");
+	console.log("[WORKER] 🔄 Settings changed. Reconfiguring worker...");
 
 	if (syncIntervalId) {
 		clearInterval(syncIntervalId);
@@ -194,22 +194,22 @@ const applySettings = async (settings) => {
 	}
 
 	if (newConfig.syncEnabled) {
-		console.log(`⏰ Sync every ${newConfig.syncInterval}m`);
+		console.log(`[WORKER] ⏰ Sync every ${newConfig.syncInterval}m`);
 		await syncMissingItems();
 		syncIntervalId = setInterval(
 			syncMissingItems,
 			newConfig.syncInterval * 60000,
 		);
 	} else {
-		console.log("⏸️ Worker: Sync is disabled in settings.");
+		console.log("[WORKER] ⏸️ Worker: Sync is disabled in settings.");
 	}
 
 	if (newConfig.hunterEnabled) {
-		console.log(`⏰ Hunter every ${newConfig.hunterInterval}m`);
+		console.log(`[WORKER] ⏰ Hunter every ${newConfig.hunterInterval}m`);
 		await runHunter();
 		hunterIntervalId = setInterval(runHunter, newConfig.hunterInterval * 60000);
 	} else {
-		console.log("⏸️ Worker: Hunter is disabled in settings.");
+		console.log("[WORKER] ⏸️ Worker: Hunter is disabled in settings.");
 	}
 
 	currentConfig = newConfig;
@@ -220,7 +220,7 @@ const settingsWatcher = async () => {
 		const settings = await getAllSettings();
 		await applySettings(settings);
 	} catch (err) {
-		console.error("⚠️ Failed to load settings:", err);
+		console.error("[WORKER] ⚠️ Failed to load settings:", err);
 	}
 };
 
@@ -246,7 +246,7 @@ const cleanupOldDownloads = () => {
 
 					if (now - stats.mtimeMs > MAX_AGE_MS) {
 						fs.unlinkSync(filePath);
-						console.log(`🧹 Sweeper: Deleted old zombie file: ${filePath}`);
+						console.log(`[WORKER] 🧹 Sweeper: Deleted old zombie file: ${filePath}`);
 					}
 				}
 
@@ -256,21 +256,21 @@ const cleanupOldDownloads = () => {
 			}
 		}
 	} catch (err) {
-		console.error("🧹 Sweeper Error:", err.message);
+		console.error("[WORKER] 🧹 Sweeper Error:", err.message);
 	}
 };
 
 const main = async () => {
-	console.log("🚀 Worker booting...");
+	console.log("[WORKER] 🚀 Worker booting...");
 	await settingsWatcher();
 	setInterval(settingsWatcher, 10000);
-	console.log("✅ Worker started and settings watcher initialized.");
+	console.log("[WORKER] ✅ Worker started and settings watcher initialized.");
 	cleanupOldDownloads();
 	setInterval(cleanupOldDownloads, 60 * 60 * 1000);
-	console.log("✅ Cleanup sweeper initialized.");
+	console.log("[WORKER] ✅ Cleanup sweeper initialized.");
 };
 
 main().catch((err) => {
-	console.error("Worker failed to start:", err);
+	console.error("[WORKER] Worker failed to start:", err);
 	process.exit(1);
 });

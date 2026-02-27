@@ -52,7 +52,7 @@ const initDefaultSettings = () => {
 		}
 	}
 
-	if (updated) console.log("⚙️ Default settings initialized in DB.");
+	if (updated) console.log("[DB] ⚙️ Default settings initialized in DB.");
 };
 
 export const getAllIds = () => {
