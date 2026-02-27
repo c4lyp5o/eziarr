@@ -137,7 +137,7 @@ export const getSetting = (key, defaultValue = null) => {
 		return JSON.parse(result.value);
 	} catch (err) {
 		console.warn(
-			`⚠️ Failed to parse JSON for setting '${key}'. Returning raw value.`,
+			`⚠️ Failed to parse JSON for setting '${key}'. Using raw value. Error: ${err.toString()}`,
 		);
 		return result.value;
 	}
@@ -161,7 +161,10 @@ export const getAllSettings = () => {
 	return rows.reduce((acc, row) => {
 		try {
 			acc[row.key] = JSON.parse(row.value);
-		} catch (e) {
+		} catch (err) {
+			console.warn(
+				`⚠️ Failed to parse JSON for setting '${row.key}'. Using raw value. Error: ${err.toString()}`,
+			);
 			acc[row.key] = row.value;
 		}
 		return acc;
