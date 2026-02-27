@@ -4,9 +4,6 @@ import { TelegramClient, Api } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { getSetting, setSetting } from "./db";
 
-// const API_ID = 35169006;
-// const API_HASH = "6af49145430d0ce2145c3c0958180109";
-
 const isId = (str) => /^-?\d+$/.test(str);
 
 const DOWNLOAD_DIR = path.resolve(process.cwd(), "downloads");
@@ -62,7 +59,7 @@ export const sendLoginCode = async (phoneNumber) => {
 		throw new Error("API ID and Hash not configured in settings.");
 
 	const { phoneCodeHash } = await tClient.sendCode(
-		{ apiId: API_ID, apiHash: API_HASH },
+		{ apiId: creds.apiId, apiHash: creds.apiHash },
 		phoneNumber,
 	);
 
