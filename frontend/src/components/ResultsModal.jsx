@@ -49,13 +49,13 @@ const ResultsModal = ({ service, serviceId, query, type, isOpen, onClose, mutate
 			});
 			const data = await res.json();
 			if (data.success) {
-				toast.success("Import From HTTP Started");
+				toast.success("Grab From Web Started");
 			} else {
-				toast.error("Import From HTTP Failed");
+				toast.error("Grab From Web Failed");
 			}
 		} catch (err) {
-			console.error(err);
-			toast.error("Import From HTTP Failed");
+			console.error("Grab From Web Failed", err);
+			toast.error("Grab From Web Failed");
 		}
 	};
 

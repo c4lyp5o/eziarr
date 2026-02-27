@@ -125,7 +125,7 @@ const MediaCard = ({
 			toast.success("Unmonitored");
 			mutate();
 		} catch (err) {
-			console.error(err);
+			console.error("Failed to unmonitor", err);
 			toast.error("Failed to unmonitor");
 		}
 	};
