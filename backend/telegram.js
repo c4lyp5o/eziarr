@@ -3,6 +3,7 @@ import path from "node:path";
 import { TelegramClient, Api } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { getSetting, setSetting } from "./db";
+import { generalLogger as logger } from "./logger";
 
 const isId = (str) => /^-?\d+$/.test(str);
 
@@ -28,7 +29,7 @@ export const getTelegramClient = async () => {
 
 	const creds = getCredentials();
 	if (!creds) {
-		console.warn(
+		logger.warn(
 			"⚠️ Telegram API ID or Hash is missing. Please configure them in Settings.",
 		);
 		return null;
@@ -45,7 +46,7 @@ export const getTelegramClient = async () => {
 	try {
 		await tClient.connect();
 	} catch (err) {
-		console.error("[TELEGRAM] Telegram connection failed", err);
+		logger.error(`[TELEGRAM] Telegram connection failed: ${err.toString()}`);
 	}
 
 	return tClient;
@@ -137,9 +138,8 @@ const resolveEntity = async (client, identifier) => {
 
 		if (match?.entity) return match.entity;
 
-		console.error(
-			`[TELEEGRAM] Failed to resolve Telegram entity for identifier: "${identifier}"`,
-			err,
+		logger.error(
+			`[TELEEGRAM] Failed to resolve Telegram entity for ${identifier}: ${err.toString()}`,
 		);
 		throw new Error(`Could not find channel with identifier: "${identifier}"`);
 	}
@@ -149,14 +149,14 @@ export const searchChannel = async (channelIdentifier, query) => {
 	const tClient = await getTelegramClient();
 
 	if (!(await tClient.checkAuthorization())) {
-		console.error("[TELEGRAM] Telegram client not authorized");
+		logger.error("[TELEGRAM] Telegram client not authorized");
 		throw new Error("Not authorized");
 	}
 
 	try {
 		const entity = await resolveEntity(tClient, channelIdentifier);
 
-		console.log(
+		logger.info(
 			`[TELEGRAM] 🔍 Searching "${entity.title || channelIdentifier}" for "${query}"...`,
 		);
 
@@ -208,8 +208,8 @@ export const searchChannel = async (channelIdentifier, query) => {
 			})
 			.filter(Boolean);
 	} catch (err) {
-		console.error("[TELEGRAM] Telegram Search Error", err);
-		throw new Error(`Failed to search Telegram channel. ${err.message}`);
+		logger.error(`[TELEGRAM] Telegram Search Error: ${err.toString()}`);
+		throw new Error("Failed to search Telegram channel");
 	}
 };
 
@@ -231,12 +231,14 @@ export const downloadMedia = async (channel, messageId, filename) => {
 
 	if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-	console.log(`[TELEGRAM] 📥 Downloading ${filename}...`);
+	logger.info(`[TELEGRAM] 📥 Downloading ${filename}...`);
 	await tClient.downloadMedia(message.media, {
 		outputFile: outputPath,
 		workers: 4,
 	});
 
-	console.log(`[TELEGRAM] ✅ Downloaded to dir: ${outputDir} and file: ${outputPath}`);
+	logger.info(
+		`[TELEGRAM] ✅ Downloaded to dir: ${outputDir} and file: ${outputPath}`,
+	);
 	return { path: outputDir, filePath: outputPath };
 };

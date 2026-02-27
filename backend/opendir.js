@@ -1,5 +1,6 @@
-import axios from "axios";
 import { URL } from "node:url";
+import axios from "axios";
+import { generalLogger as logger } from "./logger";
 
 // Common video extensions to look for
 const VIDEO_EXTENSIONS = new Set([
@@ -21,9 +22,7 @@ const isSafeUrl = (urlString) => {
 			return false;
 		return true;
 	} catch (err) {
-		console.warn(
-			`Invalid URL provided: ${urlString}. Error: ${err.toString()}`,
-		);
+		logger.warn(`Invalid URL provided: ${urlString}. Error: ${err.toString()}`);
 		return false;
 	}
 };
@@ -80,7 +79,7 @@ export const scanOpenDir = async (dirUrl) => {
 
 		return files;
 	} catch (err) {
-		console.error("[OPENDIR] OD Scan Error:", err);
+		logger.error(`[OPENDIR] OD Scan Error: ${err.toString()}`);
 		throw new Error("Failed to scan directory. Is the URL correct?");
 	}
 };

@@ -14,6 +14,7 @@ import { searchInternetArchive, getArchiveFiles } from "./ia";
 import { scanOpenDir } from "./opendir";
 import { downloadHttpFile } from "./downloader";
 import { getItems, getAllSettings, setSetting } from "./db";
+import { generalLogger as logger } from "./logger";
 import { SERVICES, fetchQueue, translatePath } from "./utils";
 
 const app = new Elysia()
@@ -29,7 +30,7 @@ const app = new Elysia()
 			}
 
 			set.status = 500;
-			console.error(`[${code}] Server Error`, error);
+			logger.error(`[SERVER] 💥[${code}] Server Error: ${error.message}`);
 			const msg =
 				process.env.NODE_ENV === "development" || process.env.NODE_ENV === "dev"
 					? error.message
@@ -289,7 +290,9 @@ const app = new Elysia()
 	.post(
 		"/api/v1/search",
 		async ({ body: { service, id } }) => {
-			console.log(`[SERVER] 🔍 [${service}] Received search request with ID ${id}`);
+			logger.info(
+				`[SERVER] 🔍 [${service}] Received search request with ID ${id}`,
+			);
 
 			let endpoint = "";
 			let payload = {};
@@ -411,7 +414,7 @@ const app = new Elysia()
 				return { success: true, message: "Grabbed successfully" };
 
 			const rejections = res.data[0].rejections.join(" ").toLowerCase();
-			console.warn(`[SERVER] ⚠️ [${service}] Grab Rejected: ${rejections}`);
+			logger.warn(`[SERVER] ⚠️ [${service}] Grab Rejected: ${rejections}`);
 			let actionsTaken = false;
 
 			if (
@@ -419,7 +422,7 @@ const app = new Elysia()
 				rejections.includes("cutoff") ||
 				rejections.includes("wanted")
 			) {
-				console.log(`[SERVER] 🔄 [${service}] Switching Profile to "Any"...`);
+				logger.info(`[SERVER] 🔄 [${service}] Switching Profile to "Any"...`);
 
 				// 1. Get "Any" Profile
 				const profilesRes = await axios.get(
@@ -459,7 +462,9 @@ const app = new Elysia()
 						headers: { "X-Api-Key": config.apiKey },
 					});
 					actionsTaken = true;
-					console.log(`[SERVER] 🔄 [${service}] Profile switched for "${item.title}"`);
+					logger.info(
+						`[SERVER] 🔄 [${service}] Profile switched for "${item.title}"`,
+					);
 				}
 			}
 
@@ -467,7 +472,9 @@ const app = new Elysia()
 				rejections.includes("queue") ||
 				rejections.includes("equal or higher preference")
 			) {
-				console.log(`[SERVER] 🔄 [${service}] Removing blocking item from Queue...`);
+				logger.info(
+					`[SERVER] 🔄 [${service}] Removing blocking item from Queue...`,
+				);
 
 				// Get Queue
 				// Note: Lidarr uses v1, others v3. But queue endpoint is generally consistent in structure.
@@ -500,10 +507,14 @@ const app = new Elysia()
 								headers: { "X-Api-Key": config.apiKey },
 							},
 						);
-						console.log(`[SERVER] 🔄 [${service}] Deleted queue item: ${item.id}`);
+						logger.info(
+							`[SERVER] 🔄 [${service}] Deleted queue item: ${item.id}`,
+						);
 						actionsTaken = true;
 					} catch (err) {
-						console.error(`[${service}] Failed to delete queue item`, err);
+						logger.error(
+							`[${service}] Failed to delete queue item ${item.id}: ${err.message}`,
+						);
 					}
 				}
 			}
@@ -729,20 +740,25 @@ const app = new Elysia()
 
 			// 1. Download from Telegram (Async - don't await if you want to return immediately)
 			// ideally, we should use a queue/worker for this. For now, we await.
-			console.log(`[SERVER] 📥 [Telegram] Starting import for ${filename}...`);
+			logger.info(`[SERVER] 📥 [Telegram] Starting import for ${filename}...`);
 			const { path, filePath } = await downloadMedia(
 				channel,
 				messageId,
 				filename,
 			);
-			console.log("[SERVER] 📥 [Telegram] Download completed", { path, filePath });
+			logger.info("[SERVER] 📥 [Telegram] Download completed", {
+				path,
+				filePath,
+			});
 
 			const commandName =
 				service === "radarr"
 					? "DownloadedMoviesScan"
 					: "DownloadedEpisodesScan";
 			const arrPath = translatePath(filePath);
-			console.log(`[SERVER] 📥 [Path Map] Local: ${filePath} -> Remote: ${arrPath}`);
+			logger.info(
+				`[SERVER] 📥 [Path Map] Local: ${filePath} -> Remote: ${arrPath}`,
+			);
 
 			const commandPayload = {
 				name: commandName,
@@ -869,7 +885,7 @@ const app = new Elysia()
 		async ({ body: { service, serviceId, url, filename } }) => {
 			const config = SERVICES[service];
 
-			console.log(`[SERVER] 📥 [HTTP] Starting download: ${filename}`);
+			logger.info(`[SERVER] 📥 [HTTP] Starting download: ${filename}`);
 			const { path: downloadPath } = await downloadHttpFile(url, filename);
 
 			const commandName =
@@ -878,7 +894,9 @@ const app = new Elysia()
 					: "DownloadedEpisodesScan";
 			const arrPath = translatePath(downloadPath);
 
-			console.log(`[SERVER] 📥 [Path Map] Local: ${downloadPath} -> Remote: ${arrPath}`);
+			logger.info(
+				`[SERVER] 📥 [Path Map] Local: ${downloadPath} -> Remote: ${arrPath}`,
+			);
 
 			const commandPayload = {
 				name: commandName,
@@ -928,9 +946,11 @@ const app = new Elysia()
 
 try {
 	app.listen(process.env.PORT || 5000);
-	console.log("[SERVER] 📘 OpenAPI UI enabled at /openapi");
-	console.log(`[SERVER] 🦊 Eziarr at ${app.server?.hostname}:${app.server?.port}`);
+	logger.info("[SERVER] 📘 OpenAPI UI enabled at /openapi");
+	logger.info(
+		`[SERVER] 🦊 Eziarr at ${app.server?.hostname}:${app.server?.port}`,
+	);
 } catch (err) {
-	console.error('[SERVER] Failed to start server', err);
+	logger.error(`[SERVER] 💥 Failed to start server: ${err.toString()}`);
 	process.exit(1);
 }

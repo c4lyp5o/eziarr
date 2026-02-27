@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite";
+import { generalLogger as logger } from "./logger";
 
 const db = new Database("media.sqlite");
 
@@ -37,7 +38,7 @@ try {
   )
 `);
 } catch (err) {
-	console.error("DB Initialization Error", err);
+	logger.error(`[DB] ❌ Database Initialization Error: ${err.message}`);
 	process.exit(1);
 }
 
@@ -52,7 +53,7 @@ const initDefaultSettings = () => {
 		}
 	}
 
-	if (updated) console.log("[DB] ⚙️ Default settings initialized in DB.");
+	if (updated) logger.info("[DB] ⚙️ Default settings initialized in DB.");
 };
 
 export const getAllIds = () => {
@@ -136,8 +137,8 @@ export const getSetting = (key, defaultValue = null) => {
 	try {
 		return JSON.parse(result.value);
 	} catch (err) {
-		console.warn(
-			`⚠️ Failed to parse JSON for setting '${key}'. Using raw value. Error: ${err.toString()}`,
+		logger.warn(
+			`[DB] ⚠️ Failed to parse JSON for setting '${key}'. Using raw value. Error: ${err.toString()}`,
 		);
 		return result.value;
 	}
@@ -162,8 +163,8 @@ export const getAllSettings = () => {
 		try {
 			acc[row.key] = JSON.parse(row.value);
 		} catch (err) {
-			console.warn(
-				`⚠️ Failed to parse JSON for setting '${row.key}'. Using raw value. Error: ${err.toString()}`,
+			logger.warn(
+				`[DB] ⚠️ Failed to parse JSON for setting '${row.key}'. Using raw value. Error: ${err.toString()}`,
 			);
 			acc[row.key] = row.value;
 		}

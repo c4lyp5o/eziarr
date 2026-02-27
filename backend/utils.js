@@ -1,6 +1,7 @@
 import path from "node:path";
 import axios from "axios";
 import { getSetting } from "./db";
+import { generalLogger as logger } from "./logger";
 
 export const SERVICES = {
 	sonarr: {
@@ -43,19 +44,21 @@ export const fetchQueue = async (serviceName, idKey) => {
 		});
 
 		return res.data.records
-    .filter((item) => item.status !== "completed")
-    .map((item) => ({
-			serviceId: item[idKey], // movieId, episodeId, or albumId
-			service: serviceName,
-			status: item.status,
-			trackStatus: item.trackedDownloadStatus,
-			quality: item.quality?.quality?.name,
-			timeleft: item.timeleft, // '00:05:30'
-			indexer: item.indexer,
-			title: item.title,
-		}));
+			.filter((item) => item.status !== "completed")
+			.map((item) => ({
+				serviceId: item[idKey], // movieId, episodeId, or albumId
+				service: serviceName,
+				status: item.status,
+				trackStatus: item.trackedDownloadStatus,
+				quality: item.quality?.quality?.name,
+				timeleft: item.timeleft, // '00:05:30'
+				indexer: item.indexer,
+				title: item.title,
+			}));
 	} catch (err) {
-		console.error(`[UTILS] Failed to fetch ${serviceName} queue`, err);
+		logger.error(
+			`[UTILS] Failed to fetch ${serviceName} queue: ${err.toString()}`,
+		);
 		return [];
 	}
 };

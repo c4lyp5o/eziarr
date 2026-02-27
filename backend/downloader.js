@@ -1,6 +1,7 @@
 import axios from "axios";
 import fs from "node:fs";
 import path from "node:path";
+import { generalLogger as logger } from "./logger";
 
 const DOWNLOAD_DIR = path.resolve(process.cwd(), "downloads");
 if (!fs.existsSync(DOWNLOAD_DIR))
@@ -16,7 +17,7 @@ export const downloadHttpFile = async (url, filename) => {
 
 	if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-	console.log(`[DOWNLOADER] 📥 Starting HTTP Download: ${url}`);
+	logger.info(`[DOWNLOADER] 📥 Starting HTTP Download: ${url}`);
 
 	const response = await axios({
 		url,
@@ -40,7 +41,7 @@ export const downloadHttpFile = async (url, filename) => {
 
 		writer.on("close", () => {
 			if (!error) {
-				console.log(`[DOWNLOADER] ✅ Download Complete: ${outputPath}`);
+				logger.info(`[DOWNLOADER] ✅ Download Complete: ${outputPath}`);
 				resolve({ path: outputDir, filePath: outputPath });
 			}
 		});

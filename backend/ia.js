@@ -1,4 +1,5 @@
 import axios from "axios";
+import { generalLogger as logger } from "./logger";
 
 const IA_BASE = "https://archive.org/advancedsearch.php";
 
@@ -36,7 +37,7 @@ export const searchInternetArchive = async (query) => {
 			detailsUrl: `https://archive.org/details/${doc.identifier}`,
 		}));
 	} catch (err) {
-		console.error("IA Search Error", err);
+		logger.error(`IA Search Error: ${err.toString()}`);
 		return [];
 	}
 };
