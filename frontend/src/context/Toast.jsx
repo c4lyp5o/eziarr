@@ -33,6 +33,49 @@ const PLACEMENT_CONFIG = {
 	},
 };
 
+const toastStyles = `
+  @keyframes slide-in-right {
+    0% { transform: translateX(100%); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slide-out-right {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(100%); opacity: 0; }
+  }
+  @keyframes slide-in-left {
+    0% { transform: translateX(-100%); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slide-out-left {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(-100%); opacity: 0; }
+  }
+  @keyframes slide-in-top {
+    0% { transform: translateY(-100%); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes slide-out-top {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-100%); opacity: 0; }
+  }
+  @keyframes slide-in-bottom {
+    0% { transform: translateY(100%); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes slide-out-bottom {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(100%); opacity: 0; }
+  }
+  .animate-slide-in-right { animation: slide-in-right 0.3s ease-out forwards; }
+  .animate-slide-out-right { animation: slide-out-right 0.3s ease-in forwards; }
+  .animate-slide-in-left { animation: slide-in-left 0.3s ease-out forwards; }
+  .animate-slide-out-left { animation: slide-out-left 0.3s ease-in forwards; }
+  .animate-slide-in-top { animation: slide-in-top 0.3s ease-out forwards; }
+  .animate-slide-out-top { animation: slide-out-top 0.3s ease-in forwards; }
+  .animate-slide-in-bottom { animation: slide-in-bottom 0.3s ease-out forwards; }
+  .animate-slide-out-bottom { animation: slide-out-bottom 0.3s ease-in forwards; }
+`;
+
 const listeners = new Set();
 
 export const ToastContainer = ({ placement = "bottom-right" }) => {
@@ -53,6 +96,15 @@ export const ToastContainer = ({ placement = "bottom-right" }) => {
 		setTimeout(() => {
 			setToasts((prev) => prev.filter((toast) => toast.id !== id));
 		}, 300);
+	}, []);
+
+	useEffect(() => {
+		const styleSheet = document.createElement("style");
+		styleSheet.innerText = toastStyles;
+		document.head.appendChild(styleSheet);
+		return () => {
+			document.head.removeChild(styleSheet);
+		};
 	}, []);
 
 	useEffect(() => {
