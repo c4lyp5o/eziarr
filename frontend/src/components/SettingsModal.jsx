@@ -8,7 +8,11 @@ import {
 	FolderSync,
 } from "lucide-react";
 
+import { useToast } from "../context/Toast";
+
 const SettingsModal = ({ isOpen, onClose }) => {
+	const { toast } = useToast();
+
 	const [settings, setSettings] = useState({
 		syncEnabled: true,
 		hunterEnabled: true,
@@ -35,6 +39,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
 			setSettings((prev) => ({ ...prev, ...data }));
 		} catch (err) {
 			console.error("Failed to load settings", err);
+			toast.error("Failed to load settings");
 		}
 	};
 
@@ -56,14 +61,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
 			});
 
 			if (res.ok) {
-				alert("✅ Settings Saved!");
-				onClose();
+				toast.success("Settings saved!");
 			} else {
-				alert("❌ Failed to save settings.");
+				toast.error("Failed to save settings");
 			}
 		} catch (err) {
-			console.error(err);
-			alert("Network Error");
+			console.error("Failed to save settings", err);
+			toast.error("Failed to save settings");
 		} finally {
 			setLoading(false);
 		}
@@ -103,12 +107,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
 						<div className="grid grid-cols-2 gap-4">
 							{/* SYNC CARD */}
 							<div
-								className={`bg-gray-900/50 p-4 rounded-xl border border-gray-800 transition-all ${!settings.syncEnabled ? "opacity-60 grayscale-[50%]" : ""}`}
+								className={`bg-gray-900/50 p-4 rounded-xl border border-gray-800 transition-all ${!settings.syncEnabled ? "opacity-60 grayscale-50" : ""}`}
 							>
 								<div className="flex justify-between items-center mb-3">
-									<span className="text-sm font-bold text-gray-200">
-										Library Sync
-									</span>
+									<span className="text-sm font-bold text-gray-200">Sync</span>
 									{/* Custom Toggle */}
 									<button
 										type="button"
@@ -145,11 +147,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
 							{/* HUNTER CARD */}
 							<div
-								className={`bg-gray-900/50 p-4 rounded-xl border border-gray-800 transition-all ${!settings.hunterEnabled ? "opacity-60 grayscale-[50%]" : ""}`}
+								className={`bg-gray-900/50 p-4 rounded-xl border border-gray-800 transition-all ${!settings.hunterEnabled ? "opacity-60 grayscale-50" : ""}`}
 							>
 								<div className="flex justify-between items-center mb-3">
 									<span className="text-sm font-bold text-gray-200">
-										Hunter Search
+										Hunter
 									</span>
 									{/* Custom Toggle */}
 									<button
