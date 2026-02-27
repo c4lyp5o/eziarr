@@ -21,6 +21,9 @@ const isSafeUrl = (urlString) => {
 			return false;
 		return true;
 	} catch (err) {
+		console.warn(
+			`Invalid URL provided: ${urlString}. Error: ${err.toString()}`,
+		);
 		return false;
 	}
 };
@@ -67,7 +70,7 @@ export const scanOpenDir = async (dirUrl) => {
 
 				files.push({
 					filename: filename,
-					url: absoluteUrl,
+					downloadUrl: absoluteUrl,
 					ext: ext,
 				});
 			}
