@@ -1,0 +1,21 @@
+{
+	"name": "backend",
+	"module": "index.js",
+	"type": "module",
+	"private": true,
+	"dependencies": {
+		"@elysiajs/cors": "^1.4.1",
+		"@elysiajs/static": "^1.4.7",
+		"axios": "^1.13.5",
+		"elysia": "^1.4.25",
+		"input": "^1.0.1",
+		"telegram": "^2.26.22"
+	},
+	"devDependencies": {
+		"@elysiajs/openapi": "^1.4.14",
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	}
+}
