@@ -13,9 +13,10 @@ import {
 import { searchInternetArchive, getArchiveFiles } from "./ia";
 import { scanOpenDir } from "./opendir";
 import { downloadHttpFile } from "./downloader";
-import { getItems, getAllSettings, setSetting } from "./db";
+import { getItems, deleteItem, getAllSettings, setSetting } from "./db";
 import { generalLogger as logger } from "./logger";
-import { SERVICES, fetchQueue, translatePath } from "./utils";
+import { coerceNumericId, fetchQueue, translatePath } from "./utils";
+import { SERVICES } from "./config";
 
 const app = new Elysia()
 	.onError(
@@ -30,7 +31,7 @@ const app = new Elysia()
 			}
 
 			set.status = 500;
-			logger.error(`[SERVER] 💥[${code}] Server Error: ${error.message}`);
+			logger.error(`[SERVER] 💥[${code}] Server Error: `, error);
 			const msg =
 				process.env.NODE_ENV === "development" || process.env.NODE_ENV === "dev"
 					? error.message
@@ -138,23 +139,17 @@ const app = new Elysia()
 	.get(
 		"/api/v1/missing",
 		async () => {
-			const missingItems = getItems()
-				.sort((a, b) => {
-					const dateA = new Date(b.release_date || 0).getTime();
-					const dateB = new Date(a.release_date || 0).getTime();
-					return dateB - dateA;
-				})
-				.map((row) => ({
-					id: row.id,
-					serviceId: row.service_id,
-					title: row.title,
-					seriesTitle: row.series_title,
-					type: row.type,
-					service: row.service,
-					releaseDate: row.release_date,
-					posterUrl: row.poster_url,
-					status: row.status,
-				}));
+			const missingItems = getItems().map((row) => ({
+				id: row.id,
+				serviceId: row.service_id,
+				title: row.title,
+				seriesTitle: row.series_title,
+				type: row.type,
+				service: row.service,
+				releaseDate: row.release_date,
+				posterUrl: row.poster_url,
+				status: row.status,
+			}));
 
 			const [radarrQ, sonarrQ, lidarrQ] = await Promise.all([
 				fetchQueue("radarr", "movieId"),
@@ -197,11 +192,12 @@ const app = new Elysia()
 							t.Literal("lidarr"),
 						]),
 						serviceId: t.Integer(),
-						title: t.String(),
-						indexer: t.String(),
-						quality: t.String(),
 						status: t.String(),
 						trackStatus: t.String(),
+						title: t.String(),
+						quality: t.Optional(t.String()),
+						indexer: t.Optional(t.String()),
+						timeleft: t.Optional(t.String()),
 					}),
 				),
 			}),
@@ -215,84 +211,13 @@ const app = new Elysia()
 	)
 
 	.post(
-		"/api/v1/unmonitor",
-		async ({ body: { service, serviceId } }) => {
-			const config = SERVICES[service];
-
-			if (service === "radarr") {
-				// 1. Get current movie data first (Radarr requires the full object to update)
-				const getRes = await axios.get(
-					`${config.url}/api/v3/movie/${serviceId}`,
-					{
-						headers: { "X-Api-Key": config.apiKey },
-					},
-				);
-				const movie = getRes.data;
-
-				// 2. Set monitored = false and update
-				movie.monitored = false;
-				await axios.put(`${config.url}/api/v3/movie/${serviceId}`, movie, {
-					headers: { "X-Api-Key": config.apiKey },
-				});
-			} else if (service === "sonarr") {
-				// For Sonarr, we are usually unmonitoring a specific EPISODE
-				const getRes = await axios.get(
-					`${config.url}/api/v3/episode/${serviceId}`,
-					{
-						headers: { "X-Api-Key": config.apiKey },
-					},
-				);
-				const episode = getRes.data;
-
-				episode.monitored = false;
-				await axios.put(`${config.url}/api/v3/episode/${serviceId}`, episode, {
-					headers: { "X-Api-Key": config.apiKey },
-				});
-			} else if (service === "lidarr") {
-				// Lidarr Album unmonitor
-				const getRes = await axios.get(
-					`${config.url}/api/v1/album/${serviceId}`,
-					{
-						headers: { "X-Api-Key": config.apiKey },
-					},
-				);
-				const album = getRes.data;
-
-				album.monitored = false;
-				await axios.put(`${config.url}/api/v1/album/${serviceId}`, album, {
-					headers: { "X-Api-Key": config.apiKey },
-				});
-			}
-
-			deleteItem(`${service}-${serviceId}`);
-
-			return { success: true };
-		},
-		{
-			body: t.Object({
-				service: t.Union([
-					t.Literal("radarr"),
-					t.Literal("sonarr"),
-					t.Literal("lidarr"),
-				]),
-				serviceId: t.String(),
-			}),
-			response: t.Object({ success: t.Boolean() }),
-			detail: {
-				summary: "Unmonitor an Item",
-				description:
-					"Stop monitoring a movie/episode/album in Radarr/Sonarr/Lidarr by setting monitored=false. This will remove it from the missing list and prevent future monitoring.",
-				tags: ["*Arr Integration"],
-			},
-		},
-	)
-
-	.post(
 		"/api/v1/search",
 		async ({ body: { service, id } }) => {
 			logger.info(
 				`[SERVER] 🔍 [${service}] Received search request with ID ${id}`,
 			);
+
+			const sid = coerceNumericId(id, "id");
 
 			let endpoint = "";
 			let payload = {};
@@ -303,25 +228,27 @@ const app = new Elysia()
 				baseUrl = SERVICES.radarr.url;
 				apiKey = SERVICES.radarr.apiKey;
 				endpoint = "/api/v3/command";
-				payload = { name: "MoviesSearch", movieIds: [id] };
+				payload = { name: "MoviesSearch", movieIds: [sid] };
 			} else if (service === "sonarr") {
 				baseUrl = SERVICES.sonarr.url;
 				apiKey = SERVICES.sonarr.apiKey;
 				endpoint = "/api/v3/command";
-				payload = { name: "EpisodeSearch", episodeIds: [id] };
+				payload = { name: "EpisodeSearch", episodeIds: [sid] };
 			} else if (service === "lidarr") {
 				baseUrl = SERVICES.lidarr.url;
 				apiKey = SERVICES.lidarr.apiKey;
 				endpoint = "/api/v1/command";
-				payload = { name: "AlbumSearch", albumIds: [id] };
+				payload = { name: "AlbumSearch", albumIds: [sid] };
 			}
 
 			await axios.post(`${baseUrl}${endpoint}`, payload, {
 				headers: { "X-Api-Key": apiKey },
+				timeout: 30000,
 			});
+
 			return {
 				success: true,
-				message: `Search triggered for ${service} item ${id}`,
+				message: `Search triggered for ${service} item ${sid}`,
 			};
 		},
 		{
@@ -331,7 +258,7 @@ const app = new Elysia()
 					t.Literal("sonarr"),
 					t.Literal("lidarr"),
 				]),
-				id: t.String(),
+				id: t.Union([t.String(), t.Number()]),
 			}),
 			response: t.Object({ success: t.Boolean(), message: t.String() }),
 			detail: {
@@ -355,6 +282,7 @@ const app = new Elysia()
 				const res = await axios.get(`${SERVICES.prowlarr.url}/api/v1/search`, {
 					params: { query, categories: categories.join(","), type: "search" },
 					headers: { "X-Api-Key": SERVICES.prowlarr.apiKey },
+					timeout: 30000,
 				});
 
 				// Return simplified results
@@ -394,6 +322,7 @@ const app = new Elysia()
 		"/api/v1/forcegrab",
 		async ({ body: { service, serviceId, title, downloadUrl } }) => {
 			const config = SERVICES[service];
+			const sid = coerceNumericId(serviceId, "serviceId");
 
 			const pushRelease = async () => {
 				return axios.post(
@@ -404,19 +333,18 @@ const app = new Elysia()
 						protocol: "Torrent",
 						publishDate: new Date().toISOString(),
 					},
-					{ headers: { "X-Api-Key": config.apiKey } },
+					{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
 				);
 			};
 
-			// 1. Try Initial Grab
 			let res = await pushRelease();
 			if (!res.data[0].rejected)
 				return { success: true, message: "Grabbed successfully" };
 
 			const rejections = res.data[0].rejections.join(" ").toLowerCase();
 			logger.warn(`[SERVER] ⚠️ [${service}] Grab Rejected: ${rejections}`);
-			let actionsTaken = false;
 
+			let actionsTaken = false;
 			if (
 				rejections.includes("profile") ||
 				rejections.includes("cutoff") ||
@@ -424,35 +352,33 @@ const app = new Elysia()
 			) {
 				logger.info(`[SERVER] 🔄 [${service}] Switching Profile to "Any"...`);
 
-				// 1. Get "Any" Profile
 				const profilesRes = await axios.get(
 					`${config.url}/api/v3/qualityprofile`,
-					{ headers: { "X-Api-Key": config.apiKey } },
+					{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
 				);
 				const anyProfile =
 					profilesRes.data.find((p) => p.name.toLowerCase() === "any") ||
 					profilesRes.data[0];
 
-				// 2. Determine Correct Endpoint & ID
 				let endpoint = "";
-				let targetId = serviceId;
+				let targetId = sid;
 
 				if (service === "radarr") {
 					endpoint = "/api/v3/movie";
 				} else if (service === "sonarr") {
-					// FIX: If Sonarr, we have EpisodeID, but we must update the SERIES
-					const epRes = await axios.get(
-						`${config.url}/api/v3/episode/${serviceId}`,
-						{ headers: { "X-Api-Key": config.apiKey } },
-					);
-					targetId = epRes.data.seriesId; // Get the parent Series ID
+					const epRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
+						headers: { "X-Api-Key": config.apiKey },
+						timeout: 30000,
+					});
+					targetId = epRes.data.seriesId;
 					endpoint = "/api/v3/series";
+				} else if (service === "lidarr") {
+					endpoint = "/api/v1/album";
 				}
 
-				// 3. Get Item (Movie or Series) & Update
 				const itemRes = await axios.get(
 					`${config.url}${endpoint}/${targetId}`,
-					{ headers: { "X-Api-Key": config.apiKey } },
+					{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
 				);
 				const item = itemRes.data;
 
@@ -460,6 +386,7 @@ const app = new Elysia()
 					item.qualityProfileId = anyProfile.id;
 					await axios.put(`${config.url}${endpoint}/${item.id}`, item, {
 						headers: { "X-Api-Key": config.apiKey },
+						timeout: 30000,
 					});
 					actionsTaken = true;
 					logger.info(
@@ -476,15 +403,12 @@ const app = new Elysia()
 					`[SERVER] 🔄 [${service}] Removing blocking item from Queue...`,
 				);
 
-				// Get Queue
-				// Note: Lidarr uses v1, others v3. But queue endpoint is generally consistent in structure.
 				const apiVer = service === "lidarr" ? "v1" : "v3";
 				const queueRes = await axios.get(`${config.url}/api/${apiVer}/queue`, {
 					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
 				});
 
-				// Find item matching our Movie/Episode
-				// Radarr uses 'movieId', Sonarr uses 'episodeId', Lidarr uses 'albumId'
 				const idKey =
 					service === "radarr"
 						? "movieId"
@@ -492,19 +416,17 @@ const app = new Elysia()
 							? "episodeId"
 							: "albumId";
 
-				// Find ALL items in queue for this content (there might be multiple)
 				const blockingItems = queueRes.data.records.filter(
-					(q) => q[idKey] === serviceId,
+					(q) => Number(q[idKey]) === sid,
 				);
 
 				for (const item of blockingItems) {
 					try {
-						// Delete from Queue AND Client (blacklist=false usually preferred for manual swaps, but blacklist=true prevents re-grab)
-						// We use removeFromClient=true to stop the other download.
 						await axios.delete(
 							`${config.url}/api/${apiVer}/queue/${item.id}?removeFromClient=true&blocklist=true`,
 							{
 								headers: { "X-Api-Key": config.apiKey },
+								timeout: 30000,
 							},
 						);
 						logger.info(
@@ -545,7 +467,7 @@ const app = new Elysia()
 					t.Literal("sonarr"),
 					t.Literal("lidarr"),
 				]),
-				serviceId: t.String(),
+				serviceId: t.Union([t.String(), t.Number()]),
 				title: t.String(),
 				downloadUrl: t.String(),
 			}),
@@ -553,6 +475,70 @@ const app = new Elysia()
 			detail: {
 				summary: "Force Grab an Item with Fixes",
 				description: `Attempt to grab a movie/episode/album via Prowlarr. If the grab is rejected due to profile or queue issues, automatically attempt to fix those issues (switch to "Any" profile, remove blocking queue items) and retry the grab once. Returns the final result of the grab attempt along with any actions taken.`,
+				tags: ["*Arr Integration"],
+			},
+		},
+	)
+
+	.post(
+		"/api/v1/unmonitor",
+		async ({ body: { service, serviceId } }) => {
+			const config = SERVICES[service];
+			const sid = coerceNumericId(serviceId, "serviceId");
+
+			if (service === "radarr") {
+				const getRes = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
+				});
+				const movie = getRes.data;
+				movie.monitored = false;
+				await axios.put(`${config.url}/api/v3/movie/${sid}`, movie, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
+				});
+			} else if (service === "sonarr") {
+				const getRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
+				});
+				const episode = getRes.data;
+				episode.monitored = false;
+				await axios.put(`${config.url}/api/v3/episode/${sid}`, episode, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
+				});
+			} else if (service === "lidarr") {
+				const getRes = await axios.get(`${config.url}/api/v1/album/${sid}`, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
+				});
+				const album = getRes.data;
+				album.monitored = false;
+				await axios.put(`${config.url}/api/v1/album/${sid}`, album, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
+				});
+			}
+
+			deleteItem(`${service}-${sid}`);
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				service: t.Union([
+					t.Literal("radarr"),
+					t.Literal("sonarr"),
+					t.Literal("lidarr"),
+				]),
+				serviceId: t.Union([t.String(), t.Number()]),
+			}),
+			response: t.Object({ success: t.Boolean() }),
+			detail: {
+				summary: "Unmonitor an Item",
+				description:
+					"Stop monitoring a movie/episode/album in Radarr/Sonarr/Lidarr by setting monitored=false. This will remove it from the missing list and prevent future monitoring.",
 				tags: ["*Arr Integration"],
 			},
 		},
@@ -587,7 +573,7 @@ const app = new Elysia()
 			}),
 			response: t.Object({
 				success: t.Boolean(),
-				saved: t.Record(t.String(), t.String()),
+				saved: t.Record(t.String(), t.Any()),
 			}),
 			detail: {
 				summary: "Update a Setting",
@@ -607,7 +593,19 @@ const app = new Elysia()
 			return { success: true };
 		},
 		{
-			body: t.Record(t.String(), t.String()),
+			body: t.Object({
+				syncEnabled: t.Boolean(),
+				hunterEnabled: t.Boolean(),
+				syncInterval: t.Number(),
+				hunterInterval: t.Number(),
+				telegramApiId: t.Optional(t.String()),
+				telegramApiHash: t.Optional(t.String()),
+				pathMapDocker: t.Optional(t.String()),
+				pathMapRemote: t.Optional(t.String()),
+				telegram_temp_hash: t.Optional(t.String()),
+				telegram_temp_phone: t.Optional(t.String()),
+				telegram_session: t.Optional(t.String()),
+			}),
 			response: t.Object({ success: t.Boolean() }),
 			detail: {
 				summary: "Batch Update Settings",
@@ -734,6 +732,8 @@ const app = new Elysia()
 		"/api/v1/telegram/import",
 		async ({ body: { service, serviceId, channel, messageId, filename } }) => {
 			const config = SERVICES[service];
+			const sid = coerceNumericId(serviceId, "serviceId");
+
 			if (!config) {
 				return { success: false, error: "Invalid service" };
 			}
@@ -754,7 +754,9 @@ const app = new Elysia()
 			const commandName =
 				service === "radarr"
 					? "DownloadedMoviesScan"
-					: "DownloadedEpisodesScan";
+					: service === "sonarr"
+						? "DownloadedEpisodesScan"
+						: "DownloadedAlbumsScan";
 			const arrPath = translatePath(filePath);
 			logger.info(
 				`[SERVER] 📥 [Path Map] Local: ${filePath} -> Remote: ${arrPath}`,
@@ -766,7 +768,7 @@ const app = new Elysia()
 				importMode: "Move",
 			};
 
-			if (service === "radarr") commandPayload.movieId = serviceId;
+			if (service === "radarr") commandPayload.movieId = sid;
 
 			// Note for Sonarr: 'DownloadedEpisodesScan' does NOT accept 'episodeId'.
 			// It relies entirely on the filename containing "S01E01".
@@ -774,6 +776,7 @@ const app = new Elysia()
 			// and you will see it in Sonarr > Activity > Queue (Manual Import needed).
 			await axios.post(`${config.url}/api/v3/command`, commandPayload, {
 				headers: { "X-Api-Key": config.apiKey },
+				timeout: 30000,
 			});
 
 			return {
@@ -788,7 +791,7 @@ const app = new Elysia()
 					t.Literal("sonarr"),
 					t.Literal("lidarr"),
 				]),
-				serviceId: t.String(),
+				serviceId: t.Union([t.String(), t.Number()]),
 				channel: t.String(),
 				messageId: t.String(),
 				filename: t.String(),
@@ -884,6 +887,7 @@ const app = new Elysia()
 		"/api/v1/import/http",
 		async ({ body: { service, serviceId, url, filename } }) => {
 			const config = SERVICES[service];
+			const sid = coerceNumericId(serviceId, "serviceId");
 
 			logger.info(`[SERVER] 📥 [HTTP] Starting download: ${filename}`);
 			const { path: downloadPath } = await downloadHttpFile(url, filename);
@@ -904,10 +908,11 @@ const app = new Elysia()
 				importMode: "Move",
 			};
 
-			if (service === "radarr") commandPayload.movieId = serviceId;
+			if (service === "radarr") commandPayload.movieId = sid;
 
 			await axios.post(`${config.url}/api/v3/command`, commandPayload, {
 				headers: { "X-Api-Key": config.apiKey },
+				timeout: 30000,
 			});
 
 			return {
@@ -922,7 +927,7 @@ const app = new Elysia()
 					t.Literal("sonarr"),
 					t.Literal("lidarr"),
 				]),
-				serviceId: t.String(),
+				serviceId: t.Union([t.String(), t.Number()]),
 				url: t.String(),
 				filename: t.String(),
 			}),
@@ -946,11 +951,12 @@ const app = new Elysia()
 
 try {
 	app.listen(process.env.PORT || 5000);
-	logger.info("[SERVER] 📘 OpenAPI UI enabled at /openapi");
+	process.env.NODE_ENV === "development" &&
+		logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
 	logger.info(
-		`[SERVER] 🦊 Eziarr at ${app.server?.hostname}:${app.server?.port}`,
+		`[SERVER] Eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
 	);
 } catch (err) {
-	logger.error(`[SERVER] 💥 Failed to start server: ${err.toString()}`);
+	logger.error("[SERVER] 💥 Failed to start server: ", err);
 	process.exit(1);
 }
