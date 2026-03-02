@@ -9,9 +9,9 @@ import {
 	getAllIds,
 	getAllSettings,
 } from "./db";
-import { generalLogger as logger } from "./logger";
-import { hunterLogger } from "./logger";
-import { SERVICES, getPosterUrl } from "./utils";
+import { generalLogger as logger, hunterLogger } from "./logger";
+import { getPosterUrl } from "./utils";
+import { SERVICES, DEFAULT_SETTINGS, DOWNLOAD_DIR } from "./config";
 
 const syncMissingItems = async () => {
 	logger.info("[WORKER] 🔄 Syncing missing items...");
@@ -26,6 +26,7 @@ const syncMissingItems = async () => {
 				{
 					params: { pageSize: 100, sortKey: "releaseDate", sortDir: "desc" },
 					headers: { "X-Api-Key": SERVICES.radarr.apiKey },
+					timeout: 30000,
 				},
 			);
 			radarrRes.data.records.forEach((m) => {
@@ -43,7 +44,7 @@ const syncMissingItems = async () => {
 				});
 			});
 		} catch (err) {
-			logger.error(`[WORKER] Radarr Sync Error ${err.toString()}`);
+			logger.error("[WORKER] Radarr Sync Error :", err);
 		}
 
 		// 2. SONARR
@@ -58,6 +59,7 @@ const syncMissingItems = async () => {
 						includeSeries: true,
 					},
 					headers: { "X-Api-Key": SERVICES.sonarr.apiKey },
+					timeout: 30000,
 				},
 			);
 			sonarrRes.data.records.forEach((ep) => {
@@ -76,7 +78,7 @@ const syncMissingItems = async () => {
 				});
 			});
 		} catch (err) {
-			logger.error(`[WORKER] Sonarr Sync Error ${err.toString()}`);
+			logger.error("[WORKER] Sonarr Sync Error :", err);
 		}
 
 		// 3. LIDARR
@@ -91,6 +93,7 @@ const syncMissingItems = async () => {
 						sortDir: "desc",
 					},
 					headers: { "X-Api-Key": SERVICES.lidarr.apiKey },
+					timeout: 30000,
 				},
 			);
 			lidarrRes.data.records.forEach((album) => {
@@ -108,7 +111,7 @@ const syncMissingItems = async () => {
 				});
 			});
 		} catch (err) {
-			logger.error(`[WORKER] Lidarr Sync Error ${err.toString()}`);
+			logger.error("[WORKER] Lidarr Sync Error :", err);
 		}
 
 		// 4. CLEANUP (Soft Sync)
@@ -126,7 +129,7 @@ const syncMissingItems = async () => {
 
 		logger.info("[WORKER] ✅ Worker: Sync Complete");
 	} catch (err) {
-		logger.error(`[WORKER] Worker Sync Failed: ${err.toString()}`);
+		logger.error("[WORKER] Worker Sync Failed: :", err);
 	}
 };
 
@@ -158,12 +161,14 @@ const runHunter = async () => {
 	try {
 		await axios.post(`${serviceConfig.url}${endpoint}`, payload, {
 			headers: { "X-Api-Key": serviceConfig.apiKey },
+			timeout: 30000,
 		});
 		markAsSearched(item.id);
 		hunterLogger.info(`[WORKER] ✅ Hunter: Search started for ${item.title}`);
 	} catch (err) {
 		hunterLogger.error(
-			`[WORKER] ❌ Hunter: Failed to search ${item.title}: ${err.toString()}`,
+			`[WORKER] ❌ Hunter: Failed to search ${item.title}: `,
+			err,
 		);
 	}
 };
@@ -174,18 +179,25 @@ let hunterIntervalId = null;
 let currentConfig = null;
 
 const applySettings = async (settings) => {
+	const syncInterval = Number.parseInt(settings.syncInterval, 10);
+	const hunterInterval = Number.parseInt(settings.hunterInterval, 10);
+
 	const newConfig = {
-		syncEnabled: settings.syncEnabled ?? true,
-		hunterEnabled: settings.hunterEnabled ?? true,
-		syncInterval: parseInt(settings.syncInterval, 10) || 10,
-		hunterInterval: parseInt(settings.hunterInterval, 10) || 1,
+		syncEnabled: settings.syncEnabled ?? DEFAULT_SETTINGS.syncEnabled,
+		hunterEnabled: settings.hunterEnabled ?? DEFAULT_SETTINGS.hunterEnabled,
+		syncInterval: Number.isFinite(syncInterval)
+			? syncInterval
+			: DEFAULT_SETTINGS.syncInterval,
+		hunterInterval: Number.isFinite(hunterInterval)
+			? hunterInterval
+			: DEFAULT_SETTINGS.hunterInterval,
 	};
 
 	if (JSON.stringify(newConfig) === JSON.stringify(currentConfig)) {
 		return;
 	}
 
-	logger.info("[WORKER] 🔄 Settings changed. Reconfiguring worker...");
+	logger.warn("[WORKER] 🔄 Settings changed. Reconfiguring worker...");
 
 	if (syncIntervalId) {
 		clearInterval(syncIntervalId);
@@ -198,7 +210,7 @@ const applySettings = async (settings) => {
 	}
 
 	if (newConfig.syncEnabled) {
-		logger.info(`[WORKER] ⏰ Sync every ${newConfig.syncInterval}m`);
+		logger.info(`[WORKER] ⏰ Sync runs every ${newConfig.syncInterval}m`);
 		await syncMissingItems();
 		syncIntervalId = setInterval(
 			syncMissingItems,
@@ -209,7 +221,7 @@ const applySettings = async (settings) => {
 	}
 
 	if (newConfig.hunterEnabled) {
-		logger.info(`[WORKER] ⏰ Hunter every ${newConfig.hunterInterval}m`);
+		logger.info(`[WORKER] ⏰ Hunter runs every ${newConfig.hunterInterval}m`);
 		await runHunter();
 		hunterIntervalId = setInterval(runHunter, newConfig.hunterInterval * 60000);
 	} else {
@@ -224,12 +236,11 @@ const settingsWatcher = async () => {
 		const settings = await getAllSettings();
 		await applySettings(settings);
 	} catch (err) {
-		logger.error(`[WORKER] ⚠️ Failed to load settings: ${err.toString()}`);
+		logger.error("[WORKER] ⚠️ Failed to load settings: :", err);
 	}
 };
 
 const cleanupOldDownloads = () => {
-	const DOWNLOAD_DIR = path.resolve(process.cwd(), "downloads");
 	if (!fs.existsSync(DOWNLOAD_DIR)) return;
 
 	const MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -262,12 +273,15 @@ const cleanupOldDownloads = () => {
 			}
 		}
 	} catch (err) {
-		logger.error(`[WORKER] 🧹 Sweeper Error: ${err.toString()}`);
+		logger.error("[WORKER] 🧹 Sweeper Error: :", err);
 	}
 };
 
 const main = async () => {
 	logger.info("[WORKER] 🚀 Worker booting...");
+	if (!fs.existsSync(DOWNLOAD_DIR))
+		fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+	logger.info("[WORKER] 📁 Download directory initialized.");
 	await settingsWatcher();
 	setInterval(settingsWatcher, 10000);
 	logger.info("[WORKER] ✅ Worker started and settings watcher initialized.");
@@ -277,6 +291,6 @@ const main = async () => {
 };
 
 main().catch((err) => {
-	logger.error(`[WORKER] Worker failed to start: ${err.toString()}`);
+	logger.error("[WORKER] Worker failed to start: :", err);
 	process.exit(1);
 });
