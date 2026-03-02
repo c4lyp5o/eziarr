@@ -5,8 +5,6 @@ const IA_BASE = "https://archive.org/advancedsearch.php";
 
 export const searchInternetArchive = async (query) => {
 	try {
-		// Construct Lucene-style query
-		// title:(Matrix) AND mediaType:(movies) AND format:(MPEG4 OR Matroska OR H.264)
 		const q = `title:(${query}) AND mediaType:(movies) AND (format:MPEG4 OR format:Matroska OR format:h.264 OR format:Unknown)`;
 
 		const params = {
@@ -18,7 +16,7 @@ export const searchInternetArchive = async (query) => {
 			output: "json",
 		};
 
-		const res = await axios.get(IA_BASE, { params });
+		const res = await axios.get(IA_BASE, { params, timeout: 30000 });
 		const docs = res.data.response.docs;
 
 		// IA returns "Items" (Identifiers). Each Item has multiple files.
@@ -37,7 +35,7 @@ export const searchInternetArchive = async (query) => {
 			detailsUrl: `https://archive.org/details/${doc.identifier}`,
 		}));
 	} catch (err) {
-		logger.error(`IA Search Error: ${err.toString()}`);
+		logger.error("IA Search Error: ", err);
 		return [];
 	}
 };
@@ -45,12 +43,13 @@ export const searchInternetArchive = async (query) => {
 // Helper to get actual file links for a specific Item ID
 export const getArchiveFiles = async (identifier) => {
 	try {
-		const res = await axios.get(`https://archive.org/metadata/${identifier}`);
+		const res = await axios.get(`https://archive.org/metadata/${identifier}`, {
+			timeout: 30000,
+		});
 		const files = res.data.files;
 		const server = res.data.d1 || res.data.d2;
 		const dir = res.data.dir;
 
-		// Filter for video files
 		return files
 			.filter(
 				(f) =>
@@ -64,7 +63,6 @@ export const getArchiveFiles = async (identifier) => {
 				filename: f.name,
 				size: f.size,
 				format: f.format,
-				// Construct Direct Download Link
 				downloadUrl: `https://${server}${dir}/${f.name}`,
 			}));
 	} catch (err) {
