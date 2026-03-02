@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
+import { Landmark } from "lucide-react";
 
 import { useToast } from "../context/Toast";
+import { apiCall } from "../utils/apiCall";
+
+import { ListItem } from "./ListItem";
+import { Button } from "./Buttons";
+import { ui } from "../ui/styles";
 
 const InternetArchiveTab = ({ query, onGrab }) => {
 	const { toast } = useToast();
@@ -15,12 +21,11 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 	const handleSearchFromArchive = async () => {
 		try {
 			setIsLoading(true);
-			const res = await fetch("/api/v1/ia/search", {
+			setArchiveSearchResults([]);
+			const iaFiles = await apiCall("/api/v1/ia/search", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ query }),
+				body: { query },
 			});
-			const iaFiles = await res.json();
 			if (iaFiles.length === 0) {
 				toast.warning("No results found in Internet Archive");
 				return;
@@ -41,13 +46,12 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 
 		try {
 			setExpandingId(identifier);
-			const res = await fetch(`/api/v1/ia/files/${identifier}`);
-			const files = await res.json();
+			const files = await apiCall(`/api/v1/ia/files/${identifier}`);
 			setArchiveFiles((prev) => ({ ...prev, [identifier]: files }));
 		} catch (err) {
 			console.error("Internet Archive File Fetch Failed", err);
-      toast.error("Internet Archive File Fetch Failed");
-      setArchiveFiles((prev) => ({ ...prev, [identifier]: [] }));
+			toast.error("Internet Archive File Fetch Failed");
+			setArchiveFiles((prev) => ({ ...prev, [identifier]: [] }));
 		} finally {
 			setExpandingId(null);
 		}
@@ -69,70 +73,79 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 				</div>
 			)}
 
+			{!isLoading && archiveSearchResults.length === 0 && (
+				<div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-800 rounded-xl">
+					<Landmark size={32} className="mx-auto mb-3 opacity-20" />
+					<p>No results found in the Archive.</p>
+				</div>
+			)}
+
 			<div className="space-y-4">
 				{archiveSearchResults.map((item) => (
-					<div
-						key={item.id}
-						className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"
-					>
-						{/* Item Header */}
-						{/** biome-ignore lint/a11y/noStaticElementInteractions: later */}
-						{/** biome-ignore lint/a11y/useKeyWithClickEvents: later */}
+					<div key={item.id} className={ui.card}>
+						{/* ITEM HEADER */}
+						{/** biome-ignore lint/a11y/noStaticElementInteractions: <explanation> */}
+						{/** biome-ignore lint/a11y/useKeyWithClickEvents: <explanation> */}
 						<div
 							onClick={() => handleArchiveExpand(item.id)}
-							className="p-4 cursor-pointer hover:bg-gray-800 transition-colors flex justify-between items-center"
+							className="flex justify-between items-center cursor-pointer group"
 						>
 							<div>
-								<h4 className="font-bold text-gray-200">{item.title}</h4>
-								<p className="text-xs text-gray-500">
+								<h4 className="font-bold text-gray-200 group-hover:text-indigo-400 transition-colors">
+									{item.title}
+								</h4>
+								<p className="text-xs text-gray-500 mt-1">
 									{item.year || "Unknown Year"} • {item.downloads} downloads
 								</p>
 							</div>
 							{expandingId === item.id ? (
 								<div className="animate-spin w-4 h-4 border-2 border-yellow-500 rounded-full border-t-transparent" />
 							) : (
-								<div className="text-gray-500">▼</div>
+								<div
+									className={`text-gray-500 transition-transform ${archiveFiles[item.id] ? "rotate-180" : ""}`}
+								>
+									▼
+								</div>
 							)}
 						</div>
 
-						{/* Files List (Expanded) */}
+						{/* FILES LIST (Expanded) */}
 						{archiveFiles[item.id] && (
-							<div className="bg-black/50 border-t border-gray-800 p-2 space-y-1">
+							<div className="mt-4 pt-4 border-t border-gray-800 space-y-2 bg-black/10 rounded-lg">
 								{archiveFiles[item.id].length === 0 ? (
 									<p className="text-xs text-center text-gray-600 py-2">
 										No video files found.
 									</p>
 								) : (
-									archiveFiles[item.id].map((file, idx) => (
-										<div
-											// biome-ignore lint/suspicious/noArrayIndexKey: later
-											key={idx}
-											className="flex justify-between items-center p-2 rounded hover:bg-gray-800"
-										>
-											<div className="truncate text-xs text-gray-400 max-w-[70%]">
+									archiveFiles[item.id].map((file) => (
+										<ListItem key={file.downloadUrl}>
+											<div
+												className="truncate text-xs text-gray-300 max-w-[60%]"
+												title={file.filename}
+											>
 												{file.filename}
 											</div>
-											<div className="flex gap-3 items-center">
-												<span className="text-[10px] text-gray-600 uppercase">
+											<div className="flex gap-3 items-center shrink-0">
+												<span className="text-[10px] text-gray-500 font-mono uppercase bg-black px-2 py-1 rounded">
 													{file.format}
 												</span>
-												<button
-													type="button"
+												<Button
+													variant="success"
+													size="sm"
 													onClick={async (e) => {
 														e.stopPropagation();
 														setGrabbingId(file.downloadUrl);
 														await onGrab(file.downloadUrl, file.filename);
-															setGrabbingId(null);
+														setGrabbingId(null);
 													}}
 													disabled={grabbingId === file.downloadUrl}
-													className="text-xs bg-yellow-600/80 hover:bg-yellow-500 px-2 py-1 rounded text-white"
 												>
 													{grabbingId === file.downloadUrl
 														? "Grabbing..."
 														: "Grab"}
-												</button>
+												</Button>
 											</div>
-										</div>
+										</ListItem>
 									))
 								)}
 							</div>

@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
-import { Send, FileVideo } from "lucide-react";
+import { Send, FileVideo, Loader as SpinnerSmall } from "lucide-react";
 
 import { useToast } from "../context/Toast";
+import { apiCall } from "../utils/apiCall";
+import { formatSize } from "../utils/formatSize";
+
+import { Panel } from "./Panel";
+import { Button } from "./Buttons";
+import { ListItem } from "./ListItem";
+import { ui } from "../ui/styles";
 
 const TelegramTab = ({ service, serviceId, query, mutate }) => {
 	const { toast } = useToast();
@@ -27,17 +34,12 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 	const handleCheckTelegramStatus = async () => {
 		try {
 			setCheckingTelegramAuth(true);
-			const res = await fetch("/api/v1/telegram/status");
-			const userDetails = await res.json();
+			const userDetails = await apiCall("/api/v1/telegram/status");
 			setTelegramConnected(userDetails.connected);
 			if (userDetails.channels) {
 				setAvailableChannels(userDetails.channels);
 				if (!selectedChannel && userDetails.channels.length > 0) {
-					setSelectedChannel(
-						userDetails.channels[0].username
-							? `@${userDetails.channels[0].username}`
-							: userDetails.channels[0].title,
-					);
+					setSelectedChannel(userDetails.channels[0].id.toString());
 				}
 			}
 		} catch (err) {
@@ -55,10 +57,9 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 
 	const handleSendCodeTelegram = async () => {
 		try {
-			await fetch("/api/v1/telegram/auth/send-code", {
+			await apiCall("/api/v1/telegram/auth/send-code", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ phoneNumber: telegramPhoneNumber }),
+				body: { phoneNumber: telegramPhoneNumber },
 			});
 			toast.success("Telegram Code Sent");
 			setTelegramAuthState("CODE");
@@ -70,21 +71,18 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 
 	const handleLoginTelegram = async () => {
 		try {
-			const res = await fetch("/api/v1/telegram/auth/login", {
+			const res = await apiCall("/api/v1/telegram/auth/login", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
+				body: {
 					code: telegramCode,
 					password: telegramPassword,
-				}),
+				},
 			});
-			const data = await res.json();
-
-			if (data.success) {
+			if (res.success) {
 				toast.success("Telegram Login Successful");
 				setTelegramConnected(true);
 				handleCheckTelegramStatus();
-			} else if (data.error === "2FA_NEEDED") {
+			} else if (res.error === "2FA_NEEDED") {
 				toast.info("2FA Required For Telegram Login");
 				setTelegramAuthState("PASSWORD");
 			} else {
@@ -102,12 +100,10 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 		try {
 			setIsLoading(true);
 			setTelegramSearchResults([]);
-			const res = await fetch("/api/v1/telegram/search", {
+			const telegramFiles = await apiCall("/api/v1/telegram/search", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ channel: selectedChannel, query }),
+				body: { channel: selectedChannel, query },
 			});
-			const telegramFiles = await res.json();
 			if (telegramFiles.length === 0) {
 				toast.warning("No results found in Telegram");
 				return;
@@ -126,22 +122,20 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 	const handleGrabFromTelegram = async (msg) => {
 		try {
 			setGrabbingId(msg.id);
-			const res = await fetch("/api/v1/telegram/import", {
+			const res = await apiCall("/api/v1/telegram/import", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
+				body: {
 					service,
 					serviceId,
 					channel: selectedChannel,
 					messageId: msg.id,
 					filename: msg.filename,
-				}),
+				},
 			});
-			const data = await res.json();
-			if (data.success) {
-        setTimeout(() => {
-          mutate();
-        }, 5000);
+			if (res.success) {
+				setTimeout(() => {
+					mutate();
+				}, 5000);
 				toast.success("Grab From Telegram Started");
 			} else {
 				toast.error("Grab From Telegram Failed");
@@ -162,12 +156,15 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 	return (
 		<div className="p-6">
 			{checkingTelegramAuth ? (
-				<div className="flex justify-center p-12">
-					<div className="animate-spin w-8 h-8 border-2 border-blue-500 rounded-full border-t-transparent"></div>
+				<div className="w-full mb-4 py-3 bg-blue-600/10 border border-blue-500/30 rounded-lg flex items-center justify-center gap-3 backdrop-blur-sm animate-pulse">
+					<div className="w-4 h-4 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+					<span className="text-sm font-bold text-blue-400 tracking-wide">
+						Connecting to Telegram...
+					</span>
 				</div>
 			) : !telegramConnected ? (
 				// --- LOGIN FORM ---
-				<div className="max-w-sm mx-auto bg-gray-900 p-8 rounded-xl border border-gray-800 text-center">
+				<Panel className="max-w-sm mx-auto p-8 text-center">
 					<div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-400">
 						<Send size={24} />
 					</div>
@@ -181,15 +178,15 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 								value={telegramPhoneNumber}
 								onChange={(e) => setTelegramPhoneNumber(e.target.value)}
 								placeholder="+1234567890"
-								className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white text-center"
+								className={`${ui.input} text-center py-3`}
 							/>
-							<button
-								type="button"
+							<Button
+								variant="primary"
+								className="w-full"
 								onClick={handleSendCodeTelegram}
-								className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg font-bold"
 							>
 								Send Code
-							</button>
+							</Button>
 						</div>
 					)}
 
@@ -199,15 +196,15 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 								value={telegramCode}
 								onChange={(e) => setTelegramCode(e.target.value)}
 								placeholder="12345"
-								className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white text-center tracking-widest text-lg"
+								className={`${ui.input} text-center py-3`}
 							/>
-							<button
-								type="button"
+							<Button
+								variant="primary"
+								className="w-full"
 								onClick={handleLoginTelegram}
-								className="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg font-bold"
 							>
 								Verify Code
-							</button>
+							</Button>
 						</div>
 					)}
 
@@ -219,79 +216,77 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 								value={telegramPassword}
 								onChange={(e) => setTelegramPassword(e.target.value)}
 								placeholder="Cloud Password"
-								className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white text-center"
+								className={`${ui.input} text-center py-3`}
 							/>
-							<button
-								type="button"
+							<Button
+								variant="primary"
+								className="w-full"
 								onClick={handleLoginTelegram}
-								className="w-full bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg font-bold"
 							>
 								Unlock
-							</button>
+							</Button>
 						</div>
 					)}
-				</div>
+				</Panel>
 			) : (
 				// --- CONNECTED: SEARCH UI ---
 				<>
-					<div className="flex gap-3 mb-6 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
-						<div className="flex-1">
-							<label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-								Target Channel
-								<div className="relative">
-									<select
-										value={selectedChannel}
-										onChange={(e) => setSelectedChannel(e.target.value)}
-										className="w-full bg-black border border-gray-700 rounded-lg py-2 pl-3 pr-8 text-white text-sm appearance-none focus:outline-none focus:border-blue-500 transition-all"
-									>
-										<option value="" disabled>
-											Select a channel...
+					<Panel className="p-4 mb-6">
+						{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+						<label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+							Target Channel
+						</label>
+						<div className="flex gap-2 items-center">
+							<div className="relative flex-1">
+								<select
+									value={selectedChannel}
+									onChange={(e) => setSelectedChannel(e.target.value)}
+									className={`${ui.input} appearance-none pr-8 focus:border-blue-500`}
+								>
+									<option value="" disabled>
+										Select a channel...
+									</option>
+									{availableChannels.map((c) => (
+										// CHANGE: Use c.id as the value.
+										// The backend sends 'id' as a string to avoid BigInt issues in JSON.
+										<option key={c.id} value={c.id}>
+											{c.title} - {c.username ? `(@${c.username})` : ""} -{" "}
+											{c.id}
 										</option>
-										{availableChannels.map((c) => (
-											// CHANGE: Use c.id as the value.
-											// The backend sends 'id' as a string to avoid BigInt issues in JSON.
-											<option key={c.id} value={c.id}>
-												{c.title} - {c.username ? `(@${c.username})` : ""} -{" "}
-												{c.id}
-											</option>
-										))}
-									</select>
-									{/* Dropdown Arrow Icon */}
-									<div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
-										<svg
-											className="w-4 h-4"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<title>Arrow Down</title>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth="2"
-												d="M19 9l-7 7-7-7"
-											></path>
-										</svg>
-									</div>
+									))}
+								</select>
+								{/* Dropdown Arrow Icon */}
+								<div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+									<svg
+										className="w-4 h-4"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<title>Arrow Down</title>
+										<path
+											strokeLinecap="round"
+											strokeLinejoin="round"
+											strokeWidth="2"
+											d="M19 9l-7 7-7-7"
+										></path>
+									</svg>
 								</div>
-							</label>
-						</div>
-						<div className="flex items-end">
-							<button
-								type="button"
+							</div>
+							<Button
+								variant="primary"
 								onClick={handleSearchFromTelegram}
 								disabled={isLoading}
-								className="h-9.5 px-6 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-sm flex items-center gap-2"
 							>
 								{isLoading ? (
-									<div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+									<SpinnerSmall className="animate-spin" />
 								) : (
 									<Send size={16} />
 								)}
 								Search
-							</button>
+							</Button>
 						</div>
-					</div>
+					</Panel>
 
 					<div className="space-y-3">
 						{telegramSearchResults.length === 0 && !isLoading && (
@@ -301,39 +296,37 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 							</div>
 						)}
 
-						{telegramSearchResults.map((msg) => (
-							<div
-								key={msg.id}
-								className="flex items-center justify-between bg-gray-800/40 border border-gray-700/50 p-4 rounded-xl"
-							>
-								<div className="flex items-center gap-4 overflow-hidden">
-									<div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 text-blue-400">
-										<FileVideo size={20} />
-									</div>
-									<div className="min-w-0">
-										<h4 className="text-sm font-medium text-white truncate pr-4">
-											{msg.filename}
-										</h4>
-										<div className="flex gap-3 text-xs text-gray-400 mt-1">
-											<span>{formatSize(msg.size)}</span>
-											<span>•</span>
-											<span>
-												{new Date(msg.date * 1000).toLocaleDateString()}
-											</span>
+						<div className="space-y-2">
+							{telegramSearchResults.map((msg) => (
+								<ListItem key={msg.id}>
+									<div className="flex items-center gap-4 overflow-hidden">
+										<div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 text-blue-400">
+											<FileVideo size={20} />
+										</div>
+										<div className="min-w-0">
+											<h4 className="text-sm font-medium text-white truncate pr-4">
+												{msg.filename}
+											</h4>
+											<div className="flex gap-3 text-xs text-gray-400 mt-1">
+												<span>{formatSize(msg.size)}</span>
+												<span>•</span>
+												<span>
+													{new Date(msg.date * 1000).toLocaleDateString()}
+												</span>
+											</div>
 										</div>
 									</div>
-								</div>
-
-								<button
-									type="button"
-									onClick={() => handleGrabFromTelegram(msg)}
-									disabled={grabbingId === msg.id}
-									className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-bold disabled:opacity-50"
-								>
-									{grabbingId === msg.id ? "Grabbing..." : "Grab"}
-								</button>
-							</div>
-						))}
+									<Button
+										variant="success"
+										size="sm"
+										onClick={() => handleGrabFromTelegram(msg)}
+										disabled={grabbingId === msg.id}
+									>
+										{grabbingId === msg.id ? "Grabbing..." : "Grab"}
+									</Button>
+								</ListItem>
+							))}
+						</div>
 					</div>
 				</>
 			)}

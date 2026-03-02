@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 
 import { useToast } from "../context/Toast";
+import { apiCall } from "../utils/apiCall";
+
+import { Button } from "./Buttons";
+import { ui } from "../ui/styles";
 
 const SettingsModal = ({ isOpen, onClose }) => {
 	const { toast } = useToast();
@@ -34,9 +38,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
 	const fetchSettings = async () => {
 		try {
-			const res = await fetch("/api/v1/settings");
-			const data = await res.json();
-			setSettings((prev) => ({ ...prev, ...data }));
+			const res = await apiCall("/api/v1/settings");
+			setSettings((prev) => ({ ...prev, ...res }));
 		} catch (err) {
 			console.error("Failed to load settings", err);
 			toast.error("Failed to load settings");
@@ -46,25 +49,17 @@ const SettingsModal = ({ isOpen, onClose }) => {
 	const handleSave = async () => {
 		setLoading(true);
 		try {
-			const payload = {
-				...settings,
-				syncEnabled: Boolean(settings.syncEnabled),
-				hunterEnabled: Boolean(settings.hunterEnabled),
-				syncInterval: Math.max(1, Number(settings.syncInterval) || 1),
-				hunterInterval: Math.max(1, Number(settings.hunterInterval) || 1),
-			};
-
-			const res = await fetch("/api/v1/settings/batch", {
+			await apiCall("/api/v1/settings/batch", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
+				body: {
+					...settings,
+					syncEnabled: Boolean(settings.syncEnabled),
+					hunterEnabled: Boolean(settings.hunterEnabled),
+					syncInterval: Math.max(1, Number(settings.syncInterval) || 1),
+					hunterInterval: Math.max(1, Number(settings.hunterInterval) || 1),
+				},
 			});
-
-			if (res.ok) {
-				toast.success("Settings saved!");
-			} else {
-				toast.error("Failed to save settings");
-			}
+			toast.success("Settings saved!");
 		} catch (err) {
 			console.error("Failed to save settings", err);
 			toast.error("Failed to save settings");
@@ -88,13 +83,9 @@ const SettingsModal = ({ isOpen, onClose }) => {
 					<h2 className="text-xl font-bold text-white flex items-center gap-2">
 						<SettingsIcon className="text-gray-400" size={20} /> App Settings
 					</h2>
-					<button
-						type="button"
-						onClick={onClose}
-						className="p-2 hover:bg-gray-800 rounded-full text-gray-400 transition-colors"
-					>
+					<Button variant="icon" size="sm" onClick={onClose}>
 						<X size={20} />
-					</button>
+					</Button>
 				</div>
 
 				{/* CONTENT */}
@@ -104,7 +95,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
 						<h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider mb-4 flex items-center gap-2">
 							<Server size={16} /> Automation Intervals
 						</h3>
-						<div className="grid grid-cols-2 gap-4">
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 							{/* SYNC CARD */}
 							<div
 								className={`bg-gray-900/50 p-4 rounded-xl border border-gray-800 transition-all ${!settings.syncEnabled ? "opacity-60 grayscale-50" : ""}`}
@@ -131,18 +122,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
 										/>
 									</button>
 								</div>
+								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
 								<label className="block text-xs text-gray-400">
 									Interval (Minutes)
-									<input
-										type="number"
-										name="syncInterval"
-										value={settings.syncInterval}
-										onChange={handleChange}
-										disabled={!settings.syncEnabled}
-										min="1"
-										className="w-full bg-black border border-gray-700 rounded-lg p-2 text-white text-sm mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
-									/>
 								</label>
+								<input
+									type="number"
+									name="syncInterval"
+									value={settings.syncInterval}
+									onChange={handleChange}
+									disabled={!settings.syncEnabled}
+									min="1"
+									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+								/>
 							</div>
 
 							{/* HUNTER CARD */}
@@ -175,18 +167,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
 										/>
 									</button>
 								</div>
+								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
 								<label className="block text-xs text-gray-400">
 									Interval (Minutes)
-									<input
-										type="number"
-										name="hunterInterval"
-										value={settings.hunterInterval}
-										onChange={handleChange}
-										disabled={!settings.hunterEnabled}
-										min="1"
-										className="w-full bg-black border border-gray-700 rounded-lg p-2 text-white text-sm mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
-									/>
 								</label>
+								<input
+									type="number"
+									name="hunterInterval"
+									value={settings.hunterInterval}
+									onChange={handleChange}
+									disabled={!settings.hunterEnabled}
+									min="1"
+									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+								/>
 							</div>
 						</div>
 					</section>
@@ -198,32 +191,30 @@ const SettingsModal = ({ isOpen, onClose }) => {
 						</h3>
 						<div className="space-y-3 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
 							<div>
-								<label className="block text-xs text-gray-400">
-									API ID
-									<input
-										type="text"
-										name="telegramApiId"
-										value={settings.telegramApiId}
-										onChange={handleChange}
-										placeholder="e.g. 12345678"
-										className="w-full bg-black border border-gray-700 rounded-lg p-2 text-white text-sm mt-1"
-									/>
-								</label>
+								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+								<label className="block text-xs text-gray-400">API ID</label>
+								<input
+									type="text"
+									name="telegramApiId"
+									value={settings.telegramApiId}
+									onChange={handleChange}
+									placeholder="e.g. 12345678"
+									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+								/>
 							</div>
 							<div>
-								<label className="block text-xs text-gray-400">
-									API Hash
-									<input
-										type="password"
-										name="telegramApiHash"
-										value={settings.telegramApiHash}
-										onChange={handleChange}
-										placeholder="Your 32-char hash"
-										className="w-full bg-black border border-gray-700 rounded-lg p-2 text-white text-sm mt-1"
-									/>
-								</label>
+								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+								<label className="block text-xs text-gray-400">API Hash</label>
+								<input
+									type="password"
+									name="telegramApiHash"
+									value={settings.telegramApiHash}
+									onChange={handleChange}
+									placeholder="Your 32-char hash"
+									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+								/>
 							</div>
-							<p className="text-[10px] text-gray-500 mt-2">
+							<p className="text-[10px] text-gray-500">
 								Get these from my.telegram.org. Restart the backend after
 								changing these to take effect.
 							</p>
@@ -237,32 +228,34 @@ const SettingsModal = ({ isOpen, onClose }) => {
 						</h3>
 						<div className="space-y-3 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
 							<div>
+								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
 								<label className="block text-xs text-gray-400">
 									Eziarr Local Path (Docker Prefix)
-									<input
-										type="text"
-										name="pathMapDocker"
-										value={settings.pathMapDocker}
-										onChange={handleChange}
-										placeholder="/app/downloads"
-										className="w-full bg-black border border-gray-700 rounded-lg p-2 text-white text-sm mt-1"
-									/>
 								</label>
+								<input
+									type="text"
+									name="pathMapDocker"
+									value={settings.pathMapDocker}
+									onChange={handleChange}
+									placeholder="/app/downloads"
+									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+								/>
 							</div>
 							<div>
+								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
 								<label className="block text-xs text-gray-400">
 									*Arr Remote Path (Host Prefix)
-									<input
-										type="text"
-										name="pathMapRemote"
-										value={settings.pathMapRemote}
-										onChange={handleChange}
-										placeholder="C:\Imports"
-										className="w-full bg-black border border-gray-700 rounded-lg p-2 text-white text-sm mt-1"
-									/>
 								</label>
+								<input
+									type="text"
+									name="pathMapRemote"
+									value={settings.pathMapRemote}
+									onChange={handleChange}
+									placeholder="C:\Imports"
+									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+								/>
 							</div>
-							<p className="text-[10px] text-gray-500 mt-2">
+							<p className="text-[10px] text-gray-500">
 								Leave blank if Eziarr and *Arr apps are on the same
 								machine/filesystem.
 							</p>
