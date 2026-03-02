@@ -1,25 +1,18 @@
+import fs from "node:fs";
 import path from "node:path";
+import { lookup } from "node:dns/promises";
+import net from "node:net";
 import axios from "axios";
 import { getSetting } from "./db";
 import { generalLogger as logger } from "./logger";
+import { SERVICES, DOWNLOAD_DIR } from "./config";
 
-export const SERVICES = {
-	sonarr: {
-		url: process.env.SONARR_URL || "http://localhost:8989",
-		apiKey: process.env.SONARR_API_KEY || "",
-	},
-	radarr: {
-		url: process.env.RADARR_URL || "http://localhost:7878",
-		apiKey: process.env.RADARR_API_KEY || "",
-	},
-	lidarr: {
-		url: process.env.LIDARR_URL || "http://localhost:8686",
-		apiKey: process.env.LIDARR_API_KEY || "",
-	},
-	prowlarr: {
-		url: process.env.PROWLARR_URL || "http://localhost:9696",
-		apiKey: process.env.PROWLARR_API_KEY || "",
-	},
+export const coerceNumericId = (value, fieldName = "id") => {
+	const n = typeof value === "number" ? value : Number(value);
+	if (!Number.isFinite(n)) {
+		throw new Error(`${fieldName} must be a valid number`);
+	}
+	return n;
 };
 
 export const getPosterUrl = (images = [], serviceKey, coverType) => {
@@ -41,31 +34,30 @@ export const fetchQueue = async (serviceName, idKey) => {
 
 		const res = await axios.get(`${conf.url}/api/${apiVer}/queue`, {
 			headers: { "X-Api-Key": conf.apiKey },
+			timeout: 30000,
 		});
 
 		return res.data.records
-			.filter((item) => item.status !== "completed")
+			.filter((item) => !["completed", "warning"].includes(item.status))
 			.map((item) => ({
-				serviceId: item[idKey], // movieId, episodeId, or albumId
 				service: serviceName,
+				serviceId: item[idKey], // movieId, episodeId, or albumId
 				status: item.status,
 				trackStatus: item.trackedDownloadStatus,
-				quality: item.quality?.quality?.name,
-				timeleft: item.timeleft, // '00:05:30'
-				indexer: item.indexer,
 				title: item.title,
+				quality: item.quality?.quality?.name,
+				indexer: item.indexer,
+				timeleft: item.timeleft, // '00:05:30'
 			}));
 	} catch (err) {
-		logger.error(
-			`[UTILS] Failed to fetch ${serviceName} queue: ${err.toString()}`,
-		);
+		logger.error(`[UTILS] Failed to fetch ${serviceName} queue: `, err);
 		return [];
 	}
 };
 
 export const translatePath = (localPath) => {
-	const dockerPrefix = getSetting("PATH_MAP_DOCKER", "");
-	const remotePrefix = getSetting("PATH_MAP_REMOTE", "");
+	const dockerPrefix = getSetting("pathMapDocker", "");
+	const remotePrefix = getSetting("pathMapRemote", "");
 
 	let finalPath = localPath;
 
@@ -87,4 +79,130 @@ export const translatePath = (localPath) => {
 	}
 
 	return finalPath;
+};
+
+const isPrivateIpv4 = (ip) => {
+	// ip is validated IPv4 string
+	const [a, b] = ip.split(".").map((x) => Number.parseInt(x, 10));
+
+	// 0.0.0.0/8 (includes 0.0.0.0)
+	if (a === 0) return true;
+
+	// 10.0.0.0/8
+	if (a === 10) return true;
+
+	// 127.0.0.0/8 (loopback)
+	if (a === 127) return true;
+
+	// 169.254.0.0/16 (link-local, includes cloud metadata hops sometimes)
+	if (a === 169 && b === 254) return true;
+
+	// 172.16.0.0/12
+	if (a === 172 && b >= 16 && b <= 31) return true;
+
+	// 192.168.0.0/16
+	if (a === 192 && b === 168) return true;
+
+	// 100.64.0.0/10 (carrier-grade NAT)
+	if (a === 100 && b >= 64 && b <= 127) return true;
+
+	return false;
+};
+
+const isPrivateIpv6 = (ip) => {
+	const normalized = ip.toLowerCase();
+
+	// :: / ::1
+	if (normalized === "::" || normalized === "::1") return true;
+
+	// fc00::/7 (unique local addresses)
+	if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+
+	// fe80::/10 (link-local unicast)
+	if (normalized.startsWith("fe8") || normalized.startsWith("fe9")) return true;
+	if (normalized.startsWith("fea") || normalized.startsWith("feb")) return true;
+
+	// ::ffff:127.0.0.1 etc (IPv4-mapped IPv6) — treat as suspicious
+	if (normalized.startsWith("::ffff:")) return true;
+
+	return false;
+};
+
+const isIpDisallowed = (ip) => {
+	const family = net.isIP(ip);
+
+	if (family === 4) return isPrivateIpv4(ip);
+	if (family === 6) return isPrivateIpv6(ip);
+
+	// not an IP string
+	return true;
+};
+
+export const isSafeUrl = async (urlString) => {
+	let url;
+	try {
+		url = new URL(urlString);
+	} catch (err) {
+		logger.warn(`Invalid URL provided: ${urlString}. Error: `, err);
+		return false;
+	}
+
+	// Protocol allowlist
+	if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+
+	// Block obvious local hostnames early (even before DNS)
+	const hostname = url.hostname.toLowerCase();
+	if (
+		hostname === "localhost" ||
+		hostname === "localhost." ||
+		hostname.endsWith(".localhost")
+	) {
+		return false;
+	}
+
+	// Optional: restrict ports (SSRF often targets internal admin ports)
+	// If you want this restriction, uncomment:
+	// const port = url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80;
+	// if (![80, 443].includes(port)) return false;
+
+	// If the hostname is already an IP literal, validate directly
+	if (net.isIP(hostname)) {
+		return !isIpDisallowed(hostname);
+	}
+
+	// Resolve DNS and ensure none of the results point to disallowed ranges
+	// Use { all: true } so we can check every A/AAAA record.
+	try {
+		const results = await lookup(hostname, { all: true, verbatim: true });
+
+		// If DNS returns nothing, treat as unsafe
+		if (!results?.length) return false;
+
+		for (const r of results) {
+			if (isIpDisallowed(r.address)) {
+				logger.warn(
+					`[SSRF] Blocked URL ${urlString} because ${hostname} resolved to disallowed IP ${r.address}`,
+				);
+				return false;
+			}
+		}
+
+		return true;
+	} catch (err) {
+		logger.warn(
+			`[SSRF] DNS lookup failed for ${hostname} (${urlString}): `,
+			err,
+		);
+		return false;
+	}
+};
+
+export const prepareFileDownload = (filename) => {
+	const safeFilename = filename.replace(/[^a-z0-9.\-_]/gi, "_");
+	const outputDir = path.join(DOWNLOAD_DIR, safeFilename.split(".")[0]);
+	const outputPath = path.join(outputDir, safeFilename);
+
+	if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+	return { outputDir, outputPath };
 };
