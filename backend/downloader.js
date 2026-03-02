@@ -1,21 +1,13 @@
 import axios from "axios";
 import fs from "node:fs";
-import path from "node:path";
+import { isSafeUrl, prepareFileDownload } from "./utils";
 import { generalLogger as logger } from "./logger";
 
-const DOWNLOAD_DIR = path.resolve(process.cwd(), "downloads");
-if (!fs.existsSync(DOWNLOAD_DIR))
-	fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
-
 export const downloadHttpFile = async (url, filename) => {
-	const safeFilename = filename.replace(/[^a-z0-9.\-_]/gi, "_");
+	if (!(await isSafeUrl(url)))
+		throw new Error("Invalid or unsafe URL provided.");
 
-	const folderName =
-		safeFilename.split(".").slice(0, -1).join(".") || "Unknown";
-	const outputDir = path.join(DOWNLOAD_DIR, folderName);
-	const outputPath = path.join(outputDir, safeFilename);
-
-	if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+	const { outputDir, outputPath } = prepareFileDownload(filename);
 
 	logger.info(`[DOWNLOADER] 📥 Starting HTTP Download: ${url}`);
 
