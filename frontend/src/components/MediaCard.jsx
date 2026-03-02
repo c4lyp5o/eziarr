@@ -78,7 +78,7 @@ const DownloadStatus = ({ queueItem }) => {
 			</div>
 
 			<div className="text-xs text-gray-400 flex justify-between">
-				<span>{queueItem.quality}</span>
+				<span>{queueItem.quality || "Unknown"}</span>
 				{/* <span className="truncate max-w-25">{queueItem.indexer}</span> */}
 			</div>
 		</div>
