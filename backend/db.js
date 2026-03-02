@@ -1,18 +1,8 @@
 import { Database } from "bun:sqlite";
+import { DEFAULT_SETTINGS } from "./config";
 import { generalLogger as logger } from "./logger";
 
 const db = new Database("media.sqlite");
-
-const DEFAULT_SETTINGS = {
-	syncEnabled: true, // Enable or disable the worker sync
-	hunterEnabled: true, // Enable or disable the Prowlarr hunter
-	syncInterval: 10, // Minutes between *Arr missing syncs
-	hunterInterval: 15, // Minutes between automated Prowlarr searches
-	telegramApiId: "", // Your my.telegram.org App ID
-	telegramApiHash: "", // Your my.telegram.org App Hash
-	pathMapDocker: "", // e.g., /app/downloads
-	pathMapRemote: "", // e.g., C:\Imports
-};
 
 // Initialize Table
 try {
@@ -38,7 +28,7 @@ try {
   )
 `);
 } catch (err) {
-	logger.error(`[DB] ❌ Database Initialization Error: ${err.message}`);
+	logger.error("[DB] ❌ Database Initialization Error: ", err);
 	process.exit(1);
 }
 
@@ -57,14 +47,13 @@ const initDefaultSettings = () => {
 };
 
 export const getAllIds = () => {
-	// Returns an array of strings: ['radarr-10', 'sonarr-25', ...]
 	const res = db.query("SELECT id FROM missing_items").all();
 	return res.map((row) => row.id);
 };
 
 export const getItems = () => {
 	return db
-		.query("SELECT * FROM missing_items ORDER BY release_date DESC")
+		.query("SELECT * FROM missing_items ORDER BY release_date ASC")
 		.all();
 };
 
@@ -106,7 +95,6 @@ export const getNextItemToSearch = () => {
 	// 86400000 ms = 24 hours
 	const searchCutoff = Date.now() - 86400000;
 
-	// Get current time in ISO format (YYYY-MM-DD...) to match string dates in DB
 	const now = new Date().toISOString();
 
 	return db
@@ -138,14 +126,14 @@ export const getSetting = (key, defaultValue = null) => {
 		return JSON.parse(result.value);
 	} catch (err) {
 		logger.warn(
-			`[DB] ⚠️ Failed to parse JSON for setting '${key}'. Using raw value. Error: ${err.toString()}`,
+			`[DB] ⚠️ Failed to parse JSON for setting '${key}'. Using raw value. Error: `,
+			err,
 		);
 		return result.value;
 	}
 };
 
 export const setSetting = (key, value) => {
-	// Store everything as a JSON string to preserve types (bool, number, object)
 	const query = db.query(`
     INSERT INTO settings (key, value) VALUES ($key, $value)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
@@ -158,13 +146,13 @@ export const setSetting = (key, value) => {
 
 export const getAllSettings = () => {
 	const rows = db.query("SELECT * FROM settings").all();
-	// Convert rows [{key: "a", value: "1"}] -> Object { a: 1 }
 	return rows.reduce((acc, row) => {
 		try {
 			acc[row.key] = JSON.parse(row.value);
 		} catch (err) {
 			logger.warn(
-				`[DB] ⚠️ Failed to parse JSON for setting '${row.key}'. Using raw value. Error: ${err.toString()}`,
+				`[DB] ⚠️ Failed to parse JSON for setting '${row.key}'. Using raw value. Error: `,
+				err,
 			);
 			acc[row.key] = row.value;
 		}
