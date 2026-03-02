@@ -11,15 +11,20 @@ import {
 } from "lucide-react";
 import useSWR from "swr";
 
-import { useToast } from "./context/Toast";
+import { useToast } from "./context/Toast.jsx";
+import { apiCall } from "./utils/apiCall.js";
 
 import MediaCard from "./components/MediaCard.jsx";
 import ResultsModal from "./components/ResultsModal.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import ErrorScreen from "./components/ErrorScreen.jsx";
-import { FilterButton } from "./components/Buttons.jsx";
+import { FilterButton, Button } from "./components/Buttons.jsx";
 
-const fetcher = (url) => fetch(url).then((res) => res.json());
+const fetcher = async (url) => {
+	const res = await fetch(url);
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	return res.json();
+};
 
 function App() {
 	const { toast } = useToast();
@@ -35,16 +40,19 @@ function App() {
 	const { data, error, isLoading, mutate } = useSWR(
 		"/api/v1/missing",
 		fetcher,
-		{ refreshInterval: 10000 },
+		{
+			refreshInterval: 10000,
+			dedupingInterval: 5000,
+			revalidateOnFocus: false,
+		},
 	);
 
 	const handleTriggerSearch = async (service, id, itemId) => {
 		setSearchingId(itemId);
 		try {
-			await fetch("/api/v1/search", {
+			await apiCall("/api/v1/search", {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ service, id }),
+				body: { service, id },
 			});
 			toast.success(`Search Triggered for ${service} | ${id}`);
 			setTimeout(() => {
@@ -59,10 +67,18 @@ function App() {
 	};
 
 	const handleOpenDeepSearch = (item) => {
-		// Use seriesTitle for Sonarr if available to search for the SHOW, not just the episode string
-		// Or construct a specific search query like "Show Name S01E01"
-		const query = item.title;
-		// Clean up title (optional, e.g. remove " - S01E01 - Episode Name" if searching whole show)
+		let query = item.title;
+
+		// Clean up TV Show queries for better indexer results
+		if (item.service === "sonarr" && item.seriesTitle) {
+			// Find the SxxExx pattern in the title (e.g., "S01E01")
+			const match = item.title.match(/S\d+E\d+/i);
+			const seasonEpCode = match ? match[0] : "";
+
+			// Combine cleanly: "Show Name S01E01"
+			query = `${item.seriesTitle} ${seasonEpCode}`.trim();
+		}
+
 		setModalData({
 			service: item.service,
 			serviceId: item.serviceId,
@@ -74,7 +90,9 @@ function App() {
 
 	const handleGetQueueItem = (item) => {
 		return (data?.queue || []).find(
-			(q) => q.service === item.service && q.serviceId === item.serviceId,
+			(q) =>
+				q.service === item.service &&
+				Number(q.serviceId) === Number(item.serviceId),
 		);
 	};
 
@@ -188,13 +206,13 @@ function App() {
 							<span>{isLoading ? "SYNCING..." : "LIVE"}</span>
 						</div>
 
-						<button
-							type="button"
+						<Button
+							size="sm"
+							variant="btnIcon"
 							onClick={() => setIsSettingsOpen(true)}
-							className="p-1.5 text-gray-500 hover:text-white bg-gray-900 hover:bg-gray-800 rounded-lg border border-gray-800 transition-colors"
 						>
-							<SettingsIcon size={18} />
-						</button>
+							<SettingsIcon size={20} />
+						</Button>
 					</div>
 				</div>
 			</header>
@@ -276,7 +294,7 @@ function App() {
 					type={modalData.type}
 					isOpen={modalData.isOpen}
 					onClose={() => setModalData(null)}
-          mutate={mutate}
+					mutate={mutate}
 				/>
 			)}
 
@@ -294,13 +312,13 @@ function App() {
 					/>
 					<span>{isLoading ? "SYNCING..." : "LIVE"}</span>
 				</div>
-				<button
-					type="button"
+				<Button
+					size="sm"
+					variant="btnIcon"
 					onClick={() => setIsSettingsOpen(true)}
-					className="p-2.5 text-gray-400 hover:text-white bg-gray-900 hover:bg-gray-800 rounded-lg border border-gray-800 transition-colors shadow-lg"
 				>
 					<SettingsIcon size={20} />
-				</button>
+				</Button>
 			</div>
 		</div>
 	);
