@@ -1,15 +1,8 @@
-import fs from "node:fs";
-import path from "node:path";
 import { TelegramClient, Api } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { getSetting, setSetting } from "./db";
+import { prepareFileDownload } from "./utils";
 import { generalLogger as logger } from "./logger";
-
-const isId = (str) => /^-?\d+$/.test(str);
-
-const DOWNLOAD_DIR = path.resolve(process.cwd(), "downloads");
-if (!fs.existsSync(DOWNLOAD_DIR))
-	fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
 let tClient = null;
 
@@ -30,7 +23,7 @@ export const getTelegramClient = async () => {
 	const creds = getCredentials();
 	if (!creds) {
 		logger.warn(
-			"⚠️ Telegram API ID or Hash is missing. Please configure them in Settings.",
+			"[TELEGRAM] ⚠️ Telegram API ID or Hash is missing. Please configure them in Settings.",
 		);
 		return null;
 	}
@@ -46,7 +39,7 @@ export const getTelegramClient = async () => {
 	try {
 		await tClient.connect();
 	} catch (err) {
-		logger.error(`[TELEGRAM] Telegram connection failed: ${err.toString()}`);
+		logger.error("[TELEGRAM] Telegram connection failed: ", err);
 	}
 
 	return tClient;
@@ -118,7 +111,7 @@ export const completeLogin = async (code, password) => {
 const resolveEntity = async (client, identifier) => {
 	try {
 		// 1. If it looks like an ID (e.g. "-100123456" or "123456")
-		if (isId(identifier)) {
+		if (/^-?\d+$/.test(identifier)) {
 			// We must cast to BigInt for GramJS to treat it as an ID
 			// If it fails to find it, it throws, and we catch it below.
 			return await client.getEntity(BigInt(identifier));
@@ -139,7 +132,8 @@ const resolveEntity = async (client, identifier) => {
 		if (match?.entity) return match.entity;
 
 		logger.error(
-			`[TELEEGRAM] Failed to resolve Telegram entity for ${identifier}: ${err.toString()}`,
+			`[TELEGRAM] Failed to resolve Telegram entity for ${identifier}: `,
+			err,
 		);
 		throw new Error(`Could not find channel with identifier: "${identifier}"`);
 	}
@@ -208,7 +202,7 @@ export const searchChannel = async (channelIdentifier, query) => {
 			})
 			.filter(Boolean);
 	} catch (err) {
-		logger.error(`[TELEGRAM] Telegram Search Error: ${err.toString()}`);
+		logger.error("[TELEGRAM] Telegram Search Error: ", err);
 		throw new Error("Failed to search Telegram channel");
 	}
 };
@@ -225,20 +219,15 @@ export const downloadMedia = async (channel, messageId, filename) => {
 	const message = messages[0];
 	if (!message?.media) throw new Error("No media");
 
-	const safeFilename = filename.replace(/[^a-z0-9.]/gi, "_");
-	const outputDir = path.join(DOWNLOAD_DIR, safeFilename.split(".")[0]);
-	const outputPath = path.join(outputDir, safeFilename);
+	const { outputDir, outputPath } = prepareFileDownload(filename);
 
-	if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+	logger.info(`[TELEGRAM] 📥 Starting Telegram Download: ${filename}`);
 
-	logger.info(`[TELEGRAM] 📥 Downloading ${filename}...`);
 	await tClient.downloadMedia(message.media, {
 		outputFile: outputPath,
 		workers: 4,
 	});
 
-	logger.info(
-		`[TELEGRAM] ✅ Downloaded to dir: ${outputDir} and file: ${outputPath}`,
-	);
+	logger.info(`[TELEGRAM] ✅ Download Complete: ${outputPath}`);
 	return { path: outputDir, filePath: outputPath };
 };
