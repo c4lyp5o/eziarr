@@ -10,36 +10,40 @@ import {
 	searchChannel,
 	downloadMedia,
 } from "./telegram";
-import { searchInternetArchive, getArchiveFiles } from "./ia";
+import { searchInternetArchive, getInternetArchiveFiles } from "./ia";
 import { scanOpenDir } from "./opendir";
 import { downloadHttpFile } from "./downloader";
-import { getItems, deleteItem, getAllSettings, setSetting } from "./db";
+import {
+	getItems,
+	deleteItem,
+	getAllSettings,
+	setSetting,
+	getServicesConfig,
+} from "./db";
 import { generalLogger as logger } from "./logger";
 import { coerceNumericId, fetchQueue, translatePath } from "./utils";
-import { SERVICES } from "./config";
 
 const app = new Elysia()
-	.onError(
-		({ code, error, set }) => {
-			if (code === "NOT_FOUND") {
-				set.status = 404;
-				return { success: false, error: "API Route Not Found" };
-			}
-			if (code === "VALIDATION") {
-				set.status = 400;
-				return { success: false, error: "Bad request data" };
-			}
+	.onError(({ code, error, set }) => {
+		if (code === "VALIDATION") {
+			process.env.NODE_ENV === "development" ||
+				(process.env.NODE_ENV === "dev" && logger.error(error));
+			set.status = 400;
+			return { success: false, message: "Bad request data" };
+		}
+		if (code === "NOT_FOUND") {
+			set.status = 404;
+			return { success: false, message: "Not Found" };
+		}
 
-			set.status = 500;
-			logger.error(`[SERVER] 💥[${code}] Server Error: `, error);
-			const msg =
-				process.env.NODE_ENV === "development" || process.env.NODE_ENV === "dev"
-					? error.message
-					: "Internal Server Error";
-			return { success: false, error: msg };
-		},
-		{ detail: { hide: true } },
-	)
+		set.status = 500;
+		logger.error(`[SERVER] 💥[${code}] Server Error: `, error);
+		const message =
+			process.env.NODE_ENV === "development" || process.env.NODE_ENV === "dev"
+				? error.message
+				: "Internal Server Error";
+		return { success: false, message };
+	})
 
 	.use(cors())
 
@@ -58,7 +62,7 @@ const app = new Elysia()
 					description:
 						"The ultimate backend for managing missing *Arr media, scraping Telegram, and deep-searching the high seas.",
 					contact: {
-						name: "Eziarr Dev Team",
+						name: "c4lyp5o",
 						url: "https://github.com/c4lyp5o/eziarr",
 						email: "calypso[at]calypsocloud.one",
 					},
@@ -121,11 +125,11 @@ const app = new Elysia()
 	.get(
 		"/api/v1",
 		() => {
-			return { status: "ok", message: "Eziarr API is Running" };
+			return { success: true, message: "Eziarr API is Running" };
 		},
 		{
 			response: t.Object({
-				status: t.String(),
+				success: t.Boolean(),
 				message: t.String(),
 			}),
 			detail: {
@@ -139,17 +143,7 @@ const app = new Elysia()
 	.get(
 		"/api/v1/missing",
 		async () => {
-			const missingItems = getItems().map((row) => ({
-				id: row.id,
-				serviceId: row.service_id,
-				title: row.title,
-				seriesTitle: row.series_title,
-				type: row.type,
-				service: row.service,
-				releaseDate: row.release_date,
-				posterUrl: row.poster_url,
-				status: row.status,
-			}));
+			const missingItems = getItems();
 
 			const [radarrQ, sonarrQ, lidarrQ] = await Promise.all([
 				fetchQueue("radarr", "movieId"),
@@ -159,10 +153,11 @@ const app = new Elysia()
 
 			const queueItems = [...radarrQ, ...sonarrQ, ...lidarrQ];
 
-			return { missing: missingItems, queue: queueItems };
+			return { success: true, missing: missingItems, queue: queueItems };
 		},
 		{
 			response: t.Object({
+				success: t.Boolean(),
 				missing: t.Array(
 					t.Object({
 						id: t.String(),
@@ -213,9 +208,22 @@ const app = new Elysia()
 	.post(
 		"/api/v1/search",
 		async ({ body: { service, id } }) => {
-			logger.info(
-				`[SERVER] 🔍 [${service}] Received search request with ID ${id}`,
-			);
+			const SERVICES = getServicesConfig();
+			const config = SERVICES[service];
+
+			if (!config) {
+				return { success: false, message: "Invalid service" };
+			}
+
+			if (!config.url || !config.apiKey) {
+				logger.warn(
+					`[SERVER] Cancelling search because ${service} is not configured.`,
+				);
+				return {
+					success: false,
+					message: `${service} is not configured.`,
+				};
+			}
 
 			const sid = coerceNumericId(id, "id");
 
@@ -273,6 +281,14 @@ const app = new Elysia()
 	.post(
 		"/api/v1/deepsearch",
 		async ({ body: { type, query } }) => {
+			const SERVICES = getServicesConfig();
+			if (!SERVICES.prowlarr.url || !SERVICES.prowlarr.apiKey) {
+				logger.warn(
+					"[WORKER] Deepsearch cancelled because it is not configured",
+				);
+				return { success: false, torrents: [] };
+			}
+
 			// Map Service Types to Prowlarr Categories
 			// 2000 = Movies, 5000 = TV, 3000 = Audio
 			const categories =
@@ -285,8 +301,7 @@ const app = new Elysia()
 					timeout: 30000,
 				});
 
-				// Return simplified results
-				return res.data
+				const torrents = res.data
 					.map((r) => ({
 						title: r.title,
 						size: r.size,
@@ -298,6 +313,8 @@ const app = new Elysia()
 						guid: r.guid,
 					}))
 					.sort((a, b) => b.seeders - a.seeders);
+
+				return { success: true, torrents };
 			}
 		},
 		{
@@ -309,6 +326,7 @@ const app = new Elysia()
 				]),
 				query: t.String(),
 			}),
+			response: { success: t.Boolean(), torrents: t.Array() },
 			detail: {
 				summary: "Perform Deep Search via Prowlarr",
 				description:
@@ -321,7 +339,23 @@ const app = new Elysia()
 	.post(
 		"/api/v1/forcegrab",
 		async ({ body: { service, serviceId, title, downloadUrl } }) => {
+			const SERVICES = getServicesConfig();
 			const config = SERVICES[service];
+
+			if (!config) {
+				return { success: false, message: "Invalid service" };
+			}
+
+			if (!config.url || !config.apiKey) {
+				logger.warn(
+					`[SERVER] Cancelling force grab because ${service} is not configured.`,
+				);
+				return {
+					success: false,
+					message: `${service} is not configured.`,
+				};
+			}
+
 			const sid = coerceNumericId(serviceId, "serviceId");
 
 			const pushRelease = async () => {
@@ -483,7 +517,23 @@ const app = new Elysia()
 	.post(
 		"/api/v1/unmonitor",
 		async ({ body: { service, serviceId } }) => {
+			const SERVICES = getServicesConfig();
 			const config = SERVICES[service];
+
+			if (!config) {
+				return { success: false, message: "Invalid service" };
+			}
+
+			if (!config.url || !config.apiKey) {
+				logger.warn(
+					`[SERVER] Cancelling unmonitor because ${service} is not configured.`,
+				);
+				return {
+					success: false,
+					message: `${service} is not configured.`,
+				};
+			}
+
 			const sid = coerceNumericId(serviceId, "serviceId");
 
 			if (service === "radarr") {
@@ -523,7 +573,7 @@ const app = new Elysia()
 
 			deleteItem(`${service}-${sid}`);
 
-			return { success: true };
+			return { success: true, message: `Unmonitored ${service}-${sid}` };
 		},
 		{
 			body: t.Object({
@@ -534,7 +584,7 @@ const app = new Elysia()
 				]),
 				serviceId: t.Union([t.String(), t.Number()]),
 			}),
-			response: t.Object({ success: t.Boolean() }),
+			response: t.Object({ success: t.Boolean(), message: t.String() }),
 			detail: {
 				summary: "Unmonitor an Item",
 				description:
@@ -547,10 +597,14 @@ const app = new Elysia()
 	.get(
 		"/api/v1/settings",
 		() => {
-			return getAllSettings();
+			const allSettings = getAllSettings();
+			return { success: true, settings: allSettings };
 		},
 		{
-			response: t.Record(t.String(), t.Any()),
+			response: t.Object({
+				success: t.Boolean(),
+				settings: t.Record(t.String(), t.Any()),
+			}),
 			detail: {
 				summary: "Get All Settings",
 				description:
@@ -564,7 +618,7 @@ const app = new Elysia()
 		"/api/v1/settings",
 		({ body: { key, value } }) => {
 			setSetting(key, value);
-			return { success: true, saved: { [key]: value } };
+			return { success: true, message: "Setting updated" };
 		},
 		{
 			body: t.Object({
@@ -573,7 +627,7 @@ const app = new Elysia()
 			}),
 			response: t.Object({
 				success: t.Boolean(),
-				saved: t.Record(t.String(), t.Any()),
+				message: t.String(),
 			}),
 			detail: {
 				summary: "Update a Setting",
@@ -590,7 +644,7 @@ const app = new Elysia()
 			for (const [key, value] of Object.entries(body)) {
 				setSetting(key, value);
 			}
-			return { success: true };
+			return { success: true, message: "Settings updated" };
 		},
 		{
 			body: t.Object({
@@ -598,6 +652,14 @@ const app = new Elysia()
 				hunterEnabled: t.Boolean(),
 				syncInterval: t.Number(),
 				hunterInterval: t.Number(),
+				radarrUrl: t.Optional(t.String()),
+				radarrApiKey: t.Optional(t.String()),
+				sonarrUrl: t.Optional(t.String()),
+				sonarrApiKey: t.Optional(t.String()),
+				lidarrUrl: t.Optional(t.String()),
+				lidarrApiKey: t.Optional(t.String()),
+				prowlarrUrl: t.Optional(t.String()),
+				prowlarrApiKey: t.Optional(t.String()),
 				telegramApiId: t.Optional(t.String()),
 				telegramApiHash: t.Optional(t.String()),
 				pathMapDocker: t.Optional(t.String()),
@@ -606,11 +668,84 @@ const app = new Elysia()
 				telegram_temp_phone: t.Optional(t.String()),
 				telegram_session: t.Optional(t.String()),
 			}),
-			response: t.Object({ success: t.Boolean() }),
+			response: t.Object({ success: t.Boolean(), message: t.String() }),
 			detail: {
 				summary: "Batch Update Settings",
 				description:
 					"Update multiple settings at once by providing an object of key-value pairs. This is more efficient for saving multiple settings in one request. Returns success status.",
+				tags: ["Settings"],
+			},
+		},
+	)
+
+	.get(
+		"/api/v1/system/status",
+		() => {
+			const s = getAllSettings();
+			const hasRadarr = !!(s.radarrUrl && s.radarrApiKey);
+			const hasSonarr = !!(s.sonarrUrl && s.sonarrApiKey);
+			const hasLidarr = !!(s.lidarrUrl && s.lidarrApiKey);
+
+			return {
+				success: true,
+				isSetup: hasRadarr || hasSonarr || hasLidarr,
+				features: {
+					radarr: hasRadarr,
+					sonarr: hasSonarr,
+					lidarr: hasLidarr,
+					prowlarr: !!(s.prowlarrUrl && s.prowlarrApiKey),
+					telegram: !!(s.telegramApiId && s.telegramApiHash),
+				},
+			};
+		},
+		{
+			response: t.Object({
+				success: t.Boolean(),
+				isSetup: t.Boolean(),
+				features: t.Object({
+					radarr: t.Boolean(),
+					sonarr: t.Boolean(),
+					lidarr: t.Boolean(),
+					prowlarr: t.Boolean(),
+					telegram: t.Boolean(),
+				}),
+			}),
+			detail: {
+				summary: "Get System Status",
+				description: "Retrieve status of services for the application.",
+				tags: ["Settings"],
+			},
+		},
+	)
+
+	.post(
+		"/api/v1/system/test",
+		async ({ body: { service, url, apiKey } }) => {
+			const cleanUrl = url.replace(/\/$/, "");
+
+			const apiVer =
+				service === "lidarr" || service === "prowlarr" ? "v1" : "v3";
+
+			await axios.get(`${cleanUrl}/api/${apiVer}/system/status`, {
+				headers: { "X-Api-Key": apiKey },
+				timeout: 5000,
+			});
+			return { success: true, message: "Test successful" };
+		},
+		{
+			body: t.Object({
+				service: t.String(),
+				url: t.String(),
+				apiKey: t.String(),
+			}),
+			response: t.Object({
+				success: t.Boolean(),
+				message: t.String(),
+			}),
+			detail: {
+				summary: "Test Service Connection",
+				description:
+					"Tests unsaved credentials against an *Arr service's status endpoint.",
 				tags: ["Settings"],
 			},
 		},
@@ -639,10 +774,11 @@ const app = new Elysia()
 				simpleChannels.sort((a, b) => a.title.localeCompare(b.title));
 			}
 
-			return { connected, channels: simpleChannels };
+			return { success: true, connected, channels: simpleChannels };
 		},
 		{
 			response: t.Object({
+				success: t.Boolean(),
 				connected: t.Boolean(),
 				channels: t.Array(
 					t.Object({
@@ -664,11 +800,12 @@ const app = new Elysia()
 	.post(
 		"/api/v1/telegram/auth/send-code",
 		async ({ body: { phoneNumber } }) => {
-			return await sendLoginCode(phoneNumber);
+			const success = await sendLoginCode(phoneNumber);
+			return { success, message: "Code sent successfully" };
 		},
 		{
 			body: t.Object({ phoneNumber: t.String() }),
-			response: t.Object({ success: t.Boolean() }),
+			response: t.Object({ success: t.Boolean(), message: t.String() }),
 			detail: {
 				summary: "Send Telegram Login Code",
 				description:
@@ -681,14 +818,15 @@ const app = new Elysia()
 	.post(
 		"/api/v1/telegram/auth/login",
 		async ({ body: { code, password } }) => {
-			return await completeLogin(code, password);
+			const success = await completeLogin(code, password);
+			return { success, message: "Login successful" };
 		},
 		{
 			body: t.Object({
 				code: t.String(),
 				password: t.String(),
 			}),
-			response: t.Object({ success: t.Boolean() }),
+			response: t.Object({ success: t.Boolean(), message: t.String() }),
 			detail: {
 				summary: "Complete Telegram Login",
 				description:
@@ -701,24 +839,27 @@ const app = new Elysia()
 	.post(
 		"/api/v1/telegram/search",
 		async ({ body: { channel, query } }) => {
-			const results = await searchChannel(channel, query);
-			return results;
+			const files = await searchChannel(channel, query);
+			return { success: true, files };
 		},
 		{
 			body: t.Object({
 				channel: t.String(),
 				query: t.String(),
 			}),
-			response: t.Array(
-				t.Object({
-					id: t.Number(),
-					channel: t.String(),
-					filename: t.String(),
-					size: t.Number(),
-					date: t.Number(),
-					messageText: t.String(),
-				}),
-			),
+			response: t.Object({
+				success: t.Boolean(),
+				files: t.Array(
+					t.Object({
+						id: t.Number(),
+						channel: t.String(),
+						filename: t.String(),
+						size: t.Number(),
+						date: t.Number(),
+						messageText: t.String(),
+					}),
+				),
+			}),
 			detail: {
 				summary: "Search for Media in a Telegram Channel",
 				description:
@@ -731,12 +872,24 @@ const app = new Elysia()
 	.post(
 		"/api/v1/telegram/import",
 		async ({ body: { service, serviceId, channel, messageId, filename } }) => {
+			const SERVICES = getServicesConfig();
 			const config = SERVICES[service];
-			const sid = coerceNumericId(serviceId, "serviceId");
 
 			if (!config) {
-				return { success: false, error: "Invalid service" };
+				return { success: false, message: "Invalid service" };
 			}
+
+			if (!config.url || !config.apiKey) {
+				logger.warn(
+					`[SERVER] Cancelling telegram because ${service} is not configured.`,
+				);
+				return {
+					success: false,
+					message: `${service} is not configured.`,
+				};
+			}
+
+			const sid = coerceNumericId(serviceId, "serviceId");
 
 			// 1. Download from Telegram (Async - don't await if you want to return immediately)
 			// ideally, we should use a queue/worker for this. For now, we await.
@@ -746,10 +899,9 @@ const app = new Elysia()
 				messageId,
 				filename,
 			);
-			logger.info("[SERVER] 📥 [Telegram] Download completed", {
-				path,
-				filePath,
-			});
+			logger.info(
+				`[SERVER] 📥 [Telegram] Download completed. Path: ${path}, Filepath: ${filePath}`,
+			);
 
 			const commandName =
 				service === "radarr"
@@ -774,10 +926,15 @@ const app = new Elysia()
 			// It relies entirely on the filename containing "S01E01".
 			// If the Telegram file doesn't have S01E01, Sonarr will likely reject it
 			// and you will see it in Sonarr > Activity > Queue (Manual Import needed).
-			await axios.post(`${config.url}/api/v3/command`, commandPayload, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
-			});
+			const res = await axios.post(
+				`${config.url}/api/v3/command`,
+				commandPayload,
+				{
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
+				},
+			);
+			console.log(res.data);
 
 			return {
 				success: true,
@@ -793,7 +950,7 @@ const app = new Elysia()
 				]),
 				serviceId: t.Union([t.String(), t.Number()]),
 				channel: t.String(),
-				messageId: t.String(),
+				messageId: t.Number(),
 				filename: t.String(),
 			}),
 			response: t.Object({ success: t.Boolean(), message: t.String() }),
@@ -809,21 +966,25 @@ const app = new Elysia()
 	.post(
 		"/api/v1/ia/search",
 		async ({ body: { query } }) => {
-			return await searchInternetArchive(query);
+			const files = await searchInternetArchive(query);
+			return { success: true, files };
 		},
 		{
 			body: t.Object({
 				query: t.String(),
 			}),
-			response: t.Array(
-				t.Object({
-					id: t.String(),
-					title: t.String(),
-					year: t.Optional(t.Any()), // Sometimes year is missing
-					downloads: t.Number(),
-					detailsUrl: t.String(),
-				}),
-			),
+			response: t.Object({
+				success: t.Boolean(),
+				files: t.Array(
+					t.Object({
+						id: t.String(),
+						title: t.String(),
+						year: t.Optional(t.Any()), // Sometimes year is missing
+						downloads: t.Number(),
+						detailsUrl: t.String(),
+					}),
+				),
+			}),
 			detail: {
 				summary: "Search Internet Archive",
 				description:
@@ -836,20 +997,24 @@ const app = new Elysia()
 	.get(
 		"/api/v1/ia/files/:identifier",
 		async ({ params: { identifier } }) => {
-			return await getArchiveFiles(identifier);
+			const filesInside = await getInternetArchiveFiles(identifier);
+			return { success: true, filesInside };
 		},
 		{
 			params: t.Object({
 				identifier: t.String(),
 			}),
-			response: t.Array(
-				t.Object({
-					downloadUrl: t.String(),
-					filename: t.String(),
-					size: t.String(),
-					format: t.String(),
-				}),
-			),
+			response: t.Object({
+				success: t.Boolean(),
+				filesInside: t.Array(
+					t.Object({
+						downloadUrl: t.String(),
+						filename: t.String(),
+						size: t.String(),
+						format: t.String(),
+					}),
+				),
+			}),
 			detail: {
 				summary: "Get Files from Internet Archive",
 				description:
@@ -862,19 +1027,23 @@ const app = new Elysia()
 	.post(
 		"/api/v1/opendir/scan",
 		async ({ body: { url } }) => {
-			return await scanOpenDir(url);
+			const files = await scanOpenDir(url);
+			return { success: true, files };
 		},
 		{
 			body: t.Object({
 				url: t.String(),
 			}),
-			response: t.Array(
-				t.Object({
-					downloadUrl: t.String(),
-					filename: t.String(),
-					ext: t.String(),
-				}),
-			),
+			response: t.Object({
+				success: t.Boolean(),
+				files: t.Array(
+					t.Object({
+						downloadUrl: t.String(),
+						filename: t.String(),
+						ext: t.String(),
+					}),
+				),
+			}),
 			detail: {
 				summary: "Scan an Open Directory",
 				description: `Given the URL of an open directory (a web page that lists files, often on a public server), scan the page and return a list of media files available for download. This can be used to find direct download links for movies or episodes that can then be sent to Radarr/Sonarr.`,
@@ -886,7 +1055,23 @@ const app = new Elysia()
 	.post(
 		"/api/v1/import/http",
 		async ({ body: { service, serviceId, url, filename } }) => {
+			const SERVICES = getServicesConfig();
 			const config = SERVICES[service];
+
+			if (!config) {
+				return { success: false, message: "Invalid service" };
+			}
+
+			if (!config.url || !config.apiKey) {
+				logger.warn(
+					`SERVER] Cancelling web import because ${service} is not configured.`,
+				);
+				return {
+					success: false,
+					message: `${service} is not configured.`,
+				};
+			}
+
 			const sid = coerceNumericId(serviceId, "serviceId");
 
 			logger.info(`[SERVER] 📥 [HTTP] Starting download: ${filename}`);
@@ -895,7 +1080,9 @@ const app = new Elysia()
 			const commandName =
 				service === "radarr"
 					? "DownloadedMoviesScan"
-					: "DownloadedEpisodesScan";
+					: service === "sonarr"
+						? "DownloadedEpisodesScan"
+						: "DownloadedAlbumsScan";
 			const arrPath = translatePath(downloadPath);
 
 			logger.info(
@@ -939,14 +1126,6 @@ const app = new Elysia()
 				tags: ["Alternative Sources", "*Arr Integration"],
 			},
 		},
-	)
-
-	.all(
-		"/api/*",
-		() => {
-			throw new NotFoundError();
-		},
-		{ detail: { hide: true } },
 	);
 
 try {
