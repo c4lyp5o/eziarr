@@ -52,9 +52,22 @@ export const getAllIds = () => {
 };
 
 export const getItems = () => {
-	return db
+	const fromDb = db
 		.query("SELECT * FROM missing_items ORDER BY release_date ASC")
 		.all();
+	const missingItems = fromDb.map((row) => ({
+		id: row.id,
+		serviceId: row.service_id,
+		title: row.title,
+		seriesTitle: row.series_title,
+		type: row.type,
+		service: row.service,
+		releaseDate: row.release_date,
+		posterUrl: row.poster_url,
+		status: row.status,
+	}));
+
+	return missingItems;
 };
 
 export const upsertItem = (item) => {
@@ -158,6 +171,16 @@ export const getAllSettings = () => {
 		}
 		return acc;
 	}, {});
+};
+
+export const getServicesConfig = () => {
+	const s = getAllSettings();
+	return {
+		radarr: { url: s.radarrUrl, apiKey: s.radarrApiKey },
+		sonarr: { url: s.sonarrUrl, apiKey: s.sonarrApiKey },
+		lidarr: { url: s.lidarrUrl, apiKey: s.lidarrApiKey },
+		prowlarr: { url: s.prowlarrUrl, apiKey: s.prowlarrApiKey },
+	};
 };
 
 initDefaultSettings();
