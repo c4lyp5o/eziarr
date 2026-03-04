@@ -24,16 +24,16 @@ const OpenDirTab = ({ query, onGrab }) => {
 		try {
 			setIsLoading(true);
 			setOdFiles([]);
-			const filesFromOpenDir = await apiCall("/api/v1/opendir/scan", {
+			const { files } = await apiCall("/api/v1/opendir/scan", {
 				method: "POST",
 				body: { url: odUrl },
 			});
-			if (Array.isArray(filesFromOpenDir)) {
+			if (Array.isArray(files)) {
 				const regex = new RegExp(
 					query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
 					"i",
 				);
-				const filteredFiles = filesFromOpenDir.filter(
+				const filteredFiles = files.filter(
 					(file) => regex.test(file.filename) || regex.test(file.downloadUrl),
 				);
 

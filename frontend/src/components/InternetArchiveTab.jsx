@@ -22,16 +22,16 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 		try {
 			setIsLoading(true);
 			setArchiveSearchResults([]);
-			const iaFiles = await apiCall("/api/v1/ia/search", {
+			const { files } = await apiCall("/api/v1/ia/search", {
 				method: "POST",
 				body: { query },
 			});
-			if (iaFiles.length === 0) {
+			if (files.length === 0) {
 				toast.warning("No results found in Internet Archive");
 				return;
 			}
 			toast.success("Internet Archive Search Complete");
-			setArchiveSearchResults(iaFiles);
+			setArchiveSearchResults(files);
 		} catch (err) {
 			console.error("Internet Archive Search Failed", err);
 			toast.error("Internet Archive Search Failed");
@@ -46,8 +46,8 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 
 		try {
 			setExpandingId(identifier);
-			const files = await apiCall(`/api/v1/ia/files/${identifier}`);
-			setArchiveFiles((prev) => ({ ...prev, [identifier]: files }));
+			const { filesInside } = await apiCall(`/api/v1/ia/files/${identifier}`);
+			setArchiveFiles((prev) => ({ ...prev, [identifier]: filesInside }));
 		} catch (err) {
 			console.error("Internet Archive File Fetch Failed", err);
 			toast.error("Internet Archive File Fetch Failed");
