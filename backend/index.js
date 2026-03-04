@@ -117,7 +117,8 @@ export const app = new Elysia()
 			fallback: "index.html",
 		}),
 	)
-	.get("/", () => file(join(import.meta.dir, "../client")), {
+
+	.get("/", () => file(join(import.meta.dir, "../client/index.html")), {
 		detail: {
 			hide: true,
 		},
