@@ -19,4 +19,7 @@ export const DEFAULT_SETTINGS = {
 	pathMapRemote: "", // e.g., C:\Imports
 };
 
-export const DOWNLOAD_DIR = path.resolve(process.cwd(), "downloads");
+export const DOWNLOAD_DIR = path.join(import.meta.dir, "../downloads");
+export const DB_DIR = path.join(import.meta.dir, "../db");
+export const LOG_DIR = path.join(import.meta.dir, "../logs");
+export const CLIENT_DIR = path.join(import.meta.dir, "../client");
