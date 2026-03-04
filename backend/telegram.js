@@ -6,75 +6,58 @@ import { generalLogger as logger } from "./logger";
 
 let tClient = null;
 
-const getCredentials = () => {
-	const apiId = getSetting("telegramApiId");
-	const apiHash = getSetting("telegramApiHash");
-
-	if (!apiId || !apiHash) {
-		return null;
-	}
-
-	return { apiId: Number(apiId), apiHash };
-};
-
 export const getTelegramClient = async () => {
 	if (tClient) return tClient;
 
-	const creds = getCredentials();
-	if (!creds) {
-		logger.warn(
-			"[TELEGRAM] ⚠️ Telegram API ID or Hash is missing. Please configure them in Settings.",
-		);
-		return null;
-	}
+	const apiId = getSetting("telegramApiId");
+	const apiHash = getSetting("telegramApiHash");
+	if (!apiId || !apiHash) throw new Error("Missing API details.");
 
-	const sessionString = getSetting("telegram_session", "");
+	const sessionString = getSetting("telegramSession", "");
 	const session = new StringSession(sessionString);
 
-	tClient = new TelegramClient(session, creds.apiId, creds.apiHash, {
+	tClient = new TelegramClient(session, apiId, apiHash, {
 		connectionRetries: 5,
 		useWSS: false,
 	});
 
-	try {
-		await tClient.connect();
-	} catch (err) {
-		logger.error("[TELEGRAM] Telegram connection failed: ", err);
-	}
-
+	await tClient.connect();
 	return tClient;
 };
 
 export const sendLoginCode = async (phoneNumber) => {
-	const tClient = await getTelegramClient();
-	const creds = getCredentials();
+	const client = await getTelegramClient();
+	if (!client) throw new Error("Not connected.");
 
-	if (!tClient || !creds)
-		throw new Error("API ID and Hash not configured in settings.");
+	const apiId = getSetting("telegramApiId");
+	const apiHash = getSetting("telegramApiHash");
+	if (!apiId || !apiHash) throw new Error("Missing API details.");
 
-	const { phoneCodeHash } = await tClient.sendCode(
-		{ apiId: creds.apiId, apiHash: creds.apiHash },
+	const { phoneCodeHash } = await client.sendCode(
+		{ apiId: Number(apiId), apiHash },
 		phoneNumber,
 	);
 
-	setSetting("telegram_temp_hash", phoneCodeHash);
-	setSetting("telegram_temp_phone", phoneNumber);
+	setSetting("telegramTempHash", phoneCodeHash);
+	setSetting("telegramTempPhoneNumber", phoneNumber);
 
 	return { success: true };
 };
 
 export const completeLogin = async (code, password) => {
-	const tClient = await getTelegramClient();
-	const creds = getCredentials();
+	const client = await getTelegramClient();
+	if (!client) throw new Error("Not connected.");
 
-	if (!tClient || !creds)
-		throw new Error("API ID and Hash not configured in settings.");
+	const apiId = getSetting("telegramApiId");
+	const apiHash = getSetting("telegramApiHash");
+	if (!apiId || !apiHash) throw new Error("Missing API details.");
 
-	const phoneCodeHash = getSetting("telegram_temp_hash");
-	const phoneNumber = getSetting("telegram_temp_phone");
+	const phoneCodeHash = getSetting("telegramTempHash");
+	const phoneNumber = getSetting("telegramTempPhoneNumber");
+	if (!phoneCodeHash || !phoneNumber) throw new Error("Missing phone details.");
 
 	try {
-		await tClient.invoke(
+		await client.invoke(
 			new Api.auth.SignIn({
 				phoneNumber,
 				phoneCodeHash,
@@ -82,79 +65,45 @@ export const completeLogin = async (code, password) => {
 			}),
 		);
 
-		const sessionStr = tClient.session.save();
-		setSetting("telegram_session", sessionStr);
-
+		const sessionStr = client.session.save();
+		setSetting("telegramSession", sessionStr);
 		return { success: true };
-	} catch (error) {
-		// If 2FA is needed
-		if (error.message?.includes("SESSION_PASSWORD_NEEDED")) {
-			if (!password) return { success: false, error: "2FA_NEEDED" };
+	} catch (err) {
+		if (err.message?.includes("SESSION_PASSWORD_NEEDED")) {
+			if (!password) return { success: false, message: "2FA_NEEDED" };
 
-			await tClient.signInWithPassword({
-				apiId: creds.apiId,
-				apiHash: creds.apiHash,
+			await client.signInWithPassword({
+				apiId: Number(apiId),
+				apiHash: apiHash,
 				password: password,
 				phoneNumber: phoneNumber,
 				phoneCode: code,
 				phoneCodeHash: phoneCodeHash,
 			});
 
-			const sessionStr = tClient.session.save();
-			setSetting("telegram_session", sessionStr);
+			const sessionStr = client.session.save();
+			setSetting("telegramSession", sessionStr);
 			return { success: true };
 		}
-		return { success: false, error: error.message };
-	}
-};
-
-const resolveEntity = async (client, identifier) => {
-	try {
-		// 1. If it looks like an ID (e.g. "-100123456" or "123456")
-		if (/^-?\d+$/.test(identifier)) {
-			// We must cast to BigInt for GramJS to treat it as an ID
-			// If it fails to find it, it throws, and we catch it below.
-			return await client.getEntity(BigInt(identifier));
-		}
-
-		// 2. Try as username or generic identifier
-		return await client.getEntity(identifier);
-	} catch (err) {
-		// 3. Fallback: Search Dialog Cache by Title
-		// (Only runs if the ID lookup failed, which shouldn't happen if getDialogs() ran)
-		const dialogs = await client.getDialogs({});
-		const match = dialogs.find(
-			(d) =>
-				d.title === identifier ||
-				d.title.toLowerCase().includes(identifier.toLowerCase()),
-		);
-
-		if (match?.entity) return match.entity;
-
-		logger.error(
-			`[TELEGRAM] Failed to resolve Telegram entity for ${identifier}: `,
-			err,
-		);
-		throw new Error(`Could not find channel with identifier: "${identifier}"`);
+		logger.error("[TELEGRAM] Login error: ", err);
+		throw new Error("Login Error");
 	}
 };
 
 export const searchChannel = async (channelIdentifier, query) => {
-	const tClient = await getTelegramClient();
+	const client = await getTelegramClient();
+	if (!client) throw new Error("Not connected.");
 
-	if (!(await tClient.checkAuthorization())) {
-		logger.error("[TELEGRAM] Telegram client not authorized");
-		throw new Error("Not authorized");
-	}
+	if (!(await client.checkAuthorization())) throw new Error("Not authorized");
 
 	try {
-		const entity = await resolveEntity(tClient, channelIdentifier);
+		const entity = await resolveEntity(client, channelIdentifier);
 
 		logger.info(
 			`[TELEGRAM] 🔍 Searching "${entity.title || channelIdentifier}" for "${query}"...`,
 		);
 
-		const result = await tClient.invoke(
+		const result = await client.invoke(
 			new Api.messages.Search({
 				peer: entity,
 				q: query,
@@ -202,32 +151,62 @@ export const searchChannel = async (channelIdentifier, query) => {
 			})
 			.filter(Boolean);
 	} catch (err) {
-		logger.error("[TELEGRAM] Telegram Search Error: ", err);
-		throw new Error("Failed to search Telegram channel");
+		logger.error("[TELEGRAM] Search Error: ", err);
+		throw new Error("Search Error");
 	}
 };
 
 export const downloadMedia = async (channel, messageId, filename) => {
-	const tClient = await getTelegramClient();
-	if (!tClient) throw new Error("Telegram client not connected");
+	const client = await getTelegramClient();
+	if (!client) throw new Error("Not connected");
 
-	if (!(await tClient.checkAuthorization())) throw new Error("Not authorized");
+	if (!(await client.checkAuthorization())) throw new Error("Not authorized");
 
-	const entity = await resolveEntity(tClient, channel);
+	const entity = await resolveEntity(client, channel);
 
-	const messages = await tClient.getMessages(entity, { ids: [messageId] });
+	const messages = await client.getMessages(entity, { ids: [messageId] });
 	const message = messages[0];
 	if (!message?.media) throw new Error("No media");
 
 	const { outputDir, outputPath } = prepareFileDownload(filename);
 
-	logger.info(`[TELEGRAM] 📥 Starting Telegram Download: ${filename}`);
+	logger.info(`[TELEGRAM] 📥 Starting download: ${filename}`);
 
-	await tClient.downloadMedia(message.media, {
+	await client.downloadMedia(message.media, {
 		outputFile: outputPath,
 		workers: 4,
 	});
 
-	logger.info(`[TELEGRAM] ✅ Download Complete: ${outputPath}`);
-	return { path: outputDir, filePath: outputPath };
+	logger.info(`[TELEGRAM] ✅ Download complete: ${outputPath}`);
+	return { success: true, path: outputDir, filePath: outputPath };
+};
+
+const resolveEntity = async (client, identifier) => {
+	try {
+		// 1. If it looks like an ID (e.g. "-100123456" or "123456")
+		if (/^-?\d+$/.test(identifier)) {
+			// We must cast to BigInt for GramJS to treat it as an ID
+			// If it fails to find it, it throws, and we catch it below.
+			return await client.getEntity(BigInt(identifier));
+		}
+
+		// 2. Try as username or generic identifier
+		return await client.getEntity(identifier);
+	} catch (err) {
+		// 3. Fallback: Search Dialog Cache by Title
+		// (Only runs if the ID lookup failed, which shouldn't happen if getDialogs() ran)
+		const dialogs = await client.getDialogs({});
+		const match = dialogs.find(
+			(d) =>
+				d.title === identifier ||
+				d.title.toLowerCase().includes(identifier.toLowerCase()),
+		);
+
+		if (match?.entity) {
+			return match.entity;
+		} else {
+			logger.error("[TELEGRAM] Channel Error: ", err);
+			throw new Error("Channel Error");
+		}
+	}
 };
