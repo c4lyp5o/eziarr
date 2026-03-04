@@ -3,6 +3,10 @@
 	"module": "index.js",
 	"type": "module",
 	"private": true,
+	"scripts": {
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
 	"dependencies": {
 		"@elysiajs/cors": "^1.4.1",
 		"@elysiajs/static": "^1.4.7",
@@ -14,7 +18,8 @@
 	},
 	"devDependencies": {
 		"@elysiajs/openapi": "^1.4.14",
-		"@types/bun": "latest"
+		"@types/bun": "latest",
+		"vitest": "^4.0.18"
 	},
 	"peerDependencies": {
 		"typescript": "^5.9.3"
