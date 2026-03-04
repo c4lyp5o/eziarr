@@ -117,11 +117,11 @@ export const app = new Elysia()
 			fallback: "index.html",
 		}),
 	)
-	// .get("/", () => file("../client/index.html"), {
-	// 	detail: {
-	// 		hide: true,
-	// 	},
-	// })
+	.get("/", () => file(join(import.meta.dir, "../client")), {
+		detail: {
+			hide: true,
+		},
+	})
 
 	.get(
 		"/api/v1",
