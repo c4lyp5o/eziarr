@@ -8,28 +8,28 @@ import { formatSize } from "../utils/formatSize";
 import { Button } from "./Buttons";
 import { ui } from "../ui/styles";
 
-const IndexersTab = ({ service, serviceId, query, type, mutate }) => {
+const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 	const { toast } = useToast();
 
 	const [indexerResults, setIndexerResults] = useState([]);
 	const [grabbingId, setGrabbingId] = useState(null);
 
-	const [isLoading, setIsLoading] = useState(false);
+	const [isLoading, setIsLoading] = useState(!!status);
 
 	const handleSearchFromIndexers = async () => {
 		try {
 			setIsLoading(true);
 			setIndexerResults([]);
-			const torrentsList = await apiCall("/api/v1/deepsearch", {
+			const { torrents } = await apiCall("/api/v1/deepsearch", {
 				method: "POST",
 				body: { type, query },
 			});
-			if (torrentsList.length === 0) {
+			if (torrents.length === 0) {
 				toast.warning("No results found in Indexers");
 				return;
 			}
-			toast.success(`Got ${torrentsList.length} results from Indexers`);
-			setIndexerResults(torrentsList);
+			toast.success(`Got ${torrents.length} results from Indexers`);
+			setIndexerResults(torrents);
 		} catch (err) {
 			console.error("Indexers Search Failed", err);
 			toast.error("Indexers Search Failed");
@@ -69,8 +69,19 @@ const IndexersTab = ({ service, serviceId, query, type, mutate }) => {
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: later
 	useEffect(() => {
-		handleSearchFromIndexers();
+		if (status) handleSearchFromIndexers();
 	}, []);
+
+	if (!status)
+		return (
+			<div className="p-6">
+				<div className="w-full mb-4 py-3 bg-red-600/10 border border-red-500/30 rounded-lg flex items-center justify-center gap-3 backdrop-blur-sm animate-pulse">
+					<span className="text-sm font-bold text-red-400 tracking-wide">
+						Prowlarr is not configured!
+					</span>
+				</div>
+			</div>
+		);
 
 	return (
 		<div className="p-6">

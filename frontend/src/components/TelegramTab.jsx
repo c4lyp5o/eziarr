@@ -10,12 +10,12 @@ import { Button } from "./Buttons";
 import { ListItem } from "./ListItem";
 import { ui } from "../ui/styles";
 
-const TelegramTab = ({ service, serviceId, query, mutate }) => {
+const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 	const { toast } = useToast();
 
 	// Connection
 	const [telegramConnected, setTelegramConnected] = useState(false);
-	const [checkingTelegramAuth, setCheckingTelegramAuth] = useState(false);
+	const [checkingTelegramAuth, setCheckingTelegramAuth] = useState(!!status);
 
 	// Auth Flow
 	const [telegramAuthState, setTelegramAuthState] = useState("PHONE"); // PHONE | CODE | PASSWORD
@@ -82,7 +82,7 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 				toast.success("Telegram Login Successful");
 				setTelegramConnected(true);
 				handleCheckTelegramStatus();
-			} else if (res.error === "2FA_NEEDED") {
+			} else if (res.message === "2FA_NEEDED") {
 				toast.info("2FA Required For Telegram Login");
 				setTelegramAuthState("PASSWORD");
 			} else {
@@ -100,16 +100,16 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 		try {
 			setIsLoading(true);
 			setTelegramSearchResults([]);
-			const telegramFiles = await apiCall("/api/v1/telegram/search", {
+			const { files } = await apiCall("/api/v1/telegram/search", {
 				method: "POST",
 				body: { channel: selectedChannel, query },
 			});
-			if (telegramFiles.length === 0) {
+			if (files.length === 0) {
 				toast.warning("No results found in Telegram");
 				return;
 			}
-			toast.success(`Got ${telegramFiles.length} results from Telegram`);
-			setTelegramSearchResults(telegramFiles);
+			toast.success(`Got ${files.length} results from Telegram`);
+			setTelegramSearchResults(files);
 		} catch (err) {
 			console.error("Telegram Search Failed", err);
 			toast.error("Telegram Search Failed");
@@ -138,7 +138,7 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 				}, 5000);
 				toast.success("Grab From Telegram Started");
 			} else {
-				toast.error("Grab From Telegram Failed");
+				toast.error(res.message);
 			}
 		} catch (err) {
 			console.error("Grab From Telegram Failed", err);
@@ -150,8 +150,19 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: later
 	useEffect(() => {
-		handleCheckTelegramStatus();
+		if (status) handleCheckTelegramStatus();
 	}, []);
+
+	if (!status)
+		return (
+			<div className="p-6">
+				<div className="w-full mb-4 py-3 bg-red-600/10 border border-red-500/30 rounded-lg flex items-center justify-center gap-3 backdrop-blur-sm animate-pulse">
+					<span className="text-sm font-bold text-red-400 tracking-wide">
+						Telegram is not configured!
+					</span>
+				</div>
+			</div>
+		);
 
 	return (
 		<div className="p-6">
@@ -250,8 +261,7 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 										// CHANGE: Use c.id as the value.
 										// The backend sends 'id' as a string to avoid BigInt issues in JSON.
 										<option key={c.id} value={c.id}>
-											{c.title} - {c.username ? `(@${c.username})` : ""} -{" "}
-											{c.id}
+											{c.title} {c.username ? `- (@${c.username})` : ""}
 										</option>
 									))}
 								</select>
@@ -299,7 +309,10 @@ const TelegramTab = ({ service, serviceId, query, mutate }) => {
 						<div className="space-y-2">
 							{telegramSearchResults.map((msg) => (
 								<ListItem key={msg.id}>
-									<div className="flex items-center gap-4 overflow-hidden">
+									<div
+										className="flex items-center gap-4 overflow-hidden"
+										title={msg.filename}
+									>
 										<div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 text-blue-400">
 											<FileVideo size={20} />
 										</div>
