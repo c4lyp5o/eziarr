@@ -5,6 +5,7 @@ import net from "node:net";
 import axios from "axios";
 import { getSetting, getServicesConfig } from "./db";
 import { generalLogger as logger } from "./logger";
+import { DOWNLOAD_DIR } from "./config";
 
 export const coerceNumericId = (value, fieldName = "id") => {
 	const n = typeof value === "number" ? value : Number(value);
@@ -202,7 +203,7 @@ export const prepareFileDownload = (filename) => {
 
 	const folderName = path.parse(safeFilename).name;
 
-	const outputDir = path.join(import.meta.dir, "../downloads", folderName);
+	const outputDir = path.join(DOWNLOAD_DIR, folderName);
 	const outputPath = path.join(outputDir, safeFilename);
 
 	if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });

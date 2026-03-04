@@ -1,3 +1,4 @@
+import path from "node:path";
 import deadslog from "deadslog";
 
 const generalLogger = deadslog({
@@ -7,7 +8,7 @@ const generalLogger = deadslog({
 	},
 	fileOutput: {
 		enabled: true,
-		logFilePath: "logs/app.log",
+		logFilePath: path.join(import.meta.dir, "../logs/general.log"),
 	},
 });
 
@@ -18,7 +19,7 @@ const hunterLogger = deadslog({
 	},
 	fileOutput: {
 		enabled: true,
-		logFilePath: "logs/hunter.log",
+		logFilePath: path.join(import.meta.dir, "../logs/hunter.log"),
 	},
 });
 

@@ -23,6 +23,7 @@ import {
 } from "./db";
 import { generalLogger as logger } from "./logger";
 import { coerceNumericId, fetchQueue, translatePath } from "./utils";
+import { CLIENT_DIR } from "./config";
 
 export const app = new Elysia()
 	.onError(({ code, error, set }) => {
@@ -112,13 +113,13 @@ export const app = new Elysia()
 
 	.use(
 		staticPlugin({
-			assets: path.join(import.meta.dir, "../client"),
+			assets: CLIENT_DIR,
 			prefix: "",
 			fallback: "index.html",
 		}),
 	)
 
-	.get("/", () => file(path.join(import.meta.dir, "../client/index.html")), {
+	.get("/", () => file(path.join(CLIENT_DIR, "index.html")), {
 		detail: {
 			hide: true,
 		},
