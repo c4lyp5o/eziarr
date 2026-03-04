@@ -3,9 +3,9 @@ import path from "node:path";
 import { lookup } from "node:dns/promises";
 import net from "node:net";
 import axios from "axios";
-import { getSetting } from "./db";
+import { getSetting, getServicesConfig } from "./db";
 import { generalLogger as logger } from "./logger";
-import { SERVICES, DOWNLOAD_DIR } from "./config";
+import { DOWNLOAD_DIR } from "./config";
 
 export const coerceNumericId = (value, fieldName = "id") => {
 	const n = typeof value === "number" ? value : Number(value);
@@ -15,44 +15,45 @@ export const coerceNumericId = (value, fieldName = "id") => {
 	return n;
 };
 
-export const getPosterUrl = (images = [], serviceKey, coverType) => {
+export const getPosterUrl = (images = [], serviceName, coverType) => {
+	const SERVICES = getServicesConfig();
+	const conf = SERVICES[serviceName];
+	if (!conf.url || !conf.apiKey) return null;
+
 	const image = images.find((img) => img.coverType === coverType);
 	if (!image) return null;
 	if (image.url) {
-		const { url, apiKey } = SERVICES[serviceKey];
-		return `${url}${image.url}?apikey=${apiKey}`;
+		return `${conf.url}${image.url}?apikey=${conf.apiKey}`;
 	} else {
 		return image.remoteUrl || null;
 	}
 };
 
 export const fetchQueue = async (serviceName, idKey) => {
-	try {
-		const conf = SERVICES[serviceName];
-		// Lidarr uses v1, others v3
-		const apiVer = serviceName === "lidarr" ? "v1" : "v3";
+	const SERVICES = getServicesConfig();
+	const conf = SERVICES[serviceName];
+	if (!conf.url || !conf.apiKey) return [];
 
-		const res = await axios.get(`${conf.url}/api/${apiVer}/queue`, {
-			headers: { "X-Api-Key": conf.apiKey },
-			timeout: 30000,
-		});
+	// Lidarr uses v1, others v3
+	const apiVer = serviceName === "lidarr" ? "v1" : "v3";
 
-		return res.data.records
-			.filter((item) => !["completed", "warning"].includes(item.status))
-			.map((item) => ({
-				service: serviceName,
-				serviceId: item[idKey], // movieId, episodeId, or albumId
-				status: item.status,
-				trackStatus: item.trackedDownloadStatus,
-				title: item.title,
-				quality: item.quality?.quality?.name,
-				indexer: item.indexer,
-				timeleft: item.timeleft, // '00:05:30'
-			}));
-	} catch (err) {
-		logger.error(`[UTILS] Failed to fetch ${serviceName} queue: `, err);
-		return [];
-	}
+	const res = await axios.get(`${conf.url}/api/${apiVer}/queue`, {
+		headers: { "X-Api-Key": conf.apiKey },
+		timeout: 30000,
+	});
+
+	return res.data.records
+		.filter((item) => !["completed", "warning"].includes(item.status))
+		.map((item) => ({
+			service: serviceName,
+			serviceId: item[idKey], // movieId, episodeId, or albumId
+			status: item.status,
+			trackStatus: item.trackedDownloadStatus,
+			title: item.title,
+			quality: item.quality?.quality?.name,
+			indexer: item.indexer,
+			timeleft: item.timeleft, // '00:05:30'
+		}));
 };
 
 export const translatePath = (localPath) => {
