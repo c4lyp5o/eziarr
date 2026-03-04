@@ -10,6 +10,7 @@
 		"dev:worker": "cd backend && bun --watch worker.js",
 		"dev:frontend": "cd frontend && bun dev",
 		"dev": "conc -n \"BACKEND,FRONTEND,WORKER\" -c \"cyan,yellow,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:worker\"",
+		"test:backend": "cd backend && bun test",
 		"build:client": "cd frontend && bun run build",
 		"start": "pm2-runtime start ecosystem.config.js --env production",
 		"stop": "pm2 stop all",
