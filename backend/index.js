@@ -1,4 +1,4 @@
-import { Elysia, t, NotFoundError, file } from "elysia";
+import { Elysia, t, file } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { staticPlugin } from "@elysiajs/static";
 import { openapi } from "@elysiajs/openapi";
@@ -23,7 +23,7 @@ import {
 import { generalLogger as logger } from "./logger";
 import { coerceNumericId, fetchQueue, translatePath } from "./utils";
 
-const app = new Elysia()
+export const app = new Elysia()
 	.onError(({ code, error, set }) => {
 		if (code === "VALIDATION") {
 			process.env.NODE_ENV === "development" ||
@@ -664,9 +664,9 @@ const app = new Elysia()
 				telegramApiHash: t.Optional(t.String()),
 				pathMapDocker: t.Optional(t.String()),
 				pathMapRemote: t.Optional(t.String()),
-				telegram_temp_hash: t.Optional(t.String()),
-				telegram_temp_phone: t.Optional(t.String()),
-				telegram_session: t.Optional(t.String()),
+				telegramTempHash: t.Optional(t.String()),
+				telegramTempPhone: t.Optional(t.String()),
+				telegramSession: t.Optional(t.String()),
 			}),
 			response: t.Object({ success: t.Boolean(), message: t.String() }),
 			detail: {
@@ -755,7 +755,7 @@ const app = new Elysia()
 		"/api/v1/telegram/status",
 		async () => {
 			const client = await getTelegramClient();
-			if (!client) return { connected: false, channels: [] };
+			if (!client) return { success: false, connected: false, channels: [] };
 
 			const connected = await client.checkAuthorization();
 			let simpleChannels = [];
@@ -800,8 +800,8 @@ const app = new Elysia()
 	.post(
 		"/api/v1/telegram/auth/send-code",
 		async ({ body: { phoneNumber } }) => {
-			const success = await sendLoginCode(phoneNumber);
-			return { success, message: "Code sent successfully" };
+			await sendLoginCode(phoneNumber);
+			return { success: true, message: "Code sent successfully" };
 		},
 		{
 			body: t.Object({ phoneNumber: t.String() }),
@@ -818,13 +818,18 @@ const app = new Elysia()
 	.post(
 		"/api/v1/telegram/auth/login",
 		async ({ body: { code, password } }) => {
-			const success = await completeLogin(code, password);
-			return { success, message: "Login successful" };
+			const res = await completeLogin(code, password);
+
+			if (res.success) {
+				return { success: true, message: "Login successful" };
+			} else {
+				return { success: false, message: res.message || "Login failed" };
+			}
 		},
 		{
 			body: t.Object({
 				code: t.String(),
-				password: t.String(),
+				password: t.Optional(t.String()),
 			}),
 			response: t.Object({ success: t.Boolean(), message: t.String() }),
 			detail: {
@@ -875,14 +880,10 @@ const app = new Elysia()
 			const SERVICES = getServicesConfig();
 			const config = SERVICES[service];
 
-			if (!config) {
-				return { success: false, message: "Invalid service" };
-			}
+			if (!config) return { success: false, message: "Invalid service" };
 
 			if (!config.url || !config.apiKey) {
-				logger.warn(
-					`[SERVER] Cancelling telegram because ${service} is not configured.`,
-				);
+				logger.error(`[SERVER] ${service} is not configured.`);
 				return {
 					success: false,
 					message: `${service} is not configured.`,
@@ -934,11 +935,12 @@ const app = new Elysia()
 					timeout: 30000,
 				},
 			);
+
 			console.log(res.data);
 
 			return {
 				success: true,
-				message: `Downloaded & Sent to ${service} for import!`,
+				message: `Sent to ${service} for import!`,
 			};
 		},
 		{
