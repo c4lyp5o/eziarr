@@ -62,18 +62,17 @@ export const translatePath = (localPath) => {
 
 	let finalPath = localPath;
 
-	// 1. Only translate if configs exist (Not needed for Local setup)
+	// 1. Swap the prefixes
 	if (dockerPrefix && remotePrefix) {
 		finalPath = localPath.replace(dockerPrefix, remotePrefix);
 	}
 
-	// 2. WINDOWS FIX: Normalize Slashes
-	// If we are on Windows, ensure we use Backslashes '\' everywhere.
-	// Node's path.sep returns '\' on Windows and '/' on Linux.
-	if (path.sep === "\\") {
+	// 2. Cross-OS Slash Fix: If the remote path is Windows (starts with a Drive letter or \\)
+	// Force all forward slashes to backslashes so Windows *Arr apps don't crash.
+	if (/^[a-zA-Z]:\\|^\\\\/.test(remotePrefix)) {
 		finalPath = finalPath.replace(/\//g, "\\");
 
-		// Optional: Capitalize Drive Letter (c:\ -> C:\) for strict apps
+		// Capitalize Drive Letter (d:\ -> D:\) for strict apps
 		if (finalPath.match(/^[a-z]:/)) {
 			finalPath = finalPath.charAt(0).toUpperCase() + finalPath.slice(1);
 		}
