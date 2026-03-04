@@ -3,9 +3,13 @@ import { Database } from "bun:sqlite";
 import { DEFAULT_SETTINGS, DB_DIR } from "./config";
 import { generalLogger as logger } from "./logger";
 
-const db = new Database(path.join(DB_DIR, "eziarr.sqlite"));
+const dbPath =
+	process.env.NODE_ENV === "dev"
+		? ":memory:"
+		: path.join(DB_DIR, "eziarr.sqlite");
 
-// Initialize Table
+const db = new Database(dbPath, { create: true });
+
 try {
 	db.run(`
   CREATE TABLE IF NOT EXISTS missing_items (
