@@ -1,7 +1,7 @@
 import { Elysia, t, file } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { staticPlugin } from "@elysiajs/static";
-import { openapi } from "@elysiajs/openapi";
+// import { openapi } from "@elysiajs/openapi";
 import axios from "axios";
 import {
 	getTelegramClient,
