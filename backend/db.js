@@ -1,9 +1,8 @@
-import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { DEFAULT_SETTINGS } from "./config";
 import { generalLogger as logger } from "./logger";
 
-const db = new Database(join(import.meta.dir, "backend", "media.sqlite"));
+const db = new Database("media.sqlite");
 
 // Initialize Table
 try {
