@@ -28,8 +28,7 @@ import { CLIENT_DIR } from "./config";
 export const app = new Elysia()
 	.onError(({ code, error, set }) => {
 		if (code === "VALIDATION") {
-			process.env.NODE_ENV === "development" ||
-				(process.env.NODE_ENV === "dev" && logger.error(error));
+			process.env.NODE_ENV === "dev" && logger.error(error);
 			set.status = 400;
 			return { success: false, message: "Bad request data" };
 		}
@@ -41,9 +40,7 @@ export const app = new Elysia()
 		set.status = 500;
 		logger.error(`[SERVER] 💥[${code}] Server Error: `, error);
 		const message =
-			process.env.NODE_ENV === "development" || process.env.NODE_ENV === "dev"
-				? error.message
-				: "Internal Server Error";
+			process.env.NODE_ENV === "dev" ? error.message : "Internal Server Error";
 		return { success: false, message };
 	})
 
@@ -51,9 +48,7 @@ export const app = new Elysia()
 
 	// .use(
 	// 	openapi({
-	// 		enabled:
-	// 			process.env.NODE_ENV === "development" ||
-	// 			process.env.NODE_ENV === "dev",
+	// 		enabled: process.env.NODE_ENV === "dev",
 	// 		exclude: {
 	// 			paths: ["/", "/*", ""],
 	// 		},
@@ -895,9 +890,7 @@ export const app = new Elysia()
 
 			const sid = coerceNumericId(serviceId, "serviceId");
 
-			// 1. Download from Telegram (Async - don't await if you want to return immediately)
-			// ideally, we should use a queue/worker for this. For now, we await.
-			logger.info(`[SERVER] 📥 [Telegram] Starting import for ${filename}...`);
+			logger.info(`[SERVER] 📥 [Telegram] Starting download: ${filename}`);
 			const { path, filePath } = await downloadMedia(
 				channel,
 				messageId,
@@ -930,16 +923,12 @@ export const app = new Elysia()
 			// It relies entirely on the filename containing "S01E01".
 			// If the Telegram file doesn't have S01E01, Sonarr will likely reject it
 			// and you will see it in Sonarr > Activity > Queue (Manual Import needed).
-			const res = await axios.post(
-				`${config.url}/api/v3/command`,
-				commandPayload,
-				{
-					headers: { "X-Api-Key": config.apiKey },
-					timeout: 30000,
-				},
-			);
+			const apiVer = service === "lidarr" ? "v1" : "v3";
 
-			console.log(res.data);
+			await axios.post(`${config.url}/api/${apiVer}/command`, commandPayload, {
+				headers: { "X-Api-Key": config.apiKey },
+				timeout: 30000,
+			});
 
 			return {
 				success: true,
@@ -1063,14 +1052,10 @@ export const app = new Elysia()
 			const SERVICES = getServicesConfig();
 			const config = SERVICES[service];
 
-			if (!config) {
-				return { success: false, message: "Invalid service" };
-			}
+			if (!config) return { success: false, message: "Invalid service" };
 
 			if (!config.url || !config.apiKey) {
-				logger.warn(
-					`SERVER] Cancelling web import because ${service} is not configured.`,
-				);
+				logger.warn(`[SERVER] ${service} is not configured.`);
 				return {
 					success: false,
 					message: `${service} is not configured.`,
@@ -1080,7 +1065,10 @@ export const app = new Elysia()
 			const sid = coerceNumericId(serviceId, "serviceId");
 
 			logger.info(`[SERVER] 📥 [HTTP] Starting download: ${filename}`);
-			const { path: downloadPath } = await downloadHttpFile(url, filename);
+			const { path, filePath } = await downloadHttpFile(url, filename);
+			logger.info(
+				`[SERVER] 📥 [HTTP] Download completed. Path: ${path}, Filepath: ${filePath}`,
+			);
 
 			const commandName =
 				service === "radarr"
@@ -1088,10 +1076,9 @@ export const app = new Elysia()
 					: service === "sonarr"
 						? "DownloadedEpisodesScan"
 						: "DownloadedAlbumsScan";
-			const arrPath = translatePath(downloadPath);
-
+			const arrPath = translatePath(filePath);
 			logger.info(
-				`[SERVER] 📥 [Path Map] Local: ${downloadPath} -> Remote: ${arrPath}`,
+				`[SERVER] 📥 [Path Map] Local: ${filePath} -> Remote: ${arrPath}`,
 			);
 
 			const commandPayload = {
@@ -1102,14 +1089,16 @@ export const app = new Elysia()
 
 			if (service === "radarr") commandPayload.movieId = sid;
 
-			await axios.post(`${config.url}/api/v3/command`, commandPayload, {
+			const apiVer = service === "lidarr" ? "v1" : "v3";
+
+			await axios.post(`${config.url}/api/${apiVer}/command`, commandPayload, {
 				headers: { "X-Api-Key": config.apiKey },
 				timeout: 30000,
 			});
 
 			return {
 				success: true,
-				message: `Downloaded & Sent to ${service} for import!`,
+				message: `Sent to ${service} for import!`,
 			};
 		},
 		{
@@ -1135,7 +1124,7 @@ export const app = new Elysia()
 
 try {
 	app.listen(process.env.PORT || 5000);
-	process.env.NODE_ENV === "development" &&
+	process.env.NODE_ENV === "dev" &&
 		logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
 	logger.info(
 		`[SERVER] Eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
