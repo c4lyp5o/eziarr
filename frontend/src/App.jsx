@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
 	RefreshCw,
+	FileWarning,
 	Search,
 	X,
 	Film,
@@ -37,15 +38,29 @@ function App() {
 	// settings modal
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-	const { data, error, isLoading, mutate } = useSWR(
-		"/api/v1/missing",
+	const { data: sysStatus, mutate: mutateSysStatus } = useSWR(
+		"/api/v1/system/status",
 		fetcher,
-		{
-			refreshInterval: 10000,
-			dedupingInterval: 5000,
-			revalidateOnFocus: false,
-		},
 	);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: nop
+	useEffect(() => {
+		if (sysStatus && !sysStatus.isSetup) {
+			toast.warning("No services configured. Lets get you set up!");
+			setIsSettingsOpen(true);
+		}
+	}, [sysStatus]);
+
+	const {
+		data: missingMedia,
+		error,
+		isLoading,
+		mutate,
+	} = useSWR(sysStatus?.isSetup ? "/api/v1/missing" : null, fetcher, {
+		refreshInterval: 10000,
+		dedupingInterval: 5000,
+		revalidateOnFocus: false,
+	});
 
 	const handleTriggerSearch = async (service, id, itemId) => {
 		setSearchingId(itemId);
@@ -89,7 +104,7 @@ function App() {
 	};
 
 	const handleGetQueueItem = (item) => {
-		return (data?.queue || []).find(
+		return (missingMedia?.queue || []).find(
 			(q) =>
 				q.service === item.service &&
 				Number(q.serviceId) === Number(item.serviceId),
@@ -129,7 +144,7 @@ function App() {
 
 	if (error) return <ErrorScreen />;
 
-	const missing = data?.missing || [];
+	const missing = missingMedia?.missing || [];
 
 	const filteredItems = missing.filter((item) => {
 		// 1. Check Text (Title or Series Title)
@@ -209,6 +224,7 @@ function App() {
 						<Button
 							size="sm"
 							variant="btnIcon"
+							title="Settings"
 							onClick={() => setIsSettingsOpen(true)}
 						>
 							<SettingsIcon size={20} />
@@ -227,6 +243,18 @@ function App() {
 							className="animate-spin mb-4 text-indigo-500"
 						/>
 						<p className="text-lg font-medium">Syncing libraries...</p>
+					</div>
+				) : !sysStatus?.isSetup ? (
+					<div className="text-center py-32 bg-gray-900/50 border border-gray-800 rounded-2xl border-dashed">
+						<div className="inline-flex p-4 rounded-full bg-red-500/10 text-red-400 mb-4">
+							<FileWarning size={32} />
+						</div>
+						<h2 className="text-2xl font-bold text-white mb-2">
+							No Services Configured!
+						</h2>
+						<p className="text-gray-400">
+							You haven't set up any services yet! Open Settings to get started.
+						</p>
 					</div>
 				) : missing.length === 0 ? (
 					// EMPTY DATABASE
@@ -288,6 +316,7 @@ function App() {
 
 			{modalData && (
 				<ResultsModal
+					sysStatus={sysStatus}
 					service={modalData.service}
 					serviceId={modalData.serviceId}
 					query={modalData.query}
@@ -301,6 +330,7 @@ function App() {
 			<SettingsModal
 				isOpen={isSettingsOpen}
 				onClose={() => setIsSettingsOpen(false)}
+				onSaveSuccess={mutateSysStatus}
 			/>
 
 			{/* MOBILE STATUS & SETTINGS */}
