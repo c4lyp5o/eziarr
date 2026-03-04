@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import path from "node:path";
 import { Elysia, t, file } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { staticPlugin } from "@elysiajs/static";
@@ -112,13 +112,13 @@ export const app = new Elysia()
 
 	.use(
 		staticPlugin({
-			assets: join(import.meta.dir, "../client"),
+			assets: path.join(import.meta.dir, "../client"),
 			prefix: "",
 			fallback: "index.html",
 		}),
 	)
 
-	.get("/", () => file(join(import.meta.dir, "../client/index.html")), {
+	.get("/", () => file(path.join(import.meta.dir, "../client/index.html")), {
 		detail: {
 			hide: true,
 		},

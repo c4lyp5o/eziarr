@@ -12,7 +12,7 @@ import {
 } from "./db";
 import { generalLogger as logger, hunterLogger } from "./logger";
 import { getPosterUrl } from "./utils";
-import { DEFAULT_SETTINGS, DOWNLOAD_DIR } from "./config";
+import { DEFAULT_SETTINGS } from "./config";
 
 const syncMissingItems = async () => {
 	const SERVICES = getServicesConfig();
@@ -275,15 +275,18 @@ const settingsWatcher = async () => {
 };
 
 const cleanupOldDownloads = () => {
-	if (!fs.existsSync(DOWNLOAD_DIR)) return;
+	if (!fs.existsSync(path.join(import.meta.file, "../downloads"))) return;
 
 	const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 	const now = Date.now();
 
 	try {
-		const folders = fs.readdirSync(DOWNLOAD_DIR);
+		const folders = fs.readdirSync(path.join(import.meta.file, "../downloads"));
 		for (const folder of folders) {
-			const folderPath = path.join(DOWNLOAD_DIR, folder);
+			const folderPath = path.join(
+				path.join(import.meta.file, "../downloads"),
+				folder,
+			);
 
 			if (fs.statSync(folderPath).isDirectory()) {
 				const files = fs.readdirSync(folderPath);
@@ -313,8 +316,10 @@ const cleanupOldDownloads = () => {
 
 const main = async () => {
 	logger.info("[WORKER] 🚀 Worker booting...");
-	if (!fs.existsSync(DOWNLOAD_DIR))
-		fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+	if (!fs.existsSync(path.join(import.meta.dir, "../downloads")))
+		fs.mkdirSync(path.join(import.meta.dir, "../downloads"), {
+			recursive: true,
+		});
 	logger.info("[WORKER] 📁 Download directory initialized.");
 	await settingsWatcher();
 	setInterval(settingsWatcher, 10000);
