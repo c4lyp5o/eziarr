@@ -40,6 +40,9 @@ COPY ecosystem.config.js ./
 # Copy built client bundle
 COPY --from=builder /app/client ./client
 
+# Set proper permissions so the user can write to them
+RUN chown -R 1000:1000 /app/downloads
+
 EXPOSE 5000
 
 # If you use PM2 ecosystem
