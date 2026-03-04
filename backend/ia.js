@@ -41,7 +41,7 @@ export const searchInternetArchive = async (query) => {
 };
 
 // Helper to get actual file links for a specific Item ID
-export const getArchiveFiles = async (identifier) => {
+export const getInternetArchiveFiles = async (identifier) => {
 	try {
 		const res = await axios.get(`https://archive.org/metadata/${identifier}`, {
 			timeout: 30000,
