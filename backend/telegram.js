@@ -168,7 +168,7 @@ export const downloadMedia = async (channel, messageId, filename) => {
 	const message = messages[0];
 	if (!message?.media) throw new Error("No media");
 
-	const { outputDir, outputPath } = prepareFileDownload(filename);
+	const { outputDir, outputPath } = await prepareFileDownload(filename);
 
 	logger.info(`[TELEGRAM] 📥 Starting download: ${filename}`);
 

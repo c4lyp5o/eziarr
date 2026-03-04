@@ -7,7 +7,7 @@ export const downloadHttpFile = async (url, filename) => {
 	if (!(await isSafeUrl(url)))
 		throw new Error("Invalid or unsafe URL provided.");
 
-	const { outputDir, outputPath } = prepareFileDownload(filename);
+	const { outputDir, outputPath } = await prepareFileDownload(filename);
 
 	logger.info(`[DOWNLOADER] 📥 Starting HTTP Download: ${url}`);
 
