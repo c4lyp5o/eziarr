@@ -6,6 +6,13 @@ import {
 	Server,
 	Send,
 	FolderSync,
+	Film,
+	Tv,
+	Search,
+	Link,
+	AlertTriangle,
+	Check,
+	Loader2,
 } from "lucide-react";
 
 import { useToast } from "../context/Toast";
@@ -14,7 +21,47 @@ import { apiCall } from "../utils/apiCall";
 import { Button } from "./Buttons";
 import { ui } from "../ui/styles";
 
-const SettingsModal = ({ isOpen, onClose }) => {
+const NoServicesConfiguredModal = ({ handleSave, onCancel, loading }) => {
+	return (
+		<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+			<div className="bg-[#0f0f10] border border-red-900/50 w-full max-w-md rounded-2xl flex flex-col shadow-2xl overflow-hidden text-center">
+				<div className="p-6">
+					<AlertTriangle
+						size={48}
+						className="mx-auto text-yellow-500 mb-4 animate-pulse"
+					/>
+					<h3 className="text-lg font-bold text-white mb-2">
+						No Services Configured
+					</h3>
+					<p className="text-sm text-gray-400">
+						You haven't configured Radarr, Sonarr, or Lidarr. Eziarr won't be
+						able to sync any missing media. Are you sure you want to save?
+					</p>
+				</div>
+				<div className="bg-[#0f0f10] border-t border-gray-800 p-4 flex justify-end gap-3">
+					<button
+						type="button"
+						onClick={onCancel}
+						disabled={loading}
+						className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+					>
+						Go Back
+					</button>
+					<button
+						type="button"
+						onClick={handleSave}
+						disabled={loading}
+						className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
+					>
+						{loading ? "Saving..." : "Yes, Save Anyway"}
+					</button>
+				</div>
+			</div>
+		</div>
+	);
+};
+
+const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 	const { toast } = useToast();
 
 	const [settings, setSettings] = useState({
@@ -26,7 +73,24 @@ const SettingsModal = ({ isOpen, onClose }) => {
 		telegramApiHash: "",
 		pathMapDocker: "",
 		pathMapRemote: "",
+		radarrUrl: "",
+		radarrApiKey: "",
+		sonarrUrl: "",
+		sonarrApiKey: "",
+		lidarrUrl: "",
+		lidarrApiKey: "",
+		prowlarrUrl: "",
+		prowlarrApiKey: "",
 	});
+	const [testStatus, setTestStatus] = useState({
+		radarr: "idle", // idle | loading | success | error
+		sonarr: "idle",
+		lidarr: "idle",
+		prowlarr: "idle",
+	});
+	const [noServicesConfiguredPrompt, setNoServicesConfiguredPrompt] =
+		useState(false);
+
 	const [loading, setLoading] = useState(false);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: later
@@ -34,19 +98,71 @@ const SettingsModal = ({ isOpen, onClose }) => {
 		if (isOpen) {
 			fetchSettings();
 		}
+
+		return () => {
+			setNoServicesConfiguredPrompt(false);
+		};
 	}, [isOpen]);
 
 	const fetchSettings = async () => {
 		try {
 			const res = await apiCall("/api/v1/settings");
-			setSettings((prev) => ({ ...prev, ...res }));
+			setSettings((prev) => ({ ...prev, ...res.settings }));
 		} catch (err) {
 			console.error("Failed to load settings", err);
 			toast.error("Failed to load settings");
 		}
 	};
 
+	const handleTestConnection = async (serviceName) => {
+		const url = settings[`${serviceName}Url`];
+		const apiKey = settings[`${serviceName}ApiKey`];
+
+		if (!url || !apiKey) {
+			toast.error(`Please enter both URL and API Key for ${serviceName}`);
+			return;
+		}
+
+		setTestStatus((prev) => ({ ...prev, [serviceName]: "loading" }));
+
+		try {
+			const res = await apiCall("/api/v1/system/test", {
+				method: "POST",
+				body: { service: serviceName, url, apiKey },
+			});
+
+			if (res.success) {
+				setTestStatus((prev) => ({ ...prev, [serviceName]: "success" }));
+				toast.success(`${serviceName} connected successfully!`);
+			} else {
+				setTestStatus((prev) => ({ ...prev, [serviceName]: "error" }));
+				toast.error(`${serviceName} connection failed.`);
+			}
+		} catch (err) {
+			setTestStatus((prev) => ({ ...prev, [serviceName]: "error" }));
+			toast.error(`Failed to reach ${serviceName}. Check URL.`);
+		}
+
+		// Reset button state after 3 seconds
+		setTimeout(() => {
+			setTestStatus((prev) => ({ ...prev, [serviceName]: "idle" }));
+		}, 3000);
+	};
+
 	const handleSave = async () => {
+		const noServices =
+			!settings.radarrUrl &&
+			!settings.radarrApiKey &&
+			!settings.sonarrUrl &&
+			!settings.sonarrApiKey &&
+			!settings.lidarrUrl &&
+			!settings.lidarrApiKey;
+
+		if (noServices && !noServicesConfiguredPrompt) {
+			setNoServicesConfiguredPrompt(true);
+			return;
+		}
+
 		setLoading(true);
 		try {
 			await apiCall("/api/v1/settings/batch", {
@@ -60,6 +176,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
 				},
 			});
 			toast.success("Settings saved!");
+			setNoServicesConfiguredPrompt(false);
+			onSaveSuccess();
 		} catch (err) {
 			console.error("Failed to save settings", err);
 			toast.error("Failed to save settings");
@@ -184,6 +302,233 @@ const SettingsModal = ({ isOpen, onClose }) => {
 						</div>
 					</section>
 
+					{/* Section: Service Connections */}
+					<section>
+						<div className="mb-4">
+							<h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+								<Link size={16} /> Service Connections
+							</h3>
+							<p className="text-[10px] text-gray-500 mt-1">
+								Leave blank if you do not use the service.{" "}
+								<strong className="text-gray-400">
+									Do not include a trailing slash (/) in URLs.
+								</strong>
+							</p>
+						</div>
+
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+							{/* RADARR */}
+							<div className="bg-gray-900/50 p-4 rounded-xl border border-gray-800 focus-within:border-yellow-500/50 transition-colors">
+								<div className="flex justify-between items-center mb-3">
+									<h4 className="text-sm font-bold text-yellow-500 flex items-center gap-2">
+										<Film size={16} /> Radarr
+									</h4>
+									<button
+										type="button"
+										onClick={() => handleTestConnection("radarr")}
+										disabled={testStatus.radarr === "loading"}
+										className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${
+											testStatus.radarr === "success"
+												? "bg-emerald-500/20 text-emerald-400"
+												: testStatus.radarr === "error"
+													? "bg-red-500/20 text-red-400"
+													: "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+										}`}
+									>
+										{testStatus.radarr === "loading" && (
+											<Loader2 size={12} className="animate-spin" />
+										)}
+										{testStatus.radarr === "success" && <Check size={12} />}
+										{testStatus.radarr === "error" && <X size={12} />}
+										{testStatus.radarr === "idle" && "Test"}
+										{testStatus.radarr !== "idle" &&
+											testStatus.radarr !== "loading" &&
+											"Tested"}
+									</button>
+								</div>
+								<div className="space-y-3">
+									<div>
+										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+										<label className="block text-xs text-gray-400">URL</label>
+										<input
+											type="text"
+											name="radarrUrl"
+											value={settings.radarrUrl || ""}
+											onChange={handleChange}
+											placeholder="http://192.168.1.50:7878"
+											className={`${ui.input} mt-1`}
+										/>
+									</div>
+									<div>
+										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+										<label className="block text-xs text-gray-400">
+											API Key
+										</label>
+										<input
+											type="password"
+											name="radarrApiKey"
+											value={settings.radarrApiKey || ""}
+											onChange={handleChange}
+											placeholder="32-character API key"
+											className={`${ui.input} mt-1`}
+										/>
+									</div>
+								</div>
+							</div>
+
+							{/* SONARR */}
+							<div className="bg-gray-900/50 p-4 rounded-xl border border-gray-800 focus-within:border-blue-500/50 transition-colors">
+								<div className="flex justify-between items-center mb-3">
+									<h4 className="text-sm font-bold text-blue-500 flex items-center gap-2">
+										<Tv size={16} /> Sonarr
+									</h4>
+									<button
+										type="button"
+										onClick={() => handleTestConnection("sonarr")}
+										disabled={testStatus.sonarr === "loading"}
+										className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${
+											testStatus.sonarr === "success"
+												? "bg-emerald-500/20 text-emerald-400"
+												: testStatus.sonarr === "error"
+													? "bg-red-500/20 text-red-400"
+													: "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+										}`}
+									>
+										{testStatus.sonarr === "loading" && (
+											<Loader2 size={12} className="animate-spin" />
+										)}
+										{testStatus.sonarr === "success" && <Check size={12} />}
+										{testStatus.sonarr === "error" && <X size={12} />}
+										{testStatus.sonarr === "idle" && "Test"}
+										{testStatus.sonarr !== "idle" &&
+											testStatus.sonarr !== "loading" &&
+											"Tested"}
+									</button>
+								</div>
+								<div className="space-y-3">
+									<div>
+										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+										<label className="block text-xs text-gray-400">URL</label>
+										<input
+											type="text"
+											name="sonarrUrl"
+											value={settings.sonarrUrl || ""}
+											onChange={handleChange}
+											placeholder="http://192.168.1.50:8989"
+											className={`${ui.input} mt-1`}
+										/>
+									</div>
+									<div>
+										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+										<label className="block text-xs text-gray-400">
+											API Key
+										</label>
+										<input
+											type="password"
+											name="sonarrApiKey"
+											value={settings.sonarrApiKey || ""}
+											onChange={handleChange}
+											placeholder="32-character API key"
+											className={`${ui.input} mt-1`}
+										/>
+									</div>
+								</div>
+							</div>
+
+							{/* LIDARR */}
+							<div className="bg-gray-900/50 p-4 rounded-xl border border-gray-800 focus-within:border-green-500/50 transition-colors">
+								<div className="flex justify-between items-center mb-3">
+									<h4 className="text-sm font-bold text-green-500 flex items-center gap-2">
+										<Film size={16} /> Lidarr
+									</h4>
+									<button
+										type="button"
+										onClick={() => handleTestConnection("lidarr")}
+										disabled={testStatus.lidarr === "loading"}
+										className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${
+											testStatus.lidarr === "success"
+												? "bg-emerald-500/20 text-emerald-400"
+												: testStatus.lidarr === "error"
+													? "bg-red-500/20 text-red-400"
+													: "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+										}`}
+									>
+										{testStatus.lidarr === "loading" && (
+											<Loader2 size={12} className="animate-spin" />
+										)}
+										{testStatus.lidarr === "success" && <Check size={12} />}
+										{testStatus.lidarr === "error" && <X size={12} />}
+										{testStatus.lidarr === "idle" && "Test"}
+										{testStatus.lidarr !== "idle" &&
+											testStatus.lidarr !== "loading" &&
+											"Tested"}
+									</button>
+								</div>
+								<div className="space-y-3">
+									<div>
+										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+										<label className="block text-xs text-gray-400">URL</label>
+										<input
+											type="text"
+											name="lidarrUrl"
+											value={settings.lidarrUrl || ""}
+											onChange={handleChange}
+											placeholder="http://192.168.1.50:8686"
+											className={`${ui.input} mt-1`}
+										/>
+									</div>
+									<div>
+										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+										<label className="block text-xs text-gray-400">
+											API Key
+										</label>
+										<input
+											type="password"
+											name="lidarrApiKey"
+											value={settings.lidarrApiKey || ""}
+											onChange={handleChange}
+											placeholder="32-character API key"
+											className={`${ui.input} mt-1`}
+										/>
+									</div>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					{/* Section: Prowlarr Connection */}
+					<section>
+						<h3 className="text-sm font-bold text-orange-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+							<Search size={16} /> Prowlarr
+						</h3>
+						<div className="space-y-3 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
+							<div>
+								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+								<label className="block text-xs text-gray-400">URL</label>
+								<input
+									type="text"
+									name="prowlarrUrl"
+									value={settings.prowlarrUrl}
+									onChange={handleChange}
+									placeholder="http://192.168.1.50:9696"
+									className={`${ui.input} mt-1`}
+								/>
+							</div>
+							<div>
+								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+								<label className="block text-xs text-gray-400">API Key</label>
+								<input
+									type="text"
+									name="prowlarrApiKey"
+									value={settings.prowlarrApiKey}
+									onChange={handleChange}
+									placeholder="32-character API key"
+									className={`${ui.input} mt-1`}
+								/>
+							</div>
+						</div>
+					</section>
+
 					{/* Section: Telegram Credentials */}
 					<section>
 						<h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -199,7 +544,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
 									value={settings.telegramApiId}
 									onChange={handleChange}
 									placeholder="e.g. 12345678"
-									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+									className={`${ui.input} mt-1`}
 								/>
 							</div>
 							<div>
@@ -211,12 +556,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
 									value={settings.telegramApiHash}
 									onChange={handleChange}
 									placeholder="Your 32-char hash"
-									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+									className={`${ui.input} mt-1`}
 								/>
 							</div>
 							<p className="text-[10px] text-gray-500">
-								Get these from my.telegram.org. Restart the backend after
-								changing these to take effect.
+								Get these from my.telegram.org.
 							</p>
 						</div>
 					</section>
@@ -238,7 +582,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
 									value={settings.pathMapDocker}
 									onChange={handleChange}
 									placeholder="/app/downloads"
-									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+									className={`${ui.input} mt-1`}
 								/>
 							</div>
 							<div>
@@ -252,7 +596,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
 									value={settings.pathMapRemote}
 									onChange={handleChange}
 									placeholder="C:\Imports"
-									className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+									className={`${ui.input} mt-1`}
 								/>
 							</div>
 							<p className="text-[10px] text-gray-500">
@@ -281,6 +625,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
 					</button>
 				</div>
 			</div>
+
+			{noServicesConfiguredPrompt && (
+				<NoServicesConfiguredModal
+					handleSave={handleSave}
+					onCancel={() => setNoServicesConfiguredPrompt(false)}
+					loading={loading}
+				/>
+			)}
 		</div>
 	);
 };
