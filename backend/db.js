@@ -10,6 +10,8 @@ const dbPath =
 
 const db = new Database(dbPath, { create: true });
 
+db.run("PRAGMA journal_mode = WAL;");
+
 try {
 	db.run(`
   CREATE TABLE IF NOT EXISTS missing_items (
