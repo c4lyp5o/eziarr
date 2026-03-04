@@ -30,6 +30,8 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 	const [grabbingId, setGrabbingId] = useState(null);
 
 	const [isLoading, setIsLoading] = useState(false);
+	const [isWaitingCode, setIsWaitingCode] = useState(false);
+	const [isWaitingLogin, setIsWaitingLogin] = useState(false);
 
 	const handleCheckTelegramStatus = async () => {
 		try {
@@ -57,6 +59,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 
 	const handleSendCodeTelegram = async () => {
 		try {
+			setIsWaitingCode(true);
 			await apiCall("/api/v1/telegram/auth/send-code", {
 				method: "POST",
 				body: { phoneNumber: telegramPhoneNumber },
@@ -66,11 +69,14 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 		} catch (err) {
 			console.error("Sending Telegram Code Failed", err);
 			toast.error("Sending Telegram Code Failed");
+		} finally {
+			setIsWaitingCode(false);
 		}
 	};
 
 	const handleLoginTelegram = async () => {
 		try {
+			setIsWaitingLogin(true);
 			const res = await apiCall("/api/v1/telegram/auth/login", {
 				method: "POST",
 				body: {
@@ -83,6 +89,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 				setTelegramConnected(true);
 				handleCheckTelegramStatus();
 			} else if (res.message === "2FA_NEEDED") {
+				setIsWaitingLogin(false);
 				toast.info("2FA Required For Telegram Login");
 				setTelegramAuthState("PASSWORD");
 			} else {
@@ -91,6 +98,8 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 		} catch (err) {
 			console.error("Telegram Login Failed", err);
 			toast.error("Telegram Login Failed");
+		} finally {
+			setIsWaitingLogin(false);
 		}
 	};
 
@@ -190,13 +199,19 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 								onChange={(e) => setTelegramPhoneNumber(e.target.value)}
 								placeholder="+1234567890"
 								className={`${ui.input} text-center py-3`}
+								disabled={isWaitingCode}
 							/>
 							<Button
 								variant="primary"
 								className="w-full"
 								onClick={handleSendCodeTelegram}
+								disabled={isWaitingCode}
 							>
-								Send Code
+								{isWaitingCode ? (
+									<SpinnerSmall className="animate-spin" />
+								) : (
+									"Send Code"
+								)}
 							</Button>
 						</div>
 					)}
@@ -208,13 +223,19 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 								onChange={(e) => setTelegramCode(e.target.value)}
 								placeholder="12345"
 								className={`${ui.input} text-center py-3`}
+								disabled={isWaitingLogin}
 							/>
 							<Button
 								variant="primary"
 								className="w-full"
 								onClick={handleLoginTelegram}
+								disabled={isWaitingLogin}
 							>
-								Verify Code
+								{isWaitingLogin ? (
+									<SpinnerSmall className="animate-spin" />
+								) : (
+									"Verify Code"
+								)}
 							</Button>
 						</div>
 					)}
@@ -228,13 +249,19 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 								onChange={(e) => setTelegramPassword(e.target.value)}
 								placeholder="Cloud Password"
 								className={`${ui.input} text-center py-3`}
+								disabled={isWaitingLogin}
 							/>
 							<Button
 								variant="primary"
 								className="w-full"
 								onClick={handleLoginTelegram}
+								disabled={isWaitingLogin}
 							>
-								Unlock
+								{isWaitingLogin ? (
+									<SpinnerSmall className="animate-spin" />
+								) : (
+									"Unlock"
+								)}
 							</Button>
 						</div>
 					)}
