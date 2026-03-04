@@ -8,110 +8,125 @@ import {
 	deleteItem,
 	getAllIds,
 	getAllSettings,
+	getServicesConfig,
 } from "./db";
 import { generalLogger as logger, hunterLogger } from "./logger";
 import { getPosterUrl } from "./utils";
-import { SERVICES, DEFAULT_SETTINGS, DOWNLOAD_DIR } from "./config";
+import { DEFAULT_SETTINGS, DOWNLOAD_DIR } from "./config";
 
 const syncMissingItems = async () => {
+	const SERVICES = getServicesConfig();
+
 	logger.info("[WORKER] 🔄 Syncing missing items...");
 
 	const activeIds = new Set();
 
 	try {
 		// 1. RADARR
-		try {
-			const radarrRes = await axios.get(
-				`${SERVICES.radarr.url}/api/v3/wanted/missing`,
-				{
-					params: { pageSize: 100, sortKey: "releaseDate", sortDir: "desc" },
-					headers: { "X-Api-Key": SERVICES.radarr.apiKey },
-					timeout: 30000,
-				},
-			);
-			radarrRes.data.records.forEach((m) => {
-				const id = `radarr-${m.id}`;
-				activeIds.add(id);
-				upsertItem({
-					id: id,
-					serviceId: m.id,
-					title: m.title,
-					type: "movie",
-					service: "radarr",
-					releaseDate: m.inCinemas || m.digitalRelease,
-					status: m.status,
-					posterUrl: getPosterUrl(m.images, "radarr", "poster"),
+		if (SERVICES.radarr.url && SERVICES.radarr.apiKey) {
+			try {
+				const radarrRes = await axios.get(
+					`${SERVICES.radarr.url}/api/v3/wanted/missing`,
+					{
+						params: { pageSize: 100, sortKey: "releaseDate", sortDir: "desc" },
+						headers: { "X-Api-Key": SERVICES.radarr.apiKey },
+						timeout: 30000,
+					},
+				);
+				radarrRes.data.records.forEach((m) => {
+					const id = `radarr-${m.id}`;
+					activeIds.add(id);
+					upsertItem({
+						id: id,
+						serviceId: m.id,
+						title: m.title,
+						type: "movie",
+						service: "radarr",
+						releaseDate: m.inCinemas || m.digitalRelease,
+						status: m.status,
+						posterUrl: getPosterUrl(m.images, "radarr", "poster"),
+					});
 				});
-			});
-		} catch (err) {
-			logger.error("[WORKER] Radarr Sync Error :", err);
+			} catch (err) {
+				logger.error("[WORKER] Radarr Sync Error :", err);
+			}
+		} else {
+			logger.warn("[WORKER[ Radarr not configured. Skipping sync.");
 		}
 
 		// 2. SONARR
-		try {
-			const sonarrRes = await axios.get(
-				`${SERVICES.sonarr.url}/api/v3/wanted/missing`,
-				{
-					params: {
-						pageSize: 100,
-						sortKey: "airDateUtc",
-						sortDir: "desc",
-						includeSeries: true,
+		if (SERVICES.sonarr.url && SERVICES.sonarr.apiKey) {
+			try {
+				const sonarrRes = await axios.get(
+					`${SERVICES.sonarr.url}/api/v3/wanted/missing`,
+					{
+						params: {
+							pageSize: 100,
+							sortKey: "airDateUtc",
+							sortDir: "desc",
+							includeSeries: true,
+						},
+						headers: { "X-Api-Key": SERVICES.sonarr.apiKey },
+						timeout: 30000,
 					},
-					headers: { "X-Api-Key": SERVICES.sonarr.apiKey },
-					timeout: 30000,
-				},
-			);
-			sonarrRes.data.records.forEach((ep) => {
-				const id = `sonarr-${ep.id}`;
-				activeIds.add(id);
-				upsertItem({
-					id: id,
-					serviceId: ep.id,
-					title: `${ep.series?.title || ""} - S${ep.seasonNumber}E${ep.episodeNumber}`,
-					seriesTitle: ep.series?.title,
-					type: "episode",
-					service: "sonarr",
-					releaseDate: ep.airDateUtc,
-					status: "missing",
-					posterUrl: getPosterUrl(ep.series?.images, "sonarr", "poster"),
+				);
+				sonarrRes.data.records.forEach((ep) => {
+					const id = `sonarr-${ep.id}`;
+					activeIds.add(id);
+					upsertItem({
+						id: id,
+						serviceId: ep.id,
+						title: `${ep.series?.title || ""} - S${ep.seasonNumber}E${ep.episodeNumber}`,
+						seriesTitle: ep.series?.title,
+						type: "episode",
+						service: "sonarr",
+						releaseDate: ep.airDateUtc,
+						status: "missing",
+						posterUrl: getPosterUrl(ep.series?.images, "sonarr", "poster"),
+					});
 				});
-			});
-		} catch (err) {
-			logger.error("[WORKER] Sonarr Sync Error :", err);
+			} catch (err) {
+				logger.error("[WORKER] Sonarr Sync Error :", err);
+			}
+		} else {
+			logger.warn("[WORKER[ Sonarr not configured. Skipping sync.");
 		}
 
 		// 3. LIDARR
-		try {
-			const lidarrRes = await axios.get(
-				`${SERVICES.lidarr.url}/api/v1/wanted/missing`,
-				{
-					params: {
-						page: 1,
-						pageSize: 100,
-						sortKey: "releaseDate",
-						sortDir: "desc",
+		if (SERVICES.lidarr.url && SERVICES.lidarr.apiKey) {
+			try {
+				const lidarrRes = await axios.get(
+					`${SERVICES.lidarr.url}/api/v1/wanted/missing`,
+					{
+						params: {
+							page: 1,
+							pageSize: 100,
+							sortKey: "releaseDate",
+							sortDir: "desc",
+						},
+						headers: { "X-Api-Key": SERVICES.lidarr.apiKey },
+						timeout: 30000,
 					},
-					headers: { "X-Api-Key": SERVICES.lidarr.apiKey },
-					timeout: 30000,
-				},
-			);
-			lidarrRes.data.records.forEach((album) => {
-				const id = `lidarr-${album.id}`;
-				activeIds.add(id);
-				upsertItem({
-					id: id,
-					serviceId: album.id,
-					title: `${album.artist.artistName} - ${album.title}`,
-					type: "album",
-					service: "lidarr",
-					releaseDate: album.releaseDate,
-					status: "missing",
-					posterUrl: getPosterUrl(album.images, "lidarr", "cover"),
+				);
+				lidarrRes.data.records.forEach((album) => {
+					const id = `lidarr-${album.id}`;
+					activeIds.add(id);
+					upsertItem({
+						id: id,
+						serviceId: album.id,
+						title: `${album.artist.artistName} - ${album.title}`,
+						type: "album",
+						service: "lidarr",
+						releaseDate: album.releaseDate,
+						status: "missing",
+						posterUrl: getPosterUrl(album.images, "lidarr", "cover"),
+					});
 				});
-			});
-		} catch (err) {
-			logger.error("[WORKER] Lidarr Sync Error :", err);
+			} catch (err) {
+				logger.error("[WORKER] Lidarr Sync Error :", err);
+			}
+		} else {
+			logger.warn("[WORKER[ Lidarr not configured. Skipping sync.");
 		}
 
 		// 4. CLEANUP (Soft Sync)
@@ -134,6 +149,8 @@ const syncMissingItems = async () => {
 };
 
 const runHunter = async () => {
+	const SERVICES = getServicesConfig();
+
 	const item = getNextItemToSearch();
 	if (!item) {
 		hunterLogger.info("[WORKER] 💤 Hunter: No eligible old items to search.");
@@ -145,6 +162,11 @@ const runHunter = async () => {
 	);
 
 	const serviceConfig = SERVICES[item.service];
+
+	if (!serviceConfig.url || !serviceConfig.apiKey) {
+		hunterLogger.warn(`Service is not configured. Aborting hunt.`);
+		return;
+	}
 
 	let endpoint = "/api/v3/command";
 	let payload = {};
@@ -181,6 +203,12 @@ let currentConfig = null;
 const applySettings = async (settings) => {
 	const syncInterval = Number.parseInt(settings.syncInterval, 10);
 	const hunterInterval = Number.parseInt(settings.hunterInterval, 10);
+	const radarrUrl = settings.radarrUrl;
+	const radarrApiKey = settings.radarrApiKey;
+	const sonarrUrl = settings.sonarrUrl;
+	const sonarrApiKey = settings.sonarrApiKey;
+	const lidarrUrl = settings.lidarrUrl;
+	const lidarrApiKey = settings.lidarrApiKey;
 
 	const newConfig = {
 		syncEnabled: settings.syncEnabled ?? DEFAULT_SETTINGS.syncEnabled,
@@ -191,6 +219,12 @@ const applySettings = async (settings) => {
 		hunterInterval: Number.isFinite(hunterInterval)
 			? hunterInterval
 			: DEFAULT_SETTINGS.hunterInterval,
+		radarrUrl: radarrUrl,
+		radarrApiKey: radarrApiKey,
+		sonarrUrl: sonarrUrl,
+		sonarrApiKey: sonarrApiKey,
+		lidarrUrl: lidarrUrl,
+		lidarrApiKey: lidarrApiKey,
 	};
 
 	if (JSON.stringify(newConfig) === JSON.stringify(currentConfig)) {
