@@ -36,7 +36,6 @@ COPY backend ./backend
 # Copy main package.json, pm2 config and .env (if present)
 COPY package.json ./
 COPY ecosystem.config.js ./
-COPY .env ./
 
 # Copy built client bundle
 COPY --from=builder /app/frontend ./frontend
