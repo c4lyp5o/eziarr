@@ -71,7 +71,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 		hunterInterval: 15,
 		telegramApiId: "",
 		telegramApiHash: "",
-		pathMapDocker: "",
+		// pathMapDocker: "",
 		pathMapRemote: "",
 		radarrUrl: "",
 		radarrApiKey: "",
@@ -571,8 +571,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 							<FolderSync size={16} /> Path Translation (Optional)
 						</h3>
 						<div className="space-y-3 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
-							<div>
-								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+							{/* <div>
 								<label className="block text-xs text-gray-400">
 									Eziarr Local Path (Docker Prefix)
 								</label>
@@ -584,7 +583,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 									placeholder="/app/downloads"
 									className={`${ui.input} mt-1`}
 								/>
-							</div>
+							</div> */}
 							<div>
 								{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
 								<label className="block text-xs text-gray-400">

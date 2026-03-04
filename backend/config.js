@@ -15,7 +15,7 @@ export const DEFAULT_SETTINGS = {
 	prowlarrApiKey: "",
 	telegramApiId: "", // Your my.telegram.org App ID
 	telegramApiHash: "", // Your my.telegram.org App Hash
-	pathMapDocker: "", // e.g., /app/downloads
+	// pathMapDocker: "", // e.g., /app/downloads
 	pathMapRemote: "", // e.g., C:\Imports
 };
 

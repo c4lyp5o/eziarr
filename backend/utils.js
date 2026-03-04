@@ -57,14 +57,13 @@ export const fetchQueue = async (serviceName, idKey) => {
 };
 
 export const translatePath = (localPath) => {
-	const dockerPrefix = getSetting("pathMapDocker", "");
 	const remotePrefix = getSetting("pathMapRemote", "");
 
 	let finalPath = localPath;
 
-	// 1. Swap the prefixes
-	if (dockerPrefix && remotePrefix) {
-		finalPath = localPath.replace(dockerPrefix, remotePrefix);
+	// 1. Swap the prefixes ONLY IF remotePrefix is set
+	if (remotePrefix) {
+		finalPath = localPath.replace("/app/downloads", remotePrefix);
 	}
 
 	// 2. Cross-OS Slash Fix: If the remote path is Windows (starts with a Drive letter or \\)
@@ -199,13 +198,8 @@ export const isSafeUrl = async (urlString) => {
 
 export const prepareFileDownload = (filename) => {
 	const safeFilename = filename.replace(/[^a-z0-9.\-_]/gi, "_");
-
 	const folderName = path.parse(safeFilename).name;
-
 	const outputDir = path.join(DOWNLOAD_DIR, folderName);
 	const outputPath = path.join(outputDir, safeFilename);
-
-	if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-
 	return { outputDir, outputPath };
 };

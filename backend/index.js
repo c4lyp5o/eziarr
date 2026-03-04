@@ -660,7 +660,7 @@ export const app = new Elysia()
 				prowlarrApiKey: t.Optional(t.String()),
 				telegramApiId: t.Optional(t.String()),
 				telegramApiHash: t.Optional(t.String()),
-				pathMapDocker: t.Optional(t.String()),
+				// pathMapDocker: t.Optional(t.String()),
 				pathMapRemote: t.Optional(t.String()),
 				telegramTempHash: t.Optional(t.String()),
 				telegramTempPhone: t.Optional(t.String()),
