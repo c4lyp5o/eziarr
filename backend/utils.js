@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { setTimeout } from "node:timers/promises";
 import { lookup } from "node:dns/promises";
 import net from "node:net";
 import axios from "axios";
@@ -196,10 +197,14 @@ export const isSafeUrl = async (urlString) => {
 	}
 };
 
-export const prepareFileDownload = (filename) => {
+export const prepareFileDownload = async (filename) => {
 	const safeFilename = filename.replace(/[^a-z0-9.\-_]/gi, "_");
 	const folderName = path.parse(safeFilename).name;
 	const outputDir = path.join(DOWNLOAD_DIR, folderName);
 	const outputPath = path.join(outputDir, safeFilename);
+	if (!fs.existsSync(outputDir)) {
+		fs.mkdirSync(outputDir, { recursive: true });
+		await setTimeout(2000);
+	}
 	return { outputDir, outputPath };
 };
