@@ -66,4 +66,4 @@ All endpoints are prefixed with `/api/v1`.
 ## 🛠️ Development Notes
 
 1. **Path Normalization:** If running on Windows, the `translatePath` function actively corrects forward slashes `/` to backward slashes `\` to prevent Radarr API rejections.
-2. **State Management:** The Telegram session is stored as a `StringSession` in the `settings` table. If you need to force a re-login, delete the `telegram_session` row from the DB.
+2. **State Management:** The Telegram session is stored as a `StringSession` in the `settings` table. If you need to force a re-login, delete the `telegramSession` row from the DB.
