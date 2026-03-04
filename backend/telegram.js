@@ -16,7 +16,7 @@ export const getTelegramClient = async () => {
 	const sessionString = getSetting("telegramSession", "");
 	const session = new StringSession(sessionString);
 
-	tClient = new TelegramClient(session, apiId, apiHash, {
+	tClient = new TelegramClient(session, Number(apiId), apiHash, {
 		connectionRetries: 5,
 		useWSS: false,
 	});
