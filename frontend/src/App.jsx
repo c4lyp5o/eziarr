@@ -13,6 +13,7 @@ import {
 import useSWR from "swr";
 
 import { useToast } from "./context/Toast.jsx";
+import { fetcher } from "./utils/fetcher.js";
 import { apiCall } from "./utils/apiCall.js";
 
 import MediaCard from "./components/MediaCard.jsx";
@@ -20,12 +21,6 @@ import ResultsModal from "./components/ResultsModal.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import ErrorScreen from "./components/ErrorScreen.jsx";
 import { FilterButton, Button } from "./components/Buttons.jsx";
-
-const fetcher = async (url) => {
-	const res = await fetch(url);
-	if (!res.ok) throw new Error(`HTTP ${res.status}`);
-	return res.json();
-};
 
 function App() {
 	const { toast } = useToast();
