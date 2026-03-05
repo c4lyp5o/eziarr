@@ -3,10 +3,7 @@ import { Database } from "bun:sqlite";
 import { DEFAULT_SETTINGS, DB_DIR } from "./config";
 import { generalLogger as logger } from "./logger";
 
-const dbPath =
-	process.env.NODE_ENV === "dev"
-		? ":memory:"
-		: path.join(DB_DIR, "eziarr.sqlite");
+const dbPath = path.join(DB_DIR, "eziarr.sqlite");
 
 const db = new Database(dbPath, { create: true });
 
@@ -34,6 +31,29 @@ try {
     value TEXT
   )
 `);
+
+	db.run(`
+  CREATE TABLE IF NOT EXISTS active_tasks (
+    id TEXT PRIMARY KEY,
+    type TEXT,
+    status TEXT,
+    message TEXT,
+    progress INTEGER,
+    updated_at INTEGER
+  )
+`);
+
+	db.run(`
+  CREATE TABLE IF NOT EXISTS download_queue (
+    id TEXT PRIMARY KEY,
+    type TEXT,
+    payload TEXT,
+    status TEXT,
+    created_at INTEGER
+  )
+`);
+
+	logger.info("[DB] ✅ Database initialized.");
 } catch (err) {
 	logger.error("[DB] ❌ Database Initialization Error: ", err);
 	process.exit(1);
@@ -117,18 +137,32 @@ export const getNextItemToSearch = () => {
 
 	const now = new Date().toISOString();
 
-	return db
+	const row = db
 		.query(`
-    SELECT * FROM missing_items 
-    WHERE (last_searched_at IS NULL OR last_searched_at < $searchCutoff)
-    AND release_date <= $now
-    ORDER BY release_date DESC
-    LIMIT 1
-  `)
+     SELECT * FROM missing_items 
+     WHERE (last_searched_at IS NULL OR last_searched_at < $searchCutoff)
+     AND release_date <= $now
+     ORDER BY release_date DESC
+     LIMIT 1
+   `)
 		.get({
 			$searchCutoff: searchCutoff,
 			$now: now,
 		});
+
+	if (!row) return null;
+	return {
+		id: row.id,
+		serviceId: row.service_id,
+		title: row.title,
+		seriesTitle: row.series_title,
+		type: row.type,
+		service: row.service,
+		releaseDate: row.release_date,
+		posterUrl: row.poster_url,
+		lastSearchedAt: row.last_searched_at,
+		status: row.status,
+	};
 };
 
 export const clearTable = () => {
@@ -188,6 +222,79 @@ export const getServicesConfig = () => {
 		lidarr: { url: s.lidarrUrl, apiKey: s.lidarrApiKey },
 		prowlarr: { url: s.prowlarrUrl, apiKey: s.prowlarrApiKey },
 	};
+};
+
+export const upsertTask = (id, type, status, message, progress = 0) => {
+	db.query(`
+    INSERT INTO active_tasks (id, type, status, message, progress, updated_at)
+    VALUES ($id, $type, $status, $message, $progress, $updatedAt)
+    ON CONFLICT(id) DO UPDATE SET
+      status = excluded.status,
+      message = excluded.message,
+      progress = excluded.progress,
+      updated_at = excluded.updated_at
+  `).run({
+		$id: id,
+		$type: type,
+		$status: status,
+		$message: message,
+		$progress: progress,
+		$updatedAt: Date.now(),
+	});
+};
+
+export const getActiveTasks = () => {
+	return db
+		.query(
+			"SELECT * FROM active_tasks WHERE status = 'running' ORDER BY updated_at DESC",
+		)
+		.all();
+};
+
+export const removeTask = (id) => {
+	db.query("DELETE FROM active_tasks WHERE id = $id").run({ $id: id });
+};
+
+export const clearAllTasks = () => {
+	db.run("DELETE FROM active_tasks");
+};
+
+export const addDownloadJob = (type, payload) => {
+	const id = `job-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+	db.query(`
+    INSERT INTO download_queue (id, type, payload, status, created_at) 
+    VALUES ($id, $type, $payload, 'pending', $createdAt)
+  `).run({
+		$id: id,
+		$type: type,
+		$payload: JSON.stringify(payload),
+		$createdAt: Date.now(),
+	});
+};
+
+export const getNextDownloadJob = () => {
+	return db
+		.query(
+			"SELECT * FROM download_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1",
+		)
+		.get();
+};
+
+export const updateDownloadJobStatus = (id, status) => {
+	db.query("UPDATE download_queue SET status = $status WHERE id = $id").run({
+		$status: status,
+		$id: id,
+	});
+};
+
+export const removeDownloadJob = (id) => {
+	db.query("DELETE FROM download_queue WHERE id = $id").run({ $id: id });
+};
+
+export const resetStuckDownloads = () => {
+	db.run(
+		"UPDATE download_queue SET status = 'pending' WHERE status = 'downloading'",
+	);
 };
 
 initDefaultSettings();
