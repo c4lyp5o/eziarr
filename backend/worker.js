@@ -61,7 +61,7 @@ const syncMissingItems = async () => {
 						service: "radarr",
 						releaseDate: m.inCinemas || m.digitalRelease,
 						status: m.status,
-						posterUrl: getPosterUrl(m.images, "radarr", "poster"),
+						posterUrl: getPosterUrl(m.images, "poster"),
 					});
 				});
 				successfulServices.add("radarr");
@@ -100,7 +100,7 @@ const syncMissingItems = async () => {
 						service: "sonarr",
 						releaseDate: ep.airDateUtc,
 						status: "missing",
-						posterUrl: getPosterUrl(ep.series?.images, "sonarr", "poster"),
+						posterUrl: getPosterUrl(ep.series?.images, "poster"),
 					});
 				});
 				successfulServices.add("sonarr");
@@ -138,7 +138,7 @@ const syncMissingItems = async () => {
 						service: "lidarr",
 						releaseDate: album.releaseDate,
 						status: "missing",
-						posterUrl: getPosterUrl(album.images, "lidarr", "cover"),
+						posterUrl: getPosterUrl(album.images, "cover"),
 					});
 				});
 				successfulServices.add("lidarr");

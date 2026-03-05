@@ -16,18 +16,15 @@ export const coerceNumericId = (value, fieldName = "id") => {
 	return n;
 };
 
-export const getPosterUrl = (images = [], serviceName, coverType) => {
-	const SERVICES = getServicesConfig();
-	const conf = SERVICES[serviceName];
-	if (!conf.url || !conf.apiKey) return null;
-
+export const getPosterUrl = (images = [], coverType) => {
 	const image = images.find((img) => img.coverType === coverType);
 	if (!image) return null;
-	if (image.url) {
-		return `${conf.url}${image.url}?apikey=${conf.apiKey}`;
-	} else {
-		return image.remoteUrl || null;
+
+	if (image.remoteUrl) {
+		return image.remoteUrl;
 	}
+
+	return null;
 };
 
 export const fetchQueue = async (serviceName, idKey) => {
