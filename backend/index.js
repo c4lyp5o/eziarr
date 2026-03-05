@@ -11,11 +11,9 @@ import {
 	sendLoginCode,
 	completeLogin,
 	searchChannel,
-	downloadTelegramFile,
 } from "./telegram";
 import { searchInternetArchive, getInternetArchiveFiles } from "./ia";
 import { scanOpenDir } from "./opendir";
-import { downloadHttpFile } from "./downloader";
 import {
 	getItems,
 	deleteItem,
@@ -26,7 +24,7 @@ import {
 	addDownloadJob,
 } from "./db";
 import { generalLogger as logger } from "./logger";
-import { coerceNumericId, fetchQueue, translatePath } from "./utils";
+import { coerceNumericId, fetchQueue } from "./utils";
 import { LOG_DIR, CLIENT_DIR } from "./config";
 
 export const app = new Elysia()
