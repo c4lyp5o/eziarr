@@ -15,7 +15,6 @@ export const DEFAULT_SETTINGS = {
 	prowlarrApiKey: "",
 	telegramApiId: "", // Your my.telegram.org App ID
 	telegramApiHash: "", // Your my.telegram.org App Hash
-	// pathMapDocker: "", // e.g., /app/downloads
 	pathMapRemote: "", // e.g., C:\Imports
 };
 
@@ -23,3 +22,5 @@ export const DOWNLOAD_DIR = path.join(import.meta.dir, "../downloads");
 export const DB_DIR = path.join(import.meta.dir, "../db");
 export const LOG_DIR = path.join(import.meta.dir, "../logs");
 export const CLIENT_DIR = path.join(import.meta.dir, "../client");
+
+export const MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024 * 1024;
