@@ -198,7 +198,7 @@ export const isSafeUrl = async (urlString) => {
 };
 
 export const prepareFileDownload = async (filename) => {
-	const safeFilename = filename.replace(/[^a-z0-9.\-_]/gi, "_");
+	const safeFilename = filename.replace(/[/\\?%*:|"<>]/g, " ").trim();
 	const folderName = path.parse(safeFilename).name;
 	const outputDir = path.join(DOWNLOAD_DIR, folderName);
 	const outputPath = path.join(outputDir, safeFilename);
