@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { setTimeout } from "node:timers/promises";
 import axios from "axios";
 import {
 	upsertItem,
@@ -362,16 +363,17 @@ const processDownloadQueue = async () => {
 			100,
 		);
 
+		await setTimeout(10000);
+
 		// --- Trigger *Arr Import ---
 		const arrPath = translatePath(result.filePath);
 		const SERVICES = getServicesConfig();
 		const config = SERVICES[payload.service];
 
-		if (!config || !config.url || !config.apiKey) {
+		if (!config || !config.url || !config.apiKey)
 			throw new Error(
 				`${payload.service} is not configured. Cannot import file.`,
 			);
-		}
 
 		const commandName =
 			payload.service === "radarr"
@@ -439,9 +441,7 @@ const cleanupOldDownloads = () => {
 								`[WORKER/SWEEPER] 🧹 Sweeper: Deleted old zombie file: ${filePath}`,
 							);
 						} catch (err) {
-							logger.warn(
-								`[WORKER/SWEEPER] 🧹 Sweeper: Skipped file ${filePath} (Likely in use)`,
-							);
+							// It's perfectly fine if this fails.
 						}
 					}
 				}
@@ -451,7 +451,7 @@ const cleanupOldDownloads = () => {
 						fs.rmdirSync(folderPath);
 					}
 				} catch (err) {
-					// It's perfectly fine if this fails. Maybe a downloader is working
+					// It's perfectly fine if this fails.
 				}
 			}
 		}

@@ -201,7 +201,7 @@ export const prepareFileDownload = async (filename) => {
 	const outputPath = path.join(outputDir, safeFilename);
 	if (!fs.existsSync(outputDir)) {
 		fs.mkdirSync(outputDir, { recursive: true });
-		await setTimeout(2000);
+		await setTimeout(10000);
 	}
 	return { outputDir, outputPath };
 };
