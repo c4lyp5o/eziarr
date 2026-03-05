@@ -81,7 +81,7 @@ const ResultsModal = ({
 							<Globe className="text-indigo-500 shrink-0 mt-0.5" size={20} />
 
 							{/* Wrap the text in a block that forces long strings to break */}
-							<div className="break-words min-w-0 leading-tight">
+							<div className="wrap-break-word min-w-0 leading-tight">
 								<span className="mr-2">Deep Search:</span>
 								<span className="text-indigo-300">{query}</span>
 							</div>
