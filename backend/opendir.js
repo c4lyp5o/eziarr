@@ -24,16 +24,14 @@ export const scanOpenDir = async (dirUrl) => {
 
 		const linkRegex = /<a\s+(?:[^>]*?\s+)?href="([^"]*)"/gi;
 		const files = [];
-		let match = linkRegex.exec(html);
 
+		let match;
 		// biome-ignore lint/suspicious/noAssignInExpressions: i had to
 		while ((match = linkRegex.exec(html)) !== null) {
 			const rawLink = match[1];
 
-			if (rawLink === "../" || rawLink === "./" || rawLink.includes("?")) {
-				match = linkRegex.exec(html);
+			if (rawLink === "../" || rawLink === "./" || rawLink.includes("?"))
 				continue;
-			}
 
 			const absoluteUrl = new URL(rawLink, dirUrl).href;
 
@@ -52,8 +50,6 @@ export const scanOpenDir = async (dirUrl) => {
 					ext: ext,
 				});
 			}
-
-			match = linkRegex.exec(html);
 		}
 
 		return files;
