@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { Elysia, t, file } from "elysia";
 import { cors } from "@elysiajs/cors";
@@ -6,10 +7,11 @@ import { staticPlugin } from "@elysiajs/static";
 import axios from "axios";
 import {
 	getTelegramClient,
+	resetTelegramClient,
 	sendLoginCode,
 	completeLogin,
 	searchChannel,
-	downloadMedia,
+	downloadTelegramFile,
 } from "./telegram";
 import { searchInternetArchive, getInternetArchiveFiles } from "./ia";
 import { scanOpenDir } from "./opendir";
@@ -20,10 +22,12 @@ import {
 	getAllSettings,
 	setSetting,
 	getServicesConfig,
+	getActiveTasks,
+	addDownloadJob,
 } from "./db";
 import { generalLogger as logger } from "./logger";
 import { coerceNumericId, fetchQueue, translatePath } from "./utils";
-import { CLIENT_DIR } from "./config";
+import { LOG_DIR, CLIENT_DIR } from "./config";
 
 export const app = new Elysia()
 	.onError(({ code, error, set }) => {
@@ -614,8 +618,11 @@ export const app = new Elysia()
 
 	.post(
 		"/api/v1/settings",
-		({ body: { key, value } }) => {
+		async ({ body: { key, value } }) => {
 			setSetting(key, value);
+
+			if (key.startsWith("telegram")) await resetTelegramClient();
+
 			return { success: true, message: "Setting updated" };
 		},
 		{
@@ -638,10 +645,18 @@ export const app = new Elysia()
 
 	.post(
 		"/api/v1/settings/batch",
-		({ body }) => {
+		async ({ body }) => {
 			for (const [key, value] of Object.entries(body)) {
 				setSetting(key, value);
 			}
+
+			if (
+				body.telegramApiId !== undefined ||
+				body.telegramApiHash !== undefined ||
+				body.telegramSession !== undefined
+			)
+				await resetTelegramClient();
+
 			return { success: true, message: "Settings updated" };
 		},
 		{
@@ -660,10 +675,7 @@ export const app = new Elysia()
 				prowlarrApiKey: t.Optional(t.String()),
 				telegramApiId: t.Optional(t.String()),
 				telegramApiHash: t.Optional(t.String()),
-				// pathMapDocker: t.Optional(t.String()),
 				pathMapRemote: t.Optional(t.String()),
-				telegramTempHash: t.Optional(t.String()),
-				telegramTempPhone: t.Optional(t.String()),
 				telegramSession: t.Optional(t.String()),
 			}),
 			response: t.Object({ success: t.Boolean(), message: t.String() }),
@@ -712,6 +724,68 @@ export const app = new Elysia()
 				summary: "Get System Status",
 				description: "Retrieve status of services for the application.",
 				tags: ["Settings"],
+			},
+		},
+	)
+
+	.get(
+		"/api/v1/system/tasks",
+		() => {
+			const tasks = getActiveTasks();
+			return { success: true, tasks };
+		},
+		{
+			response: t.Object({
+				success: t.Boolean(),
+				tasks: t.Array(
+					t.Object({
+						id: t.String(),
+						type: t.String(),
+						status: t.String(),
+						message: t.String(),
+						progress: t.Number(),
+						updated_at: t.Number(),
+					}),
+				),
+			}),
+			detail: {
+				summary: "Get Active Tasks",
+				description:
+					"Returns a list of currently running background tasks across the server and worker.",
+				tags: ["General"],
+			},
+		},
+	)
+
+	.get(
+		"/api/v1/system/logs",
+		({ query: { type } }) => {
+			const filename = type === "hunter" ? "hunter.log" : "general.log";
+			const logPath = path.join(LOG_DIR, filename);
+
+			if (!fs.existsSync(logPath)) return { success: true, logs: [] };
+
+			try {
+				const content = fs.readFileSync(logPath, "utf-8");
+				const lines = content.split("\n").filter(Boolean).slice(-100);
+				return { success: true, logs: lines };
+			} catch (err) {
+				return { success: false, message: "Could not read logs", logs: [] };
+			}
+		},
+		{
+			query: t.Object({
+				type: t.Optional(t.String()),
+			}),
+			response: t.Object({
+				success: t.Boolean(),
+				logs: t.Array(t.String()),
+				message: t.Optional(t.String()),
+			}),
+			detail: {
+				summary: "Get System Logs",
+				description: "Returns the tail of the Eziarr system logs.",
+				tags: ["General"],
 			},
 		},
 	)
@@ -890,49 +964,54 @@ export const app = new Elysia()
 
 			const sid = coerceNumericId(serviceId, "serviceId");
 
-			logger.info(`[SERVER] 📥 [Telegram] Starting download: ${filename}`);
-			const { path, filePath } = await downloadMedia(
+			let perfectName = filename;
+			try {
+				const ext = filename.substring(filename.lastIndexOf("."));
+				if (service === "radarr") {
+					const res = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
+						headers: { "X-Api-Key": config.apiKey },
+						timeout: 10000,
+					});
+					perfectName = `${res.data.title} (${res.data.year})${ext}`;
+				} else if (service === "sonarr") {
+					const epRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
+						headers: { "X-Api-Key": config.apiKey },
+						timeout: 10000,
+					});
+					const sRes = await axios.get(
+						`${config.url}/api/v3/series/${epRes.data.seriesId}`,
+						{ headers: { "X-Api-Key": config.apiKey }, timeout: 10000 },
+					);
+					const sn = epRes.data.seasonNumber.toString().padStart(2, "0");
+					const en = epRes.data.episodeNumber.toString().padStart(2, "0");
+					perfectName = `${sRes.data.title} S${sn}E${en}${ext}`;
+				} else if (service === "lidarr") {
+					const alRes = await axios.get(`${config.url}/api/v1/album/${sid}`, {
+						headers: { "X-Api-Key": config.apiKey },
+						timeout: 10000,
+					});
+					perfectName = `${alRes.data.artist.artistName} - ${alRes.data.title}${ext}`;
+				}
+				perfectName = perfectName.replace(/[/\\?%*:|"<>]/g, "");
+			} catch (err) {
+				logger.warn(
+					`[SERVER] Failed to fetch exact title for renaming, falling back to original: ${err.message}`,
+				);
+			}
+
+			logger.info(`[SERVER] 📥 Queueing Telegram download: ${perfectName}`);
+
+			addDownloadJob("telegram", {
+				service,
+				serviceId: sid,
 				channel,
 				messageId,
-				filename,
-			);
-			logger.info(
-				`[SERVER] 📥 [Telegram] Download completed. Path: ${path}, Filepath: ${filePath}`,
-			);
-
-			const commandName =
-				service === "radarr"
-					? "DownloadedMoviesScan"
-					: service === "sonarr"
-						? "DownloadedEpisodesScan"
-						: "DownloadedAlbumsScan";
-			const arrPath = translatePath(filePath);
-			logger.info(
-				`[SERVER] 📥 [Path Map] Local: ${filePath} -> Remote: ${arrPath}`,
-			);
-
-			const commandPayload = {
-				name: commandName,
-				path: arrPath,
-				importMode: "Move",
-			};
-
-			if (service === "radarr") commandPayload.movieId = sid;
-
-			// Note for Sonarr: 'DownloadedEpisodesScan' does NOT accept 'episodeId'.
-			// It relies entirely on the filename containing "S01E01".
-			// If the Telegram file doesn't have S01E01, Sonarr will likely reject it
-			// and you will see it in Sonarr > Activity > Queue (Manual Import needed).
-			const apiVer = service === "lidarr" ? "v1" : "v3";
-
-			await axios.post(`${config.url}/api/${apiVer}/command`, commandPayload, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
+				filename: perfectName,
 			});
 
 			return {
 				success: true,
-				message: `Sent to ${service} for import!`,
+				message: `Added to download queue! Check Active Tasks.`,
 			};
 		},
 		{
@@ -1064,41 +1143,53 @@ export const app = new Elysia()
 
 			const sid = coerceNumericId(serviceId, "serviceId");
 
-			logger.info(`[SERVER] 📥 [HTTP] Starting download: ${filename}`);
-			const { path, filePath } = await downloadHttpFile(url, filename);
-			logger.info(
-				`[SERVER] 📥 [HTTP] Download completed. Path: ${path}, Filepath: ${filePath}`,
-			);
+			let perfectName = filename;
+			try {
+				const ext = filename.substring(filename.lastIndexOf("."));
+				if (service === "radarr") {
+					const res = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
+						headers: { "X-Api-Key": config.apiKey },
+						timeout: 10000,
+					});
+					perfectName = `${res.data.title} (${res.data.year})${ext}`;
+				} else if (service === "sonarr") {
+					const epRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
+						headers: { "X-Api-Key": config.apiKey },
+						timeout: 10000,
+					});
+					const sRes = await axios.get(
+						`${config.url}/api/v3/series/${epRes.data.seriesId}`,
+						{ headers: { "X-Api-Key": config.apiKey }, timeout: 10000 },
+					);
+					const sn = epRes.data.seasonNumber.toString().padStart(2, "0");
+					const en = epRes.data.episodeNumber.toString().padStart(2, "0");
+					perfectName = `${sRes.data.title} S${sn}E${en}${ext}`;
+				} else if (service === "lidarr") {
+					const alRes = await axios.get(`${config.url}/api/v1/album/${sid}`, {
+						headers: { "X-Api-Key": config.apiKey },
+						timeout: 10000,
+					});
+					perfectName = `${alRes.data.artist.artistName} - ${alRes.data.title}${ext}`;
+				}
+				perfectName = perfectName.replace(/[/\\?%*:|"<>]/g, "");
+			} catch (err) {
+				logger.warn(
+					`[SERVER] Failed to fetch exact title for renaming, falling back to original: ${err.message}`,
+				);
+			}
 
-			const commandName =
-				service === "radarr"
-					? "DownloadedMoviesScan"
-					: service === "sonarr"
-						? "DownloadedEpisodesScan"
-						: "DownloadedAlbumsScan";
-			const arrPath = translatePath(filePath);
-			logger.info(
-				`[SERVER] 📥 [Path Map] Local: ${filePath} -> Remote: ${arrPath}`,
-			);
+			logger.info(`[SERVER] 📥 Queueing HTTP download: ${perfectName}`);
 
-			const commandPayload = {
-				name: commandName,
-				path: arrPath,
-				importMode: "Move",
-			};
-
-			if (service === "radarr") commandPayload.movieId = sid;
-
-			const apiVer = service === "lidarr" ? "v1" : "v3";
-
-			await axios.post(`${config.url}/api/${apiVer}/command`, commandPayload, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
+			addDownloadJob("http", {
+				service,
+				serviceId: sid,
+				url,
+				filename: perfectName,
 			});
 
 			return {
 				success: true,
-				message: `Sent to ${service} for import!`,
+				message: `Added to download queue! Check Active Tasks.`,
 			};
 		},
 		{
