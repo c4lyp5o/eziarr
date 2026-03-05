@@ -25,13 +25,25 @@ export const getTelegramClient = async () => {
 	return tClient;
 };
 
+export const resetTelegramClient = async () => {
+	if (tClient) {
+		logger.info("[TELEGRAM] 🔄 Resetting cached Telegram client.");
+		try {
+			await tClient.disconnect();
+		} catch (err) {
+			// Ignore disconnect errors
+		}
+		tClient = null;
+	}
+};
+
 export const sendLoginCode = async (phoneNumber) => {
 	const client = await getTelegramClient();
 	if (!client) throw new Error("Not connected.");
 
 	const apiId = getSetting("telegramApiId");
 	const apiHash = getSetting("telegramApiHash");
-	if (!apiId || !apiHash) throw new Error("Missing API details.");
+	if (!apiId || !apiHash) throw new Error("Missing details.");
 
 	const { phoneCodeHash } = await client.sendCode(
 		{ apiId: Number(apiId), apiHash },
@@ -50,11 +62,11 @@ export const completeLogin = async (code, password) => {
 
 	const apiId = getSetting("telegramApiId");
 	const apiHash = getSetting("telegramApiHash");
-	if (!apiId || !apiHash) throw new Error("Missing API details.");
+	if (!apiId || !apiHash) throw new Error("Missing details.");
 
 	const phoneCodeHash = getSetting("telegramTempHash");
 	const phoneNumber = getSetting("telegramTempPhoneNumber");
-	if (!phoneCodeHash || !phoneNumber) throw new Error("Missing phone details.");
+	if (!phoneCodeHash || !phoneNumber) throw new Error("Missing details.");
 
 	try {
 		await client.invoke(
@@ -156,7 +168,12 @@ export const searchChannel = async (channelIdentifier, query) => {
 	}
 };
 
-export const downloadMedia = async (channel, messageId, filename) => {
+export const downloadTelegramFile = async (
+	channel,
+	messageId,
+	filename,
+	onProgress,
+) => {
 	const client = await getTelegramClient();
 	if (!client) throw new Error("Not connected");
 
@@ -175,6 +192,14 @@ export const downloadMedia = async (channel, messageId, filename) => {
 	await client.downloadMedia(message.media, {
 		outputFile: outputPath,
 		workers: 4,
+		progressCallback: onProgress
+			? (downloaded, total) => {
+					const percent = Math.round(
+						(Number(downloaded) / Number(total)) * 100,
+					);
+					onProgress(percent);
+				}
+			: undefined,
 	});
 
 	logger.info(`[TELEGRAM] ✅ Download complete: ${outputPath}`);
