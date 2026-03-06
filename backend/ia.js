@@ -1,8 +1,6 @@
 import axios from "axios";
 import { generalLogger as logger } from "./logger";
 
-const IA_BASE = "https://archive.org/advancedsearch.php";
-
 export const searchInternetArchive = async (query) => {
 	try {
 		const q = `title:(${query}) AND mediaType:(movies) AND (format:MPEG4 OR format:Matroska OR format:h.264 OR format:Unknown)`;
@@ -16,22 +14,27 @@ export const searchInternetArchive = async (query) => {
 			output: "json",
 		};
 
-		const res = await axios.get(IA_BASE, { params, timeout: 30000 });
-		const docs = res.data.response.docs;
+		const res = await axios.get("https://archive.org/advancedsearch.php", {
+			params,
+			timeout: 30000,
+		});
+		const docs = res.data?.response?.docs || [];
+
+		if (!Array.isArray(docs)) {
+			logger.warn("[IA] API returned an invalid response structure.");
+			return [];
+		}
 
 		// IA returns "Items" (Identifiers). Each Item has multiple files.
 		// We need to fetch the file list for each item to find the actual video link.
 		// However, to keep it fast, we will construct the direct download link
 		// which is usually https://archive.org/download/{identifier}/{identifier}.mp4
 
-		// For now, let's return the Items.
-		// The frontend will select an Item, and we will fetch specific files then.
 		return docs.map((doc) => ({
 			id: doc.identifier,
 			title: doc.title,
 			year: doc.year,
 			downloads: doc.downloads,
-			// We construct a "Details" URL so we can verify files later if needed
 			detailsUrl: `https://archive.org/details/${doc.identifier}`,
 		}));
 	} catch (err) {
@@ -40,7 +43,6 @@ export const searchInternetArchive = async (query) => {
 	}
 };
 
-// Helper to get actual file links for a specific Item ID
 export const getInternetArchiveFiles = async (identifier) => {
 	try {
 		const res = await axios.get(`https://archive.org/metadata/${identifier}`, {
