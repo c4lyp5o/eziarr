@@ -84,8 +84,8 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 				{archiveSearchResults.map((item) => (
 					<div key={item.id} className={ui.card}>
 						{/* ITEM HEADER */}
-						{/** biome-ignore lint/a11y/noStaticElementInteractions: <explanation> */}
-						{/** biome-ignore lint/a11y/useKeyWithClickEvents: <explanation> */}
+						{/** biome-ignore lint/a11y/noStaticElementInteractions: interaction needed */}
+						{/** biome-ignore lint/a11y/useKeyWithClickEvents: interaction needed */}
 						<div
 							onClick={() => handleArchiveExpand(item.id)}
 							className="flex justify-between items-center cursor-pointer group"
@@ -128,6 +128,9 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 											<div className="flex gap-3 items-center shrink-0">
 												<span className="text-[10px] text-gray-500 font-mono uppercase bg-black px-2 py-1 rounded">
 													{file.format}
+												</span>
+												<span className="text-[10px] text-gray-500 font-mono uppercase bg-black px-2 py-1 rounded">
+													{file.size}
 												</span>
 												<Button
 													variant="success"
