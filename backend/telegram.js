@@ -203,7 +203,14 @@ export const downloadTelegramFile = async (
 	});
 
 	logger.info(`[TELEGRAM] ✅ Download complete: ${outputPath}`);
-	return { success: true, path: outputDir, filePath: outputPath };
+	return {
+		success: true,
+		path: outputDir,
+		filePath: outputPath,
+		downloadBytes: message.media.document.size
+			? Number(message.media.document.size)
+			: null,
+	};
 };
 
 const resolveEntity = async (client, identifier) => {

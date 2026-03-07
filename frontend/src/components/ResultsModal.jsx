@@ -54,7 +54,7 @@ const ResultsModal = ({
 
 	const handleGrabFromWeb = async (url, filename) => {
 		try {
-			await apiCall("/api/v1/import/http", {
+			await apiCall("/api/v1/http/import", {
 				method: "POST",
 				body: { service, serviceId, url, filename },
 			});
