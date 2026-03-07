@@ -32,7 +32,7 @@ export const downloadHttpFile = async (url, filename, onProgress) => {
 	}
 
 	const totalLength = parseInt(response.headers["content-length"], 10);
-	let downloadedBytes = 0;
+	let downloadBytes = 0;
 
 	const writer = fs.createWriteStream(outputPath);
 
@@ -40,12 +40,12 @@ export const downloadHttpFile = async (url, filename, onProgress) => {
 		let error = null;
 
 		response.data.on("data", (chunk) => {
-			downloadedBytes += chunk.length;
+			downloadBytes += chunk.length;
 			if (onProgress && totalLength) {
-				const percent = Math.round((downloadedBytes / totalLength) * 100);
+				const percent = Math.round((downloadBytes / totalLength) * 100);
 				onProgress(percent);
 			}
-			if (downloadedBytes > MAX_DOWNLOAD_BYTES) {
+			if (downloadBytes > MAX_DOWNLOAD_BYTES) {
 				error = new Error(
 					`Download exceeded maximum size (${MAX_DOWNLOAD_BYTES} bytes)`,
 				);
@@ -71,7 +71,12 @@ export const downloadHttpFile = async (url, filename, onProgress) => {
 		writer.on("close", () => {
 			if (!error) {
 				logger.info(`[DOWNLOADER] ✅ Download Complete: ${outputPath}`);
-				resolve({ path: outputDir, filePath: outputPath });
+				resolve({
+					success: true,
+					path: outputDir,
+					filePath: outputPath,
+					downloadBytes,
+				});
 			}
 		});
 	});
