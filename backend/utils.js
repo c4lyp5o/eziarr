@@ -4,7 +4,7 @@ import { setTimeout } from "node:timers/promises";
 import { lookup } from "node:dns/promises";
 import net from "node:net";
 import axios from "axios";
-import { getSetting, getServicesConfig } from "./db";
+import { getSetting, getAllServices } from "./db";
 import { generalLogger as logger } from "./logger";
 import { DOWNLOAD_DIR } from "./config";
 
@@ -28,7 +28,7 @@ export const getPosterUrl = (images = [], coverType) => {
 };
 
 export const fetchQueue = async (serviceName, idKey) => {
-	const SERVICES = getServicesConfig();
+	const SERVICES = getAllServices();
 	const conf = SERVICES[serviceName];
 	if (!conf.url || !conf.apiKey) return [];
 

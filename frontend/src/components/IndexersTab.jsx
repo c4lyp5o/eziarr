@@ -20,7 +20,7 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 		try {
 			setIsLoading(true);
 			setIndexerResults([]);
-			const { torrents } = await apiCall("/api/v1/deepsearch", {
+			const { torrents } = await apiCall("/api/v1/missing/deepsearch", {
 				method: "POST",
 				body: { type, query },
 			});
@@ -42,7 +42,7 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 	const handleGrabFromIndexers = async (item) => {
 		try {
 			setGrabbingId(item.guid);
-			const res = await apiCall("/api/v1/forcegrab", {
+			const res = await apiCall("/api/v1/missing/forcegrab", {
 				method: "POST",
 				body: {
 					service,

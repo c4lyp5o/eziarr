@@ -3,20 +3,23 @@ import path from "node:path";
 import { setTimeout } from "node:timers/promises";
 import axios from "axios";
 import {
-	upsertItem,
-	getNextItemToSearch,
-	markAsSearched,
-	getItems,
-	deleteItem,
+	upsertMissingMedia,
+	getNextItemToSearchMissingMedia,
+	markAsSearchedMissingMedia,
+	getMissingMedia,
+	unmonitorMissingMedia,
 	getAllSettings,
-	getServicesConfig,
+	getAllServices,
 	upsertTask,
 	removeTask,
-	clearAllTasks,
-	getNextDownloadJob,
-	updateDownloadJobStatus,
-	removeDownloadJob,
-	resetStuckDownloads,
+	markStaleTasks,
+	claimNextDownloadQueue,
+	unstuckDownloadQueue,
+	scheduleRetryDownloadQueue,
+	markAsFailedDownloadQueue,
+	finalizeDownloadQueue,
+	pruneDownloadQueue,
+	// pruneDownloadHistory,
 } from "./db";
 import { downloadTelegramFile } from "./telegram";
 import { downloadHttpFile } from "./downloader";
@@ -24,17 +27,19 @@ import { generalLogger as logger, hunterLogger } from "./logger";
 import { getPosterUrl, translatePath } from "./utils";
 import { DEFAULT_SETTINGS, DOWNLOAD_DIR } from "./config";
 
+const MAX_ATTEMPTS = 5;
+
 let isProcessingQueue = false;
 
 const syncMissingItems = async () => {
-	const SERVICES = getServicesConfig();
+	const SERVICES = getAllServices();
 
 	const activeIds = new Set();
 	const successfulServices = new Set();
 
 	try {
 		upsertTask("worker-sync", "Sync", "running", "Syncing missing items...");
-		logger.info("[WORKER/SYNC] 🔄 Syncing missing items...");
+		logger.info("[WORKER/SYNC] 🔄 Syncing missing items.");
 
 		if (SERVICES.radarr.url && SERVICES.radarr.apiKey) {
 			// 1. RADARR
@@ -54,7 +59,7 @@ const syncMissingItems = async () => {
 				radarrRes.data.records.forEach((m) => {
 					const id = `radarr-${m.id}`;
 					activeIds.add(id);
-					upsertItem({
+					upsertMissingMedia({
 						id: id,
 						serviceId: m.id,
 						title: m.title,
@@ -70,7 +75,7 @@ const syncMissingItems = async () => {
 				logger.error("[WORKER] Radarr Sync Error :", err);
 			}
 		} else {
-			logger.warn("[WORKER/SYNC] Radarr not configured. Skipping sync.");
+			logger.warn("[WORKER/SYNC] Radarr not configured. Skipping.");
 		}
 
 		if (SERVICES.sonarr.url && SERVICES.sonarr.apiKey) {
@@ -92,7 +97,7 @@ const syncMissingItems = async () => {
 				sonarrRes.data.records.forEach((ep) => {
 					const id = `sonarr-${ep.id}`;
 					activeIds.add(id);
-					upsertItem({
+					upsertMissingMedia({
 						id: id,
 						serviceId: ep.id,
 						title: `${ep.series?.title || ""} - S${ep.seasonNumber}E${ep.episodeNumber}`,
@@ -109,7 +114,7 @@ const syncMissingItems = async () => {
 				logger.error("[WORKER/SYNC] Sonarr Sync Error :", err);
 			}
 		} else {
-			logger.warn("[WORKER/SYNC] Sonarr not configured. Skipping sync.");
+			logger.warn("[WORKER/SYNC] Sonarr not configured. Skipping.");
 		}
 
 		if (SERVICES.lidarr.url && SERVICES.lidarr.apiKey) {
@@ -131,7 +136,7 @@ const syncMissingItems = async () => {
 				lidarrRes.data.records.forEach((album) => {
 					const id = `lidarr-${album.id}`;
 					activeIds.add(id);
-					upsertItem({
+					upsertMissingMedia({
 						id: id,
 						serviceId: album.id,
 						title: `${album.artist.artistName} - ${album.title}`,
@@ -147,12 +152,12 @@ const syncMissingItems = async () => {
 				logger.error("[WORKER/SYNC] Lidarr Sync Error :", err);
 			}
 		} else {
-			logger.warn("[WORKER/SYNC] Lidarr not configured. Skipping sync.");
+			logger.warn("[WORKER/SYNC] Lidarr not configured. Skipping.");
 		}
 
 		// 4. CLEANUP (Soft Sync)
-		const allDbItems = getItems();
-		const idsToDelete = allDbItems
+		const missingMedia = getMissingMedia();
+		const idsToDelete = missingMedia
 			.filter(
 				(item) =>
 					successfulServices.has(item.service) && !activeIds.has(item.id),
@@ -164,22 +169,22 @@ const syncMissingItems = async () => {
 				`[WORKER] 🧹 Cleaning up ${idsToDelete.length} downloaded/removed items...`,
 			);
 			idsToDelete.forEach((id) => {
-				deleteItem(id);
+				unmonitorMissingMedia(id);
 			});
 		}
 
-		logger.info("[WORKER] ✅ Worker Sync Complete");
+		logger.info("[WORKER] ✅ Syncing Complete.");
 	} catch (err) {
-		logger.error("[WORKER] Worker Sync Failed: :", err);
+		logger.error("[WORKER] Syncing Failed: :", err);
 	} finally {
 		removeTask("worker-sync");
 	}
 };
 
 const runHunter = async () => {
-	const SERVICES = getServicesConfig();
+	const SERVICES = getAllServices();
 
-	const item = getNextItemToSearch();
+	const item = getNextItemToSearchMissingMedia();
 	if (!item)
 		return hunterLogger.info(
 			"[WORKER/HUNTER] 💤 No eligible old items to search.",
@@ -222,7 +227,7 @@ const runHunter = async () => {
 		hunterLogger.error(`[WORKER/HUNTER] Failed searching ${item.title}: `, err);
 	} finally {
 		removeTask("worker-hunter");
-		markAsSearched(item.id);
+		markAsSearchedMissingMedia(item.id);
 	}
 };
 
@@ -305,13 +310,22 @@ const settingsWatcher = async () => {
 const processDownloadQueue = async () => {
 	if (isProcessingQueue) return;
 
-	const job = getNextDownloadJob();
+	const job = claimNextDownloadQueue();
 	if (!job) return;
 
 	isProcessingQueue = true;
-	updateDownloadJobStatus(job.id, "downloading");
 
-	const payload = JSON.parse(job.payload);
+	let payload;
+	try {
+		payload = JSON.parse(job.payload);
+	} catch (err) {
+		markAsFailedDownloadQueue(job.id, "Invalid job payload JSON");
+		finalizeDownloadQueue(job.id, "failed");
+		removeTask(job.id);
+		isProcessingQueue = false;
+		return;
+	}
+
 	upsertTask(
 		job.id,
 		"Download",
@@ -367,7 +381,7 @@ const processDownloadQueue = async () => {
 
 		// --- Trigger *Arr Import ---
 		const arrPath = translatePath(result.filePath);
-		const SERVICES = getServicesConfig();
+		const SERVICES = getAllServices();
 		const config = SERVICES[payload.service];
 
 		if (!config || !config.url || !config.apiKey)
@@ -398,10 +412,20 @@ const processDownloadQueue = async () => {
 		});
 
 		logger.info(`[WORKER] ✅ Download & Import complete: ${payload.filename}`);
-		removeDownloadJob(job.id);
+		finalizeDownloadQueue(job.id, "completed", result);
 	} catch (err) {
+		const msg = err?.message ?? String(err);
+
+		const attempts = Number(job.attempts ?? 0);
+
+		if (attempts + 1 >= MAX_ATTEMPTS) {
+			markAsFailedDownloadQueue(job.id, msg);
+			finalizeDownloadQueue(job.id, "failed");
+		} else {
+			scheduleRetryDownloadQueue(job.id, msg);
+		}
+
 		logger.error(`[WORKER] ❌ Download Job Failed: `, err);
-		updateDownloadJobStatus(job.id, "failed");
 	} finally {
 		removeTask(job.id);
 		isProcessingQueue = false;
@@ -464,21 +488,24 @@ const cleanupOldDownloads = () => {
 };
 
 const main = async () => {
-	logger.info("[WORKER] 🚀 Worker booting...");
-	clearAllTasks();
-	resetStuckDownloads();
+	logger.info("[WORKER] 🚀 Worker booting.");
 	if (!fs.existsSync(DOWNLOAD_DIR))
 		fs.mkdirSync(DOWNLOAD_DIR, {
 			recursive: true,
 		});
-	logger.info("[WORKER] 📁 Download directory initialized.");
-	await settingsWatcher();
-	setInterval(settingsWatcher, 10000);
-	setInterval(processDownloadQueue, 5000);
-	logger.info("[WORKER] ✅ Worker started and settings watcher initialized.");
+	unstuckDownloadQueue();
+	pruneDownloadQueue();
+	markStaleTasks();
 	cleanupOldDownloads();
+	// pruneDownloadHistory();
+	await settingsWatcher();
+	// set recurring tasks
+	setInterval(settingsWatcher, 10000);
 	setInterval(cleanupOldDownloads, 60 * 60 * 1000);
-	logger.info("[WORKER] ✅ Cleanup sweeper initialized.");
+	// setInterval(pruneDownloadQueue, 60 * 60 * 1000);
+	// setInterval(pruneDownloadHistory, 60 * 60 * 1000);
+	setInterval(processDownloadQueue, 5000);
+	logger.info("[WORKER] ✅ Worker initialized.");
 };
 
 main().catch((err) => {

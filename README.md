@@ -6,6 +6,7 @@ Eziarr is a powerful, missing-media manager designed to work alongside your exis
 
 * **Unified Dashboard:** View all your missing media from Radarr, Sonarr, and Lidarr in one clean, filterable interface.
 * **The "Hunter" Automations:** A background worker continuously monitors your missing items and periodically triggers automated searches on your indexers to find old releases.
+* **Asynchronous Queue:** Downloads are handled by a dedicated background worker, keeping the UI lightning-fast and preventing memory crashes.
 * **Deep Search Capabilities:** * **Telegram (MTProto):** Connect your Telegram account to search channels and download large media files directly.
   * **Internet Archive:** Search and download public domain or archived media directly from archive.org.
   * **Open Directories:** Paste an Apache/Nginx directory link, and Eziarr will scan it for video files.
@@ -14,7 +15,7 @@ Eziarr is a powerful, missing-media manager designed to work alongside your exis
 
 ## ⚙️ Configuration & Path Mapping
 
-Eziarr features a built-in Settings UI to manage your setup. 
+Eziarr features a built-in Settings UI to manage your setup, view active background tasks, and monitor system logs in real-time.
 
 ### The "Docker vs. Host" Problem (Path Translation)
 If you run Eziarr in a Docker container (or on PC A), but Radarr/Sonarr are on your host machine (or PC B), they won't agree on where downloaded files live. 
@@ -33,35 +34,41 @@ Eziarr will seamlessly translate the paths before asking Radarr to import them.
 ---
 
 ### 🔗 Mounting the Share (Cross-Platform)
-If your *Arr stack is on a Windows machine but Eziarr is running on a Linux or macOS machine (or Docker host), you need to mount the Windows network share to your local OS first.
+If your *Arr stack is on a Windows machine but Eziarr is running on a Linux host (like a Docker server), you must mount the Windows network share permanently so Docker has the correct read/write permissions.
 
-**🐧 Linux (Ubuntu/Debian) to Windows:**
-First, install the required SMB utilities and create an empty folder for the mount point:
-```bash
+**🐧 Linux (Ubuntu/Debian) to Windows (Permanent Auto-Mount):**
+First, install the SMB utilities and create a mount point:
+\`\`\`bash
 sudo apt-get update && sudo apt-get install cifs-utils -y
 sudo mkdir -p /mnt/eziarr_imports
-```
+\`\`\`
 
-Then, mount your Windows share to Linux (replace the IP 192.168.1.50 and share name Eziarr with your own):
-```bash
-sudo mount -t cifs //192.168.1.50/Eziarr /mnt/eziarr_imports -o username=Guest,password=,uid=1000,gid=1000,iocharset=utf8
-```
+Next, edit your file system table to make the mount permanent and give Docker (`uid=1000`) ownership:
+\`\`\`bash
+sudo nano /etc/fstab
+\`\`\`
+Add this line to the bottom (replace IP, ShareName, and credentials):
+\`\`\`text
+//192.168.1.50/ShareName /mnt/eziarr_imports cifs username=YOUR_WINDOWS_USER,password=YOUR_WINDOWS_PASS,uid=1000,gid=1000,dir_mode=0777,file_mode=0777,nofail,x-systemd.automount 0 0
+\`\`\`
+
+Reload the daemon and mount it:
+\`\`\`bash
+sudo systemctl daemon-reload
+sudo mount -a
+\`\`\`
+Finally, pass `-v /mnt/eziarr_imports:/app/downloads` to your Docker container!
 
 **🍎 macOS to Windows:**
-macOS natively supports SMB, so no extra installations are needed. Create a mount point and use the native mount command:
-```bash
+macOS natively supports SMB. Create a mount point and use the native mount command:
+\`\`\`bash
 mkdir -p ~/eziarr_imports
 mount_smbfs //Guest:@192.168.1.50/Eziarr ~/eziarr_imports
-```
-
-(Alternatively, in macOS UI: Open Finder > Go > Connect to Server > Type smb://192.168.1.50/Eziarr)
-
-**Final Docker Step:**
-Once mounted to your host OS, simply pass that mounted folder into your Eziarr Docker container as a volume (e.g., -v /mnt/eziarr_imports:/app/downloads).
+\`\`\`
 
 ---
 
 ## 🚀 Getting Started
-1. Ensure your `.env` contains your *Arr API keys and URLs (or configure them in `utils.js`).
-2. Start the backend server and worker.
+1. Configure your `.env` or use the built-in Settings UI.
+2. Start the backend server and worker using Docker Compose or PM2.
 3. Open the web UI. Eziarr will automatically sync your missing items and start hunting!

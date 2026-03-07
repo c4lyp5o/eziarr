@@ -3,6 +3,7 @@ import { Landmark } from "lucide-react";
 
 import { useToast } from "../context/Toast";
 import { apiCall } from "../utils/apiCall";
+import { formatSize } from "../utils/formatSize";
 
 import { ListItem } from "./ListItem";
 import { Button } from "./Buttons";
@@ -130,7 +131,7 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 													{file.format}
 												</span>
 												<span className="text-[10px] text-gray-500 font-mono uppercase bg-black px-2 py-1 rounded">
-													{file.size}
+													{formatSize(file.size)}
 												</span>
 												<Button
 													variant="success"

@@ -60,7 +60,7 @@ function App() {
 	const handleTriggerSearch = async (service, id, itemId) => {
 		setSearchingId(itemId);
 		try {
-			await apiCall("/api/v1/search", {
+			await apiCall("/api/v1/missing/search", {
 				method: "POST",
 				body: { service, id },
 			});

@@ -65,7 +65,7 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 		expect(body.queue[0].title).toBe("Test Movie");
 	});
 
-	it("POST /api/v1/search - Should send correct search command to Sonarr", async () => {
+	it("POST /api/v1/missing/search - Should send correct search command to Sonarr", async () => {
 		// Fake DB setup for Sonarr
 		setSetting("sonarrUrl", "http://fake-sonarr:8989");
 		setSetting("sonarrApiKey", "fake_sonarr_key");
@@ -75,7 +75,7 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 			data: { id: 123, name: "EpisodeSearch" },
 		});
 
-		const req = new Request("http://localhost/api/v1/search", {
+		const req = new Request("http://localhost/api/v1/missing/search", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -100,7 +100,7 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 		);
 	});
 
-	it("POST /api/v1/forcegrab - Should successfully push release to Radarr", async () => {
+	it("POST /api/v1/missing/forcegrab - Should successfully push release to Radarr", async () => {
 		// 1. Define what the fake *Arr app should return
 		// (A successful push returns an array where rejected is false)
 		axios.post.mockResolvedValueOnce({
@@ -108,7 +108,7 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 		});
 
 		// 2. Fire the request at our Elysia backend
-		const req = new Request("http://localhost/api/v1/forcegrab", {
+		const req = new Request("http://localhost/api/v1/missing/forcegrab", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -143,7 +143,7 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 		);
 	});
 
-	it("POST /api/v1/deepsearch - Should fetch and map Prowlarr results", async () => {
+	it("POST /api/v1/missing/deepsearch - Should fetch and map Prowlarr results", async () => {
 		// 1. Fake Prowlarr Response
 		axios.get.mockResolvedValueOnce({
 			data: [
@@ -161,7 +161,7 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 		});
 
 		// 2. Fire the request
-		const req = new Request("http://localhost/api/v1/deepsearch", {
+		const req = new Request("http://localhost/api/v1/missing/deepsearch", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -181,10 +181,11 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 
 		// 4. Verify the Axios call
 		expect(axios.get).toHaveBeenCalledWith(
-			"http://fake-prowlarr:9696/api/v1/search",
+			"http://fake-prowlarr:9696/api/v1/missing/search",
 			expect.objectContaining({
 				params: { query: "Test Movie", categories: "2000", type: "search" },
 				headers: { "X-Api-Key": "fake_prowlarr_key" },
+				timeout: 30000,
 			}),
 		);
 	});

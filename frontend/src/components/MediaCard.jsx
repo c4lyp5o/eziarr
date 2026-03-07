@@ -68,8 +68,8 @@ const DownloadStatus = ({ queueItem }) => {
 				</div>
 
 				<div className="flex flex-col min-w-0">
-					<span className="text-sm font-bold text-white leading-tight truncate">
-						{queueItem.status.toUpperCase()}
+					<span className="text-sm font-bold text-white leading-tight truncate capitalize">
+						{queueItem.status}
 					</span>
 					<span className="text-xs text-gray-400 font-mono mt-0.5">
 						{queueItem.timeleft || "Download stalled"}
@@ -114,7 +114,7 @@ const MediaCard = ({
 			return;
 
 		try {
-			await fetch("/api/v1/unmonitor", {
+			await fetch("/api/v1/missing/unmonitor", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
@@ -129,22 +129,6 @@ const MediaCard = ({
 			toast.error("Failed to unmonitor");
 		}
 	};
-
-	// Helper to generate Deep Links
-	// const getServiceLink = () => {
-	// 	// You'll need to hardcode your base URLs or pass them from backend
-	// 	const baseUrls = {
-	// 		radarr: "http://localhost:7878",
-	// 		sonarr: "http://localhost:8989",
-	// 		lidarr: "http://localhost:8686",
-	// 	};
-
-	// 	const base = baseUrls[item.service];
-	// 	if (item.service === "radarr") return `${base}/movie/${item.tmdbId}`; // Radarr uses tmdbId
-	// 	if (item.service === "sonarr") return `${base}/series/${item.seriesTitle}`; // Link to the Series, not the specific episode
-	// 	if (item.service === "lidarr") return `${base}/artist/${item.artistId}`; // Link to Artist
-	// 	return "#";
-	// };
 
 	return (
 		<div
@@ -166,15 +150,6 @@ const MediaCard = ({
 				<div className="absolute inset-0 bg-linear-to-t from-gray-900 via-gray-900/60 to-transparent opacity-90"></div>
 				<div className="absolute top-3 left-3 flex gap-2">
 					<ServiceBadge service={item.service} />
-					{/* <a
-						href={getServiceLink()}
-						target="_blank"
-						rel="noreferrer"
-						className="p-1 rounded-md bg-black/40 hover:bg-black/70 text-white backdrop-blur-md transition-colors"
-						title="Open in Manager"
-					>
-						<ExternalLink size={12} />
-					</a> */}
 				</div>
 
 				{/* Success Overlay if Downloading */}
