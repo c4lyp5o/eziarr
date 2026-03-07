@@ -15,13 +15,17 @@ import {
 import { searchInternetArchive, getInternetArchiveFiles } from "./ia";
 import { scanOpenDir } from "./opendir";
 import {
-	getItems,
-	deleteItem,
+	getMissingMedia,
+	unmonitorMissingMedia,
 	getAllSettings,
 	setSetting,
-	getServicesConfig,
-	getActiveTasks,
-	addDownloadJob,
+	getAllServices,
+	getTasks,
+	addToDownloadQueue,
+	getDownloadQueue,
+	getDownloadHistory,
+	recordForceGrabHistory,
+	getDownloadStats,
 } from "./db";
 import { generalLogger as logger } from "./logger";
 import { coerceNumericId, fetchQueue } from "./utils";
@@ -143,7 +147,7 @@ export const app = new Elysia()
 	.get(
 		"/api/v1/missing",
 		async () => {
-			const missingItems = getItems();
+			const missingItems = getMissingMedia();
 
 			const [radarrQ, sonarrQ, lidarrQ] = await Promise.all([
 				fetchQueue("radarr", "movieId"),
@@ -151,7 +155,37 @@ export const app = new Elysia()
 				fetchQueue("lidarr", "albumId"),
 			]);
 
-			const queueItems = [...radarrQ, ...sonarrQ, ...lidarrQ];
+			const eziarrQueue = getDownloadQueue();
+
+			const normalizedEziarrQueue = eziarrQueue.map((item) => {
+				let payload;
+				try {
+					payload =
+						typeof item.payload === "string"
+							? JSON.parse(item.payload)
+							: item.payload;
+				} catch {
+					payload = {};
+				}
+
+				return {
+					service: "eziarr",
+					serviceId: Number(payload.serviceId ?? 0),
+					status: item.status ?? "unknown",
+					trackStatus: "ok",
+					title: payload.title ?? payload.filename ?? "Queued download",
+					quality: payload.quality ?? undefined,
+					indexer: payload.indexer ?? undefined,
+					timeleft: "",
+				};
+			});
+
+			const queueItems = [
+				...radarrQ,
+				...sonarrQ,
+				...lidarrQ,
+				...normalizedEziarrQueue,
+			];
 
 			return { success: true, missing: missingItems, queue: queueItems };
 		},
@@ -173,6 +207,7 @@ export const app = new Elysia()
 							t.Literal("radarr"),
 							t.Literal("sonarr"),
 							t.Literal("lidarr"),
+							t.Literal("eziarr"),
 						]),
 						releaseDate: t.Optional(t.Any()),
 						posterUrl: t.Optional(t.Any()),
@@ -185,6 +220,7 @@ export const app = new Elysia()
 							t.Literal("radarr"),
 							t.Literal("sonarr"),
 							t.Literal("lidarr"),
+							t.Literal("eziarr"),
 						]),
 						serviceId: t.Integer(),
 						status: t.String(),
@@ -206,9 +242,9 @@ export const app = new Elysia()
 	)
 
 	.post(
-		"/api/v1/search",
+		"/api/v1/missing/search",
 		async ({ body: { service, id } }) => {
-			const SERVICES = getServicesConfig();
+			const SERVICES = getAllServices();
 			const config = SERVICES[service];
 
 			if (!config) {
@@ -216,9 +252,7 @@ export const app = new Elysia()
 			}
 
 			if (!config.url || !config.apiKey) {
-				logger.warn(
-					`[SERVER] Cancelling search because ${service} is not configured.`,
-				);
+				logger.warn(`[SERVER] ${service} is not configured.`);
 				return {
 					success: false,
 					message: `${service} is not configured.`,
@@ -279,13 +313,11 @@ export const app = new Elysia()
 	)
 
 	.post(
-		"/api/v1/deepsearch",
+		"/api/v1/missing/deepsearch",
 		async ({ body: { type, query } }) => {
-			const SERVICES = getServicesConfig();
+			const SERVICES = getAllServices();
 			if (!SERVICES.prowlarr.url || !SERVICES.prowlarr.apiKey) {
-				logger.warn(
-					"[WORKER] Deepsearch cancelled because it is not configured",
-				);
+				logger.warn("[WORKER] Deepsearch is not configured");
 				return { success: false, torrents: [] };
 			}
 
@@ -337,9 +369,9 @@ export const app = new Elysia()
 	)
 
 	.post(
-		"/api/v1/forcegrab",
+		"/api/v1/missing/forcegrab",
 		async ({ body: { service, serviceId, title, downloadUrl } }) => {
-			const SERVICES = getServicesConfig();
+			const SERVICES = getAllServices();
 			const config = SERVICES[service];
 
 			if (!config) {
@@ -347,9 +379,7 @@ export const app = new Elysia()
 			}
 
 			if (!config.url || !config.apiKey) {
-				logger.warn(
-					`[SERVER] Cancelling force grab because ${service} is not configured.`,
-				);
+				logger.warn(`[SERVER] ${service} is not configured.`);
 				return {
 					success: false,
 					message: `${service} is not configured.`,
@@ -372,8 +402,10 @@ export const app = new Elysia()
 			};
 
 			let res = await pushRelease();
-			if (!res.data[0].rejected)
+			if (!res.data[0].rejected) {
+				recordForceGrabHistory(service, sid, title, downloadUrl, true);
 				return { success: true, message: "Grabbed successfully" };
+			}
 
 			const rejections = res.data[0].rejections.join(" ").toLowerCase();
 			logger.warn(`[SERVER] ⚠️ [${service}] Grab Rejected: ${rejections}`);
@@ -480,11 +512,20 @@ export const app = new Elysia()
 
 				res = await pushRelease();
 				if (!res.data[0].rejected) {
+					recordForceGrabHistory(service, sid, title, downloadUrl, true);
 					return {
 						success: true,
 						message: "Grabbed! (Overrode Profile/Queue)",
 					};
 				} else {
+					recordForceGrabHistory(
+						service,
+						sid,
+						title,
+						downloadUrl,
+						false,
+						res.data[0].rejections[0],
+					);
 					return {
 						success: false,
 						message: `Still rejected: ${res.data[0].rejections[0]}`,
@@ -492,6 +533,14 @@ export const app = new Elysia()
 				}
 			}
 
+			recordForceGrabHistory(
+				service,
+				sid,
+				title,
+				downloadUrl,
+				false,
+				rejections,
+			);
 			return { success: false, message: `Rejected: ${rejections}` };
 		},
 		{
@@ -515,9 +564,9 @@ export const app = new Elysia()
 	)
 
 	.post(
-		"/api/v1/unmonitor",
+		"/api/v1/missing/unmonitor",
 		async ({ body: { service, serviceId } }) => {
-			const SERVICES = getServicesConfig();
+			const SERVICES = getAllServices();
 			const config = SERVICES[service];
 
 			if (!config) {
@@ -525,9 +574,7 @@ export const app = new Elysia()
 			}
 
 			if (!config.url || !config.apiKey) {
-				logger.warn(
-					`[SERVER] Cancelling unmonitor because ${service} is not configured.`,
-				);
+				logger.warn(`[SERVER] ${service} is not configured.`);
 				return {
 					success: false,
 					message: `${service} is not configured.`,
@@ -571,7 +618,7 @@ export const app = new Elysia()
 				});
 			}
 
-			deleteItem(`${service}-${sid}`);
+			unmonitorMissingMedia(`${service}-${sid}`);
 
 			return { success: true, message: `Unmonitored ${service}-${sid}` };
 		},
@@ -726,10 +773,43 @@ export const app = new Elysia()
 		},
 	)
 
+	.post(
+		"/api/v1/system/test",
+		async ({ body: { service, url, apiKey } }) => {
+			const cleanUrl = url.replace(/\/$/, "");
+
+			const apiVer =
+				service === "lidarr" || service === "prowlarr" ? "v1" : "v3";
+
+			await axios.get(`${cleanUrl}/api/${apiVer}/system/status`, {
+				headers: { "X-Api-Key": apiKey },
+				timeout: 5000,
+			});
+			return { success: true, message: "Test successful" };
+		},
+		{
+			body: t.Object({
+				service: t.String(),
+				url: t.String(),
+				apiKey: t.String(),
+			}),
+			response: t.Object({
+				success: t.Boolean(),
+				message: t.String(),
+			}),
+			detail: {
+				summary: "Test Service Connection",
+				description:
+					"Tests unsaved credentials against an *Arr service's status endpoint.",
+				tags: ["Settings"],
+			},
+		},
+	)
+
 	.get(
 		"/api/v1/system/tasks",
 		() => {
-			const tasks = getActiveTasks();
+			const tasks = getTasks();
 			return { success: true, tasks };
 		},
 		{
@@ -788,35 +868,106 @@ export const app = new Elysia()
 		},
 	)
 
-	.post(
-		"/api/v1/system/test",
-		async ({ body: { service, url, apiKey } }) => {
-			const cleanUrl = url.replace(/\/$/, "");
+	.get(
+		"/api/v1/downloads/queue",
+		async () => {
+			const eziarrQueue = getDownloadQueue();
 
-			const apiVer =
-				service === "lidarr" || service === "prowlarr" ? "v1" : "v3";
+			const [radarrQ, sonarrQ, lidarrQ] = await Promise.all([
+				fetchQueue("radarr", "movieId"),
+				fetchQueue("sonarr", "episodeId"),
+				fetchQueue("lidarr", "albumId"),
+			]);
 
-			await axios.get(`${cleanUrl}/api/${apiVer}/system/status`, {
-				headers: { "X-Api-Key": apiKey },
-				timeout: 5000,
-			});
-			return { success: true, message: "Test successful" };
+			const arrQueueRaw = [...radarrQ, ...sonarrQ, ...lidarrQ];
+
+			// 3. Normalize the *Arr queue to match Eziarr's SQLite schema so the React UI doesn't crash
+			const arrQueueNormalized = arrQueueRaw.map((item, index) => ({
+				id: `arr-${item.service}-${index}`,
+				type: item.service, // radarr, sonarr, lidarr
+				status: item.status,
+				created_at: Date.now(), // *Arr doesn't expose this easily in the queue endpoint
+				payload: JSON.stringify({
+					filename: `${item.title} (${item.quality || "Unknown Quality"})`,
+					service: item.service,
+				}),
+				message: item.timeleft
+					? `Time left: ${item.timeleft}`
+					: "Managed by *Arr",
+				next_attempt: null,
+				last_error: null,
+			}));
+
+			return {
+				success: true,
+				queue: [...eziarrQueue, ...arrQueueNormalized],
+			};
 		},
 		{
-			body: t.Object({
-				service: t.String(),
-				url: t.String(),
-				apiKey: t.String(),
+			response: t.Object({
+				success: t.Boolean(),
+				queue: t.Array(t.Any()),
+			}),
+			detail: {
+				summary: "Get Unified Download Queue",
+				description:
+					"Returns Eziarr pending/retry/downloading jobs mixed with active *Arr client downloads.",
+				tags: ["Settings", "General"],
+			},
+		},
+	)
+
+	.get(
+		"/api/v1/downloads/history",
+		({ query: { limit, status } }) => {
+			const n = limit ? Math.min(500, Math.max(1, Number(limit))) : 100;
+			return { success: true, history: getDownloadHistory(n, status || null) };
+		},
+		{
+			query: t.Object({
+				limit: t.Optional(t.String()),
+				status: t.Optional(t.String()),
 			}),
 			response: t.Object({
 				success: t.Boolean(),
-				message: t.String(),
+				history: t.Array(t.Any()),
 			}),
 			detail: {
-				summary: "Test Service Connection",
-				description:
-					"Tests unsaved credentials against an *Arr service's status endpoint.",
-				tags: ["Settings"],
+				summary: "Get Download History",
+				description: "Returns completed/failed jobs for audit and UI display.",
+				tags: ["Settings", "General"],
+			},
+		},
+	)
+
+	.get(
+		"/api/v1/downloads/stats",
+		() => {
+			const stats = getDownloadStats();
+			return { success: true, stats };
+		},
+		{
+			response: t.Object({
+				success: t.Boolean(),
+				stats: t.Array(
+					t.Object({
+						service: t.Union([
+							t.Literal("radarr"),
+							t.Literal("sonarr"),
+							t.Literal("lidarr"),
+						]),
+						total: t.Number(),
+						completed: t.Number(),
+						failed: t.Number(),
+						bytes: t.Number(),
+						avg_duration_ms: t.Any(),
+					}),
+				),
+			}),
+			detail: {
+				summary: "Get Download Stats",
+				description: "Returns download statistics for audit and UI display.",
+				tags: ["Settings", "General"],
 			},
 		},
 	)
@@ -947,7 +1098,7 @@ export const app = new Elysia()
 	.post(
 		"/api/v1/telegram/import",
 		async ({ body: { service, serviceId, channel, messageId, filename } }) => {
-			const SERVICES = getServicesConfig();
+			const SERVICES = getAllServices();
 			const config = SERVICES[service];
 
 			if (!config) return { success: false, message: "Invalid service" };
@@ -999,7 +1150,7 @@ export const app = new Elysia()
 
 			logger.info(`[SERVER] 📥 Queueing Telegram download: ${perfectName}`);
 
-			addDownloadJob("telegram", {
+			addToDownloadQueue("telegram", {
 				service,
 				serviceId: sid,
 				channel,
@@ -1124,9 +1275,9 @@ export const app = new Elysia()
 	)
 
 	.post(
-		"/api/v1/import/http",
+		"/api/v1/http/import",
 		async ({ body: { service, serviceId, url, filename } }) => {
-			const SERVICES = getServicesConfig();
+			const SERVICES = getAllServices();
 			const config = SERVICES[service];
 
 			if (!config) return { success: false, message: "Invalid service" };
@@ -1178,7 +1329,7 @@ export const app = new Elysia()
 
 			logger.info(`[SERVER] 📥 Queueing HTTP download: ${perfectName}`);
 
-			addDownloadJob("http", {
+			addToDownloadQueue("http", {
 				service,
 				serviceId: sid,
 				url,
@@ -1219,6 +1370,6 @@ try {
 		`[SERVER] Eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
 	);
 } catch (err) {
-	logger.error("[SERVER] 💥 Failed to start server: ", err);
+	logger.error("[SERVER] Failed to start server: ", err);
 	process.exit(1);
 }
