@@ -2,6 +2,7 @@
 	"name": "eziarr",
 	"type": "module",
 	"private": true,
+	"version": "1.0.0",
 	"scripts": {
 		"install:backend": "cd backend && bun install",
 		"install:frontend": "cd frontend && bun install",
