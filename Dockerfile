@@ -16,7 +16,6 @@ RUN cd frontend && bun run build
 # Stage 2: Production
 # ============================
 FROM oven/bun:1.3.8-alpine
-
 WORKDIR /app
 
 # Install system deps
