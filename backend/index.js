@@ -411,12 +411,22 @@ export const app = new Elysia()
 			logger.warn(`[SERVER] ⚠️ [${service}] Grab Rejected: ${rejections}`);
 
 			let actionsTaken = false;
+			let originalItem = null;
+			let itemEndpoint = "";
+
 			if (
 				rejections.includes("profile") ||
 				rejections.includes("cutoff") ||
-				rejections.includes("wanted")
+				rejections.includes("wanted") ||
+				rejections.includes("language") ||
+				rejections.includes("format") ||
+				rejections.includes("score") ||
+				rejections.includes("english") ||
+				rejections.includes("size")
 			) {
-				logger.info(`[SERVER] 🔄 [${service}] Switching Profile to "Any"...`);
+				logger.info(
+					`[SERVER] 🔄 [${service}] Temporarily dropping restrictions...`,
+				);
 
 				const profilesRes = await axios.get(
 					`${config.url}/api/v3/qualityprofile`,
@@ -426,38 +436,69 @@ export const app = new Elysia()
 					profilesRes.data.find((p) => p.name.toLowerCase() === "any") ||
 					profilesRes.data[0];
 
-				let endpoint = "";
 				let targetId = sid;
 
 				if (service === "radarr") {
-					endpoint = "/api/v3/movie";
+					itemEndpoint = "/api/v3/movie";
 				} else if (service === "sonarr") {
 					const epRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
 						headers: { "X-Api-Key": config.apiKey },
 						timeout: 30000,
 					});
 					targetId = epRes.data.seriesId;
-					endpoint = "/api/v3/series";
+					itemEndpoint = "/api/v3/series";
 				} else if (service === "lidarr") {
-					endpoint = "/api/v1/album";
+					itemEndpoint = "/api/v1/album";
 				}
 
 				const itemRes = await axios.get(
-					`${config.url}${endpoint}/${targetId}`,
+					`${config.url}${itemEndpoint}/${targetId}`,
 					{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
 				);
+
 				const item = itemRes.data;
+
+				originalItem = JSON.parse(JSON.stringify(item));
+
+				let needsUpdate = false;
 
 				if (item.qualityProfileId !== anyProfile.id) {
 					item.qualityProfileId = anyProfile.id;
-					await axios.put(`${config.url}${endpoint}/${item.id}`, item, {
+					needsUpdate = true;
+				}
+
+				if (item.tags && item.tags.length > 0) {
+					item.tags = [];
+					needsUpdate = true;
+				}
+
+				if (service === "sonarr" && item.languageProfileId) {
+					try {
+						const langRes = await axios.get(
+							`${config.url}/api/v3/languageprofile`,
+							{
+								headers: { "X-Api-Key": config.apiKey },
+								timeout: 10000,
+							},
+						);
+						const anyLang =
+							langRes.data.find((p) => p.name.toLowerCase() === "any") ||
+							langRes.data[0];
+						if (anyLang && item.languageProfileId !== anyLang.id) {
+							item.languageProfileId = anyLang.id;
+							needsUpdate = true;
+						}
+					} catch (e) {
+						// Ignored
+					}
+				}
+
+				if (needsUpdate) {
+					await axios.put(`${config.url}${itemEndpoint}/${item.id}`, item, {
 						headers: { "X-Api-Key": config.apiKey },
 						timeout: 30000,
 					});
 					actionsTaken = true;
-					logger.info(
-						`[SERVER] 🔄 [${service}] Profile switched for "${item.title}"`,
-					);
 				}
 			}
 
@@ -510,26 +551,49 @@ export const app = new Elysia()
 			if (actionsTaken) {
 				await new Promise((r) => setTimeout(r, 1000));
 
-				res = await pushRelease();
-				if (!res.data[0].rejected) {
-					recordForceGrabHistory(service, sid, title, downloadUrl, true);
-					return {
-						success: true,
-						message: "Grabbed! (Overrode Profile/Queue)",
-					};
-				} else {
-					recordForceGrabHistory(
-						service,
-						sid,
-						title,
-						downloadUrl,
-						false,
-						res.data[0].rejections[0],
-					);
-					return {
-						success: false,
-						message: `Still rejected: ${res.data[0].rejections[0]}`,
-					};
+				try {
+					res = await pushRelease();
+					if (!res.data[0].rejected) {
+						recordForceGrabHistory(service, sid, title, downloadUrl, true);
+						return {
+							success: true,
+							message: "Grabbed! (Bypassed Restrictions)",
+						};
+					} else {
+						recordForceGrabHistory(
+							service,
+							sid,
+							title,
+							downloadUrl,
+							false,
+							res.data[0].rejections[0],
+						);
+						return {
+							success: false,
+							message: `Still rejected: ${res.data[0].rejections[0]}`,
+						};
+					}
+				} finally {
+					// RESTORE ORIGINAL SETTINGS
+					if (originalItem) {
+						logger.info(
+							`[SERVER] 🔄 [${service}] Restoring original settings for "${originalItem.title}"...`,
+						);
+						try {
+							await axios.put(
+								`${config.url}${itemEndpoint}/${originalItem.id}`,
+								originalItem,
+								{
+									headers: { "X-Api-Key": config.apiKey },
+									timeout: 30000,
+								},
+							);
+						} catch (restoreErr) {
+							logger.error(
+								`[SERVER] Failed to restore original item settings: ${restoreErr.message}`,
+							);
+						}
+					}
 				}
 			}
 
@@ -541,6 +605,7 @@ export const app = new Elysia()
 				false,
 				rejections,
 			);
+
 			return { success: false, message: `Rejected: ${rejections}` };
 		},
 		{
@@ -557,7 +622,8 @@ export const app = new Elysia()
 			response: t.Object({ success: t.Boolean(), message: t.String() }),
 			detail: {
 				summary: "Force Grab an Item with Fixes",
-				description: `Attempt to grab a movie/episode/album via Prowlarr. If the grab is rejected due to profile or queue issues, automatically attempt to fix those issues (switch to "Any" profile, remove blocking queue items) and retry the grab once. Returns the final result of the grab attempt along with any actions taken.`,
+				description:
+					"Attempt to grab a movie/episode via Prowlarr. If rejected due to profile, language, or queue, Eziarr will temporarily drop the item's restrictions, push the download, and instantly restore the item to its original state.",
 				tags: ["*Arr Integration"],
 			},
 		},
