@@ -8,7 +8,9 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
+		"@elysiajs/cookie": "^0.8.0",
 		"@elysiajs/cors": "^1.4.1",
+		"@elysiajs/jwt": "^1.4.1",
 		"@elysiajs/static": "^1.4.7",
 		"axios": "^1.13.6",
 		"deadslog": "^1.3.0",
