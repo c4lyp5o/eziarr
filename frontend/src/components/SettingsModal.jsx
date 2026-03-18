@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
 import {
+	Lock,
 	X,
 	Save,
 	Settings as SettingsIcon,
@@ -27,7 +28,6 @@ import {
 } from "lucide-react";
 
 import { useToast } from "../context/Toast";
-import { fetcher } from "../utils/fetcher";
 import { apiCall } from "../utils/apiCall";
 import { formatSize } from "../utils/formatSize";
 import { formatDuration } from "../utils/formatDuration";
@@ -35,7 +35,11 @@ import { formatDuration } from "../utils/formatDuration";
 import { Button } from "./Buttons";
 import { ui } from "../ui/styles";
 
-const NoServicesConfiguredModal = ({ handleSave, onCancel, loading }) => {
+const NoServicesConfiguredModal = ({
+	handleSave,
+	onCancel,
+	isSavingConfig,
+}) => {
 	return (
 		<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
 			<div className="bg-[#0f0f10] border border-red-900/50 w-full max-w-md rounded-2xl flex flex-col shadow-2xl overflow-hidden text-center">
@@ -56,7 +60,7 @@ const NoServicesConfiguredModal = ({ handleSave, onCancel, loading }) => {
 					<button
 						type="button"
 						onClick={onCancel}
-						disabled={loading}
+						disabled={isSavingConfig}
 						className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors disabled:opacity-50"
 					>
 						Go Back
@@ -64,10 +68,10 @@ const NoServicesConfiguredModal = ({ handleSave, onCancel, loading }) => {
 					<button
 						type="button"
 						onClick={handleSave}
-						disabled={loading}
+						disabled={isSavingConfig}
 						className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
 					>
-						{loading ? "Saving..." : "Yes, Save Anyway"}
+						{isSavingConfig ? "Saving..." : "Yes, Save Anyway"}
 					</button>
 				</div>
 			</div>
@@ -86,6 +90,9 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 	const logsEndRef = useRef(null);
 
 	const [settings, setSettings] = useState({
+		username: "",
+		password: "",
+		confirmPassword: "",
 		syncEnabled: true,
 		hunterEnabled: true,
 		syncInterval: 10,
@@ -102,6 +109,8 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 		prowlarrUrl: "",
 		prowlarrApiKey: "",
 	});
+	const [isLoadingConfig, setIsLoadingConfig] = useState(false);
+	const [isSavingConfig, setIsSavingConfig] = useState(false);
 
 	const [testStatus, setTestStatus] = useState({
 		radarr: "idle",
@@ -111,29 +120,28 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 	});
 	const [noServicesConfiguredPrompt, setNoServicesConfiguredPrompt] =
 		useState(false);
-	const [loading, setLoading] = useState(false);
 
 	const { data: tasksData, isLoading: taskIsLoading } = useSWR(
 		isOpen && activeTab === "tasks" ? "/api/v1/system/tasks" : null,
-		fetcher,
+		apiCall,
 		{ refreshInterval: 2000 },
 	);
 
 	const { data: queueData, isLoading: queueIsLoading } = useSWR(
 		isOpen && activeTab === "queues" ? "/api/v1/downloads/queue" : null,
-		fetcher,
+		apiCall,
 		{ refreshInterval: 2000 },
 	);
 
 	const { data: historyData, isLoading: historyIsLoading } = useSWR(
 		isOpen && activeTab === "history" ? "/api/v1/downloads/history" : null,
-		fetcher,
+		apiCall,
 		{ refreshInterval: 2000 },
 	);
 
 	const { data: statsData, isLoading: statsIsLoading } = useSWR(
 		isOpen && activeTab === "stats" ? "/api/v1/downloads/stats" : null,
-		fetcher,
+		apiCall,
 		{ refreshInterval: 2000 },
 	);
 
@@ -141,7 +149,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 		isOpen && activeTab === "logs"
 			? `/api/v1/system/logs?type=${logType}`
 			: null,
-		fetcher,
+		apiCall,
 		{ refreshInterval: 2000 },
 	);
 
@@ -154,7 +162,25 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: later
 	useEffect(() => {
 		if (isOpen) {
-			fetchSettings();
+			const loadConfig = async () => {
+				try {
+					setIsLoadingConfig(true);
+					const res = await apiCall("/api/v1/settings");
+					setSettings((prev) => ({
+						...prev,
+						...res.settings,
+						password: "",
+						confirmPassword: "",
+					}));
+				} catch (err) {
+					console.error("Failed to load settings", err);
+					toast.error("Failed to load settings");
+				} finally {
+					setIsLoadingConfig(false);
+				}
+			};
+
+			loadConfig();
 			setActiveTab("settings");
 		}
 		return () => setNoServicesConfiguredPrompt(false);
@@ -166,16 +192,6 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 			logsEndRef.current.scrollIntoView({ behavior: "smooth" });
 		}
 	}, [logs, activeTab]);
-
-	const fetchSettings = async () => {
-		try {
-			const res = await apiCall("/api/v1/settings");
-			setSettings((prev) => ({ ...prev, ...res.settings }));
-		} catch (err) {
-			console.error("Failed to load settings", err);
-			toast.error("Failed to load settings");
-		}
-	};
 
 	const handleTestConnection = async (serviceName) => {
 		const url = settings[`${serviceName}Url`];
@@ -189,21 +205,16 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 		setTestStatus((prev) => ({ ...prev, [serviceName]: "loading" }));
 
 		try {
-			const res = await apiCall("/api/v1/system/test", {
+			await apiCall("/api/v1/system/test", {
 				method: "POST",
 				body: { service: serviceName, url, apiKey },
 			});
 
-			if (res.success) {
-				setTestStatus((prev) => ({ ...prev, [serviceName]: "success" }));
-				toast.success(`${serviceName} connected successfully!`);
-			} else {
-				setTestStatus((prev) => ({ ...prev, [serviceName]: "error" }));
-				toast.error(`${serviceName} connection failed.`);
-			}
-		} catch (err) {
+			setTestStatus((prev) => ({ ...prev, [serviceName]: "success" }));
+			toast.success(`${serviceName} connected successfully!`);
+		} catch (_err) {
 			setTestStatus((prev) => ({ ...prev, [serviceName]: "error" }));
-			toast.error(`Failed to reach ${serviceName}. Check URL.`);
+			toast.error(`${serviceName} connection failed.`);
 		}
 
 		setTimeout(() => {
@@ -212,6 +223,11 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 	};
 
 	const handleSave = async () => {
+		if (settings.password && settings.password !== settings.confirmPassword) {
+			toast.error("New passwords do not match!");
+			return;
+		}
+
 		const noServices =
 			!settings.radarrUrl &&
 			!settings.radarrApiKey &&
@@ -225,8 +241,19 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 			return;
 		}
 
-		setLoading(true);
+		const payload = {
+			...settings,
+			syncEnabled: Boolean(settings.syncEnabled),
+			hunterEnabled: Boolean(settings.hunterEnabled),
+			syncInterval: Math.max(1, Number(settings.syncInterval) || 1),
+			hunterInterval: Math.max(1, Number(settings.hunterInterval) || 1),
+		};
+
+		delete payload.confirmPassword;
+		if (!payload.password) delete payload.password;
+
 		try {
+			setIsSavingConfig(true);
 			await apiCall("/api/v1/settings/batch", {
 				method: "POST",
 				body: {
@@ -237,23 +264,79 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 					hunterInterval: Math.max(1, Number(settings.hunterInterval) || 1),
 				},
 			});
-			toast.success("Settings saved!");
 			setNoServicesConfiguredPrompt(false);
+			setSettings((prev) => ({
+				...prev,
+				password: "",
+				confirmPassword: "",
+			}));
 			onSaveSuccess();
+			toast.success("Settings saved!");
 		} catch (err) {
 			console.error("Failed to save settings", err);
 			toast.error("Failed to save settings");
 		} finally {
-			setLoading(false);
+			setIsSavingConfig(false);
 		}
 	};
 
 	const handleChange = (e) => {
 		const { name, value } = e.target;
 		setSettings((prev) => ({ ...prev, [name]: value }));
+		if (name === "password" && !value.trim()) {
+			setSettings((prev) => ({ ...prev, confirmPassword: "" }));
+		}
 	};
 
 	if (!isOpen) return null;
+
+	if (isLoadingConfig) {
+		return (
+			<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+				<div className="bg-[#0f0f10] border border-gray-800 w-full max-w-3xl h-[85vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+					{/* 1. Static Header */}
+					<div className="bg-[#0f0f10] border-b border-gray-800 shrink-0">
+						<div className="flex justify-between items-center p-6 pb-4 opacity-50">
+							<h2 className="text-xl font-bold text-gray-400 flex items-center gap-2">
+								<Server className="text-indigo-400/50" size={20} /> System Hub
+							</h2>
+							{/* Disabled close button while loading */}
+							<div className="p-1.5 rounded-lg bg-gray-800/50 text-gray-600">
+								<X size={20} />
+							</div>
+						</div>
+						{/* Fake Tab Bar Skeleton */}
+						<div className="flex px-6 gap-6 overflow-x-hidden border-b-2 border-transparent">
+							<div className="h-5 w-24 bg-gray-800/50 rounded animate-pulse mb-3" />
+							<div className="h-5 w-20 bg-gray-800/50 rounded animate-pulse mb-3" />
+							<div className="h-5 w-24 bg-gray-800/50 rounded animate-pulse mb-3" />
+						</div>
+					</div>
+
+					{/* 2. Centered Loading Content */}
+					<div className="flex-1 flex flex-col items-center justify-center bg-[#0a0a0a]">
+						<div className="flex flex-col items-center justify-center text-gray-500 animate-pulse">
+							<div className="relative flex items-center justify-center mb-6">
+								<div className="absolute w-16 h-16 bg-indigo-500/10 rounded-full animate-ping" />
+								<RefreshCw
+									size={40}
+									className="animate-spin text-indigo-500 relative z-10"
+								/>
+							</div>
+							<h3 className="text-xl font-bold text-gray-300 mb-2">
+								Loading Configuration
+							</h3>
+						</div>
+					</div>
+
+					{/* 3. Fake Footer Skeleton */}
+					<div className="bg-[#0f0f10] border-t border-gray-800 p-4 shrink-0 flex justify-end">
+						<div className="h-9 w-36 bg-gray-800/50 rounded-lg animate-pulse" />
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -269,7 +352,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 						</Button>
 					</div>
 
-					{/* Navigation Tabs (Scrollable for smaller screens) */}
+					{/* Navigation Tabs */}
 					<div className="flex px-6 gap-6 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 						<button
 							type="button"
@@ -356,8 +439,58 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 					{/* TAB 1: SETTINGS                */}
 					{/* ============================== */}
 					{activeTab === "settings" && (
-						// ... (Keep your exact Settings tab code here unchanged) ...
 						<div className="space-y-8 animate-in fade-in duration-300">
+							{/* Section: Credentials */}
+							<section>
+								<h3 className="text-sm font-bold text-red-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+									<Lock size={16} /> Credentials
+								</h3>
+								<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
+									<div>
+										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+										<label className="block text-xs text-gray-400">
+											Username
+										</label>
+										<input
+											type="text"
+											name="username"
+											value={settings.username || ""}
+											onChange={handleChange}
+											className={`${ui.input} mt-1`}
+											placeholder="admin"
+										/>
+									</div>
+									<div>
+										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+										<label className="block text-xs text-gray-400">
+											New Password
+										</label>
+										<input
+											type="password"
+											name="password"
+											value={settings.password}
+											onChange={handleChange}
+											className={`${ui.input} mt-1`}
+											placeholder="Leave blank to keep current"
+										/>
+									</div>
+									<div>
+										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+										<label className="block text-xs text-gray-400">
+											Confirm Password
+										</label>
+										<input
+											type="password"
+											name="confirmPassword"
+											value={settings.confirmPassword}
+											onChange={handleChange}
+											disabled={!settings.password.trim()}
+											className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+											placeholder="Confirm new password"
+										/>
+									</div>
+								</div>
+							</section>
 							{/* Section: Worker Intervals */}
 							<section>
 								<h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -474,7 +607,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												{testStatus.radarr === "idle" && "Test"}
 												{testStatus.radarr !== "idle" &&
 													testStatus.radarr !== "loading" &&
-													"Tested"}
+													"Success"}
 											</button>
 										</div>
 										<div className="space-y-3">
@@ -809,7 +942,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 										No Downloads Queued
 									</h3>
 									<p className="text-sm mt-2 max-w-sm">
-										The background queue is completely clear.
+										Download queue is clear.
 									</p>
 								</div>
 							) : queueIsLoading ? (
@@ -828,7 +961,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 										let payloadObj = {};
 										try {
 											payloadObj = JSON.parse(q.payload);
-										} catch (e) {}
+										} catch (_e) {}
 										return (
 											<div
 												key={q.id}
@@ -1116,10 +1249,10 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 						<button
 							type="button"
 							onClick={handleSave}
-							disabled={loading}
+							disabled={isSavingConfig}
 							className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
 						>
-							{loading ? (
+							{isSavingConfig ? (
 								"Saving..."
 							) : (
 								<>
@@ -1135,7 +1268,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 				<NoServicesConfiguredModal
 					handleSave={handleSave}
 					onCancel={() => setNoServicesConfiguredPrompt(false)}
-					loading={loading}
+					isSavingConfig={isSavingConfig}
 				/>
 			)}
 		</div>
