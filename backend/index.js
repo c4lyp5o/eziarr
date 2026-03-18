@@ -21,8 +21,8 @@ import { HTTPImportRoutes } from "./routes/httpimport.route";
 import { AuthPlugin } from "./plugins/auth.plugin";
 import { ProtectorPlugin } from "./plugins/protector.plugin";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) throw new Error("JWT_SECRET is required");
+const JWT_SECRET =
+	process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
 
 export const app = new Elysia()
 	.onError(({ code, error, set }) => {
@@ -48,7 +48,7 @@ export const app = new Elysia()
 	.use(
 		jwt({
 			name: "jwt",
-			secret: crypto.createHash("sha256").update(JWT_SECRET).digest("hex"),
+			secret: JWT_SECRET,
 		}),
 	)
 
