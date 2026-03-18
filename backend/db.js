@@ -114,7 +114,6 @@ const initDefaultSettings = () => {
 	if (updated) logger.info("[DB] ⚙️ Default settings initialized in DB.");
 };
 
-// missing media
 export const getMissingMedia = () => {
 	const fromDb = db
 		.query("SELECT * FROM missing_items ORDER BY release_date ASC")
@@ -206,7 +205,6 @@ export const clearMissingMedia = () => {
 	db.run("DELETE FROM missing_items");
 };
 
-// settings
 export const getAllSettings = () => {
 	const rows = db.query("SELECT * FROM settings").all();
 	return rows.reduce((acc, row) => {
