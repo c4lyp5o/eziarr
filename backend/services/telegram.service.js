@@ -1,0 +1,125 @@
+import axios from "axios";
+import {
+	getTelegramClient,
+	sendLoginCode,
+	completeLogin,
+	searchChannel,
+} from "../telegram";
+import { getAllServices, addToDownloadQueue } from "../db";
+import { generalLogger as logger } from "../logger";
+import { coerceNumericId } from "../utils";
+
+export const TelegramService = {
+	getTelegramStatus: async () => {
+		const client = await getTelegramClient();
+		if (!client) return { success: false, connected: false, channels: [] };
+
+		const connected = await client.checkAuthorization();
+		let simpleChannels = [];
+
+		if (connected) {
+			const dialogs = await client.getDialogs({ limit: 150 });
+
+			simpleChannels = dialogs
+				.filter((d) => d.isChannel)
+				.map((d) => ({
+					id: d.id.toString(),
+					title: d.title || "Unknown Channel",
+					username: d.entity?.username || null,
+				}));
+
+			simpleChannels.sort((a, b) => a.title.localeCompare(b.title));
+		}
+
+		return { success: true, connected, channels: simpleChannels };
+	},
+
+	postTelegramSendCode: async ({ body: { phoneNumber } }) => {
+		await sendLoginCode(phoneNumber);
+		return { success: true, message: "Code sent successfully" };
+	},
+
+	postTelegramLogin: async ({ body: { code, password } }) => {
+		const res = await completeLogin(code, password);
+
+		if (res.success) {
+			return { success: true, message: "Login successful" };
+		} else {
+			return { success: false, message: res.message || "Login failed" };
+		}
+	},
+
+	postTelegramSearch: async ({ body: { channel, query } }) => {
+		const files = await searchChannel(channel, query);
+		return { success: true, files };
+	},
+
+	postTelegramImport: async ({
+		body: { service, serviceId, channel, messageId, filename },
+	}) => {
+		const SERVICES = getAllServices();
+		const config = SERVICES[service];
+
+		if (!config) return { success: false, message: "Invalid service" };
+
+		if (!config.url || !config.apiKey) {
+			logger.error(`[SERVER] ${service} is not configured.`);
+			return {
+				success: false,
+				message: `${service} is not configured.`,
+			};
+		}
+
+		const sid = coerceNumericId(serviceId, "serviceId");
+
+		let perfectName = filename;
+		try {
+			const ext = filename.substring(filename.lastIndexOf("."));
+			if (service === "radarr") {
+				const res = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 10000,
+				});
+				perfectName = `${res.data.title} (${res.data.year})${ext}`;
+			} else if (service === "sonarr") {
+				const epRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 10000,
+				});
+				const sRes = await axios.get(
+					`${config.url}/api/v3/series/${epRes.data.seriesId}`,
+					{ headers: { "X-Api-Key": config.apiKey }, timeout: 10000 },
+				);
+				const sn = epRes.data.seasonNumber.toString().padStart(2, "0");
+				const en = epRes.data.episodeNumber.toString().padStart(2, "0");
+				perfectName = `${sRes.data.title} S${sn}E${en}${ext}`;
+			} else if (service === "lidarr") {
+				const alRes = await axios.get(`${config.url}/api/v1/album/${sid}`, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 10000,
+				});
+				perfectName = `${alRes.data.artist.artistName} - ${alRes.data.title}${ext}`;
+			}
+			perfectName = perfectName.replace(/[/\\?%*:|"<>]/g, "");
+		} catch (err) {
+			logger.warn(
+				`[SERVER] Failed to fetch exact title for renaming, falling back to original: ${err.message}`,
+			);
+		}
+
+		logger.info(`[SERVER] 📥 Queueing Telegram download: ${perfectName}`);
+
+		addToDownloadQueue("telegram", {
+			service,
+			serviceId: sid,
+			channel,
+			messageId,
+			filename: perfectName,
+		});
+
+		return {
+			success: true,
+			message: `Added to download queue! Check Active Tasks.`,
+		};
+	},
+};
