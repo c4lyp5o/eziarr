@@ -30,7 +30,7 @@ export const resetTelegramClient = async () => {
 		logger.info("[TELEGRAM] 🔄 Resetting cached Telegram client.");
 		try {
 			await tClient.disconnect();
-		} catch (err) {
+		} catch (_err) {
 			// Ignore disconnect errors
 		}
 		tClient = null;

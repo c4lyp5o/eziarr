@@ -20,9 +20,7 @@ export const getPosterUrl = (images = [], coverType) => {
 	const image = images.find((img) => img.coverType === coverType);
 	if (!image) return null;
 
-	if (image.remoteUrl) {
-		return image.remoteUrl;
-	}
+	if (image.remoteUrl) return image.remoteUrl;
 
 	return null;
 };

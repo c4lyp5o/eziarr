@@ -1,0 +1,44 @@
+import { t } from "elysia";
+
+export const AuthModel = {
+	// bodies
+	postFirstTime: t.Object({
+		username: t.String(),
+		password: t.String(),
+	}),
+	login: t.Object({
+		username: t.String(),
+		password: t.String(),
+		rememberMe: t.Optional(t.Boolean()),
+	}),
+
+	// responses
+	getFirstTimeResponse: t.Object({
+		success: t.Boolean(),
+		isFirstTime: t.Boolean(),
+	}),
+	postFirstTimeResponse: t.Object({
+		success: t.Boolean(),
+		message: t.String(),
+	}),
+	loginResponse: t.Object({
+		success: t.Boolean(),
+		message: t.Optional(t.String()),
+	}),
+	meResponse: t.Object({
+		success: t.Boolean(),
+		user: t.Optional(
+			t.Object({
+				username: t.String(),
+			}),
+		),
+		message: t.Optional(t.String()),
+	}),
+	refreshResponse: t.Object({
+		success: t.Boolean(),
+		message: t.Optional(t.String()),
+	}),
+	logoutResponse: t.Object({
+		success: t.Boolean(),
+	}),
+};
