@@ -53,18 +53,38 @@ export const app = new Elysia()
 	)
 
 	.use(HealthRoute)
-	.use(AuthPlugin)
-	.use(AuthRoutes)
-	.use(ProtectorPlugin)
-	.use(MissingRoutes)
-	.use(SettingsRoutes)
-	.use(SystemRoutes)
-	.use(DownloadsRoutes)
-	.use(TelegramRoutes)
-	.use(IARoutes)
-	.use(OpendirRoutes)
-	.use(HTTPImportRoutes)
+	.derive(async ({ jwt, cookie: c }) => {
+		console.log("[AuthPlugin] cookie", c);
+		const token = c.eziarr_access?.value;
+		if (!token) return { user: null };
 
+		try {
+			const payload = await jwt.verify(token);
+			if (!payload?.username) return { user: null };
+			return { user: { username: payload.username } };
+		} catch {
+			return { user: null };
+		}
+	})
+	.use(AuthRoutes)
+	.guard((api) =>
+		api
+			.onBeforeHandle(({ user, set }) => {
+				console.log("[ProtectorPlugin] user", user);
+				if (!user) {
+					set.status = 401;
+					return { success: false, message: "Unauthorized" };
+				}
+			})
+			.use(MissingRoutes)
+			.use(SettingsRoutes)
+			.use(SystemRoutes)
+			.use(DownloadsRoutes)
+			.use(TelegramRoutes)
+			.use(IARoutes)
+			.use(OpendirRoutes)
+			.use(HTTPImportRoutes),
+	)
 	.use(
 		staticPlugin({
 			assets: CLIENT_DIR,
