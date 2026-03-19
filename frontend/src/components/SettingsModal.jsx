@@ -173,7 +173,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 						confirmPassword: "",
 					}));
 				} catch (err) {
-					console.error("Failed to load settings", err);
+					// console.error("Failed to load settings", err);
 					toast.error("Failed to load settings");
 				} finally {
 					setIsLoadingConfig(false);
@@ -273,7 +273,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 			onSaveSuccess();
 			toast.success("Settings saved!");
 		} catch (err) {
-			console.error("Failed to save settings", err);
+			// console.error("Failed to save settings", err);
 			toast.error("Failed to save settings");
 		} finally {
 			setIsSavingConfig(false);

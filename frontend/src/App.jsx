@@ -109,7 +109,7 @@ function App() {
 				setSearchingId(null);
 			}, 5000);
 		} catch (err) {
-			console.error("Search failed", err);
+			// console.error("Search failed", err);
 			toast.error("Search failed");
 			setSearchingId(null);
 		}
