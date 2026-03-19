@@ -63,7 +63,7 @@ const ResultsModal = ({
 				mutate();
 			}, 5000);
 		} catch (err) {
-			console.error("Grab From Web Failed", err);
+			// console.error("Grab From Web Failed", err);
 			toast.error("Grab From Web Failed");
 		}
 	};

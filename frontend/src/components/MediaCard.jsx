@@ -181,7 +181,7 @@ const MediaCard = ({
 			setShowUnmonitorModal(false);
 			mutate();
 		} catch (err) {
-			console.error("Failed to unmonitor", err);
+			// console.error("Failed to unmonitor", err);
 			toast.error("Failed to unmonitor");
 		} finally {
 			setIsUnmonitoring(false);
