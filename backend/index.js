@@ -1,12 +1,13 @@
-import path from "node:path";
 import crypto from "node:crypto";
 import { Elysia, file } from "elysia";
 import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
-import { staticPlugin } from "@elysiajs/static";
 import { openapi } from "@elysiajs/openapi";
+import staticPlugin from "@elysiajs/static";
 import { generalLogger as logger } from "./logger";
-import { CLIENT_DIR } from "./config";
+
+import { AuthPlugin } from "./plugins/auth.plugin";
+import { ProtectorPlugin } from "./plugins/protector.plugin";
 
 import { HealthRoute } from "./routes/health.route";
 import { AuthRoutes } from "./routes/auth.route";
@@ -18,9 +19,6 @@ import { TelegramRoutes } from "./routes/telegram.route";
 import { IARoutes } from "./routes/ia.route";
 import { OpendirRoutes } from "./routes/opendir.route";
 import { HTTPImportRoutes } from "./routes/httpimport.route";
-
-import { AuthPlugin } from "./plugins/auth.plugin";
-import { ProtectorPlugin } from "./plugins/protector.plugin";
 
 const JWT_SECRET =
 	process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
@@ -54,29 +52,14 @@ export const app = new Elysia()
 	)
 
 	.use(HealthRoute)
-	.derive(async ({ jwt, cookie: c }) => {
-		console.log("[AuthPlugin] cookie", c);
-		const token = c.eziarr_access?.value;
-		if (!token) return { user: null };
 
-		try {
-			const payload = await jwt.verify(token);
-			if (!payload?.username) return { user: null };
-			return { user: { username: payload.username } };
-		} catch {
-			return { user: null };
-		}
-	})
+	.use(AuthPlugin)
+
 	.use(AuthRoutes)
+
 	.guard((api) =>
 		api
-			.onBeforeHandle(({ user, set }) => {
-				console.log("[ProtectorPlugin] user", user);
-				if (!user) {
-					set.status = 401;
-					return { success: false, message: "Unauthorized" };
-				}
-			})
+			.use(ProtectorPlugin)
 			.use(MissingRoutes)
 			.use(SettingsRoutes)
 			.use(SystemRoutes)
@@ -89,13 +72,15 @@ export const app = new Elysia()
 
 	.use(
 		staticPlugin({
-			assets: CLIENT_DIR,
-			prefix: "",
-			fallback: "index.html",
+			assets: "../client",
+			prefix: "/",
+			indexHTML: true,
+			alwaysStatic: true,
+			maxAge: 7 * 24 * 60 * 60,
 		}),
 	)
 
-	.get("/", () => file(path.join(CLIENT_DIR, "index.html")), {
+	.get("/", () => file("../client/index.html"), {
 		detail: {
 			hide: true,
 		},
