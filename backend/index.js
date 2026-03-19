@@ -1,3 +1,4 @@
+import path from "node:path";
 import crypto from "node:crypto";
 import { Elysia, file } from "elysia";
 import { cookie } from "@elysiajs/cookie";
@@ -5,6 +6,8 @@ import { jwt } from "@elysiajs/jwt";
 import { openapi } from "@elysiajs/openapi";
 import staticPlugin from "@elysiajs/static";
 import { generalLogger as logger } from "./logger";
+
+import { CLIENT_DIR } from "./config";
 
 import { AuthPlugin } from "./plugins/auth.plugin";
 import { ProtectorPlugin } from "./plugins/protector.plugin";
@@ -72,7 +75,7 @@ export const app = new Elysia()
 
 	.use(
 		staticPlugin({
-			assets: "../client",
+			assets: CLIENT_DIR,
 			prefix: "/",
 			indexHTML: true,
 			alwaysStatic: true,
@@ -80,7 +83,7 @@ export const app = new Elysia()
 		}),
 	)
 
-	.get("/", () => file("../client/index.html"), {
+	.get("/", () => file(path.join(CLIENT_DIR, "index.html")), {
 		detail: {
 			hide: true,
 		},
