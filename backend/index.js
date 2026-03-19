@@ -1,10 +1,9 @@
-import path from "node:path";
 import crypto from "node:crypto";
-import { Elysia, file } from "elysia";
+import { Elysia } from "elysia";
 import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import { staticPlugin } from "@elysiajs/static";
-// import { openapi } from "@elysiajs/openapi";
+import { openapi } from "@elysiajs/openapi";
 import { generalLogger as logger } from "./logger";
 import { CLIENT_DIR } from "./config";
 
@@ -53,20 +52,6 @@ export const app = new Elysia()
 		}),
 	)
 
-	.use(
-		staticPlugin({
-			assets: CLIENT_DIR,
-			prefix: "",
-			fallback: "index.html",
-		}),
-	)
-
-	.get("/", () => file(path.join(CLIENT_DIR, "index.html")), {
-		detail: {
-			hide: true,
-		},
-	})
-
 	.use(HealthRoute)
 	.use(AuthPlugin)
 	.use(AuthRoutes)
@@ -78,74 +63,84 @@ export const app = new Elysia()
 	.use(TelegramRoutes)
 	.use(IARoutes)
 	.use(OpendirRoutes)
-	.use(HTTPImportRoutes);
+	.use(HTTPImportRoutes)
 
-// if (process.env.NODE_ENV === "dev") {
-// 	app.use(
-// 		openapi({
-// 			exclude: {
-// 				paths: ["/", "/*", ""],
-// 			},
-// 			documentation: {
-// 				info: {
-// 					title: "Eziarr API 🍿",
-// 					version: "1.0.0",
-// 					description:
-// 						"The ultimate backend for managing missing *Arr media, scraping Telegram, and deep-searching the high seas.",
-// 					contact: {
-// 						name: "c4lyp5o",
-// 						url: "https://github.com/c4lyp5o/eziarr",
-// 						email: "calypso[at]calypsocloud.one",
-// 					},
-// 					license: {
-// 						name: "MIT",
-// 						url: "https://opensource.org/licenses/MIT",
-// 					},
-// 				},
-// 				servers: [
-// 					{
-// 						url: "http://localhost:5000",
-// 						description: "Local Development Server",
-// 					},
-// 				],
-// 				tags: [
-// 					{ name: "Auth", description: "Authentication and authorization" },
-// 					{ name: "General", description: "System health and sync" },
-// 					{
-// 						name: "*Arr Integration",
-// 						description: "Commands for Radarr, Sonarr, Lidarr",
-// 					},
-// 					{
-// 						name: "Telegram",
-// 						description: "MTProto auth and channel scraping",
-// 					},
-// 					{
-// 						name: "Alternative Sources",
-// 						description: "Internet Archive & Open Directories",
-// 					},
-// 					{
-// 						name: "Settings",
-// 						description: "Database and worker configuration",
-// 					},
-// 				],
-// 				// components: {
-// 				// 	securitySchemes: {
-// 				// 		ApiKeyAuth: {
-// 				// 			type: "apiKey",
-// 				// 			in: "header",
-// 				// 			name: "X-Api-Key",
-// 				// 		},
-// 				// 	},
-// 				// },
-// 			},
-// 		}),
-// 	);
-// }
+	.use(
+		staticPlugin({
+			assets: CLIENT_DIR,
+			prefix: "/",
+			fallback: "index.html",
+			alwaysStatic: true,
+			headers: { "Cache-Control": "max-age=31536000" },
+		}),
+	);
+
+if (process.env.NODE_ENV === "dev") {
+	app.use(
+		openapi({
+			exclude: {
+				paths: ["/", "/*", ""],
+			},
+			documentation: {
+				info: {
+					title: "Eziarr API 🍿",
+					version: "1.0.0",
+					description:
+						"The ultimate backend for managing missing *Arr media, scraping Telegram, and deep-searching the high seas.",
+					contact: {
+						name: "c4lyp5o",
+						url: "https://github.com/c4lyp5o/eziarr",
+						email: "calypso[at]calypsocloud.one",
+					},
+					license: {
+						name: "MIT",
+						url: "https://opensource.org/licenses/MIT",
+					},
+				},
+				servers: [
+					{
+						url: "http://localhost:5000",
+						description: "Local Development Server",
+					},
+				],
+				tags: [
+					{ name: "Auth", description: "Authentication and authorization" },
+					{ name: "General", description: "System health and sync" },
+					{
+						name: "*Arr Integration",
+						description: "Commands for Radarr, Sonarr, Lidarr",
+					},
+					{
+						name: "Telegram",
+						description: "MTProto auth and channel scraping",
+					},
+					{
+						name: "Alternative Sources",
+						description: "Internet Archive & Open Directories",
+					},
+					{
+						name: "Settings",
+						description: "Database and worker configuration",
+					},
+				],
+				// components: {
+				// 	securitySchemes: {
+				// 		ApiKeyAuth: {
+				// 			type: "apiKey",
+				// 			in: "header",
+				// 			name: "X-Api-Key",
+				// 		},
+				// 	},
+				// },
+			},
+		}),
+	);
+}
 
 try {
 	app.listen(process.env.PORT || 5000);
-	// process.env.NODE_ENV === "dev" &&
-	// 	logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
+	process.env.NODE_ENV === "dev" &&
+		logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
 	logger.info(
 		`[SERVER] Eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
 	);
