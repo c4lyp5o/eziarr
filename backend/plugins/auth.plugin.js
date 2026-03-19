@@ -3,7 +3,6 @@ import { Elysia } from "elysia";
 export const AuthPlugin = new Elysia({ name: "AuthPlugin" }).derive(
 	{ as: "scoped" },
 	async ({ jwt, cookie: c }) => {
-		// console.log("[AuthPlugin] cookie", c);
 		const token = c.eziarr_access?.value;
 		if (!token) return { user: null };
 
