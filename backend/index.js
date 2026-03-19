@@ -3,10 +3,14 @@ import crypto from "node:crypto";
 import { Elysia, file } from "elysia";
 import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
-import { staticPlugin } from "@elysiajs/static";
-// import { openapi } from "@elysiajs/openapi";
+import { openapi } from "@elysiajs/openapi";
+import staticPlugin from "@elysiajs/static";
 import { generalLogger as logger } from "./logger";
+
 import { CLIENT_DIR } from "./config";
+
+import { AuthPlugin } from "./plugins/auth.plugin";
+import { ProtectorPlugin } from "./plugins/protector.plugin";
 
 import { HealthRoute } from "./routes/health.route";
 import { AuthRoutes } from "./routes/auth.route";
@@ -18,9 +22,6 @@ import { TelegramRoutes } from "./routes/telegram.route";
 import { IARoutes } from "./routes/ia.route";
 import { OpendirRoutes } from "./routes/opendir.route";
 import { HTTPImportRoutes } from "./routes/httpimport.route";
-
-import { AuthPlugin } from "./plugins/auth.plugin";
-import { ProtectorPlugin } from "./plugins/protector.plugin";
 
 const JWT_SECRET =
 	process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
@@ -53,11 +54,32 @@ export const app = new Elysia()
 		}),
 	)
 
+	.use(HealthRoute)
+
+	.use(AuthPlugin)
+
+	.use(AuthRoutes)
+
+	.guard((api) =>
+		api
+			.use(ProtectorPlugin)
+			.use(MissingRoutes)
+			.use(SettingsRoutes)
+			.use(SystemRoutes)
+			.use(DownloadsRoutes)
+			.use(TelegramRoutes)
+			.use(IARoutes)
+			.use(OpendirRoutes)
+			.use(HTTPImportRoutes),
+	)
+
 	.use(
 		staticPlugin({
 			assets: CLIENT_DIR,
-			prefix: "",
-			fallback: "index.html",
+			prefix: "/",
+			indexHTML: true,
+			alwaysStatic: true,
+			maxAge: 7 * 24 * 60 * 60,
 		}),
 	)
 
@@ -65,87 +87,74 @@ export const app = new Elysia()
 		detail: {
 			hide: true,
 		},
-	})
+	});
 
-	.use(HealthRoute)
-	.use(AuthPlugin)
-	.use(AuthRoutes)
-	.use(ProtectorPlugin)
-	.use(MissingRoutes)
-	.use(SettingsRoutes)
-	.use(SystemRoutes)
-	.use(DownloadsRoutes)
-	.use(TelegramRoutes)
-	.use(IARoutes)
-	.use(OpendirRoutes)
-	.use(HTTPImportRoutes);
-
-// if (process.env.NODE_ENV === "dev") {
-// 	app.use(
-// 		openapi({
-// 			exclude: {
-// 				paths: ["/", "/*", ""],
-// 			},
-// 			documentation: {
-// 				info: {
-// 					title: "Eziarr API 🍿",
-// 					version: "1.0.0",
-// 					description:
-// 						"The ultimate backend for managing missing *Arr media, scraping Telegram, and deep-searching the high seas.",
-// 					contact: {
-// 						name: "c4lyp5o",
-// 						url: "https://github.com/c4lyp5o/eziarr",
-// 						email: "calypso[at]calypsocloud.one",
-// 					},
-// 					license: {
-// 						name: "MIT",
-// 						url: "https://opensource.org/licenses/MIT",
-// 					},
-// 				},
-// 				servers: [
-// 					{
-// 						url: "http://localhost:5000",
-// 						description: "Local Development Server",
-// 					},
-// 				],
-// 				tags: [
-// 					{ name: "Auth", description: "Authentication and authorization" },
-// 					{ name: "General", description: "System health and sync" },
-// 					{
-// 						name: "*Arr Integration",
-// 						description: "Commands for Radarr, Sonarr, Lidarr",
-// 					},
-// 					{
-// 						name: "Telegram",
-// 						description: "MTProto auth and channel scraping",
-// 					},
-// 					{
-// 						name: "Alternative Sources",
-// 						description: "Internet Archive & Open Directories",
-// 					},
-// 					{
-// 						name: "Settings",
-// 						description: "Database and worker configuration",
-// 					},
-// 				],
-// 				// components: {
-// 				// 	securitySchemes: {
-// 				// 		ApiKeyAuth: {
-// 				// 			type: "apiKey",
-// 				// 			in: "header",
-// 				// 			name: "X-Api-Key",
-// 				// 		},
-// 				// 	},
-// 				// },
-// 			},
-// 		}),
-// 	);
-// }
+if (process.env.NODE_ENV === "dev") {
+	app.use(
+		openapi({
+			exclude: {
+				paths: ["/", "/*", ""],
+			},
+			documentation: {
+				info: {
+					title: "Eziarr API 🍿",
+					version: "1.0.0",
+					description:
+						"The ultimate backend for managing missing *Arr media, scraping Telegram, and deep-searching the high seas.",
+					contact: {
+						name: "c4lyp5o",
+						url: "https://github.com/c4lyp5o/eziarr",
+						email: "calypso[at]calypsocloud.one",
+					},
+					license: {
+						name: "MIT",
+						url: "https://opensource.org/licenses/MIT",
+					},
+				},
+				servers: [
+					{
+						url: "http://localhost:5000",
+						description: "Local Development Server",
+					},
+				],
+				tags: [
+					{ name: "Auth", description: "Authentication and authorization" },
+					{ name: "General", description: "System health and sync" },
+					{
+						name: "*Arr Integration",
+						description: "Commands for Radarr, Sonarr, Lidarr",
+					},
+					{
+						name: "Telegram",
+						description: "MTProto auth and channel scraping",
+					},
+					{
+						name: "Alternative Sources",
+						description: "Internet Archive & Open Directories",
+					},
+					{
+						name: "Settings",
+						description: "Database and worker configuration",
+					},
+				],
+				// components: {
+				// 	securitySchemes: {
+				// 		ApiKeyAuth: {
+				// 			type: "apiKey",
+				// 			in: "header",
+				// 			name: "X-Api-Key",
+				// 		},
+				// 	},
+				// },
+			},
+		}),
+	);
+}
 
 try {
 	app.listen(process.env.PORT || 5000);
-	// process.env.NODE_ENV === "dev" &&
-	// 	logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
+	process.env.NODE_ENV === "dev" &&
+		logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
 	logger.info(
 		`[SERVER] Eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
 	);

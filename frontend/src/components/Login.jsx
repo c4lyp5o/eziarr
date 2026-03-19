@@ -41,7 +41,7 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 			});
 			onClose();
 		} catch (err) {
-			console.error("Failed to login", err);
+			// console.error("Failed to login", err);
 			setError(err.message);
 		} finally {
 			setIsLoading(false);
@@ -193,7 +193,7 @@ const Login = ({ onLoginSuccess }) => {
 			});
 			onLoginSuccess();
 		} catch (err) {
-			console.error("Failed to login", err);
+			// console.error("Failed to login", err);
 			setError(err.message || "Invalid username or password.");
 		} finally {
 			setIsLoading(false);

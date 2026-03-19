@@ -34,7 +34,7 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 			toast.success("Internet Archive Search Complete");
 			setArchiveSearchResults(files);
 		} catch (err) {
-			console.error("Internet Archive Search Failed", err);
+			// console.error("Internet Archive Search Failed", err);
 			toast.error("Internet Archive Search Failed");
 			setArchiveSearchResults([]);
 		} finally {
@@ -50,7 +50,7 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 			const { filesInside } = await apiCall(`/api/v1/ia/files/${identifier}`);
 			setArchiveFiles((prev) => ({ ...prev, [identifier]: filesInside }));
 		} catch (err) {
-			console.error("Internet Archive File Fetch Failed", err);
+			// console.error("Internet Archive File Fetch Failed", err);
 			toast.error("Internet Archive File Fetch Failed");
 			setArchiveFiles((prev) => ({ ...prev, [identifier]: [] }));
 		} finally {
