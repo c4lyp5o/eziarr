@@ -3,11 +3,9 @@ import { t } from "elysia";
 export const AuthModel = {
 	// bodies
 	postFirstTime: t.Object({
-		username: t.String(),
 		password: t.String(),
 	}),
 	login: t.Object({
-		username: t.String(),
 		password: t.String(),
 		rememberMe: t.Optional(t.Boolean()),
 	}),
@@ -29,7 +27,7 @@ export const AuthModel = {
 		success: t.Boolean(),
 		user: t.Optional(
 			t.Object({
-				username: t.String(),
+				isAdmin: t.Boolean(),
 			}),
 		),
 		message: t.Optional(t.String()),

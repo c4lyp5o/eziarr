@@ -18,43 +18,46 @@ export const scanOpenDir = async (dirUrl) => {
 	if (!(await isSafeUrl(dirUrl)))
 		throw new Error("Invalid or unsafe URL provided.");
 
-	try {
-		const res = await axios.get(dirUrl, { timeout: 30000 });
-		const html = res.data;
+	const res = await axios({
+		url: dirUrl,
+		method: "GET",
+		responseType: "text",
+		timeout: 30000,
+		maxRedirects: 0,
+		validateStatus: (status) => status >= 200 && status < 300,
+	});
 
-		const linkRegex = /<a\s+(?:[^>]*?\s+)?href="([^"]*)"/gi;
-		const files = [];
+	const html = res.data;
 
-		let match;
-		// biome-ignore lint/suspicious/noAssignInExpressions: i had to
-		while ((match = linkRegex.exec(html)) !== null) {
-			const rawLink = match[1];
+	const linkRegex = /<a\s+(?:[^>]*?\s+)?href="([^"]*)"/gi;
+	const files = [];
 
-			if (rawLink === "../" || rawLink === "./" || rawLink.includes("?"))
-				continue;
+	let match;
+	// biome-ignore lint/suspicious/noAssignInExpressions: i had to
+	while ((match = linkRegex.exec(html)) !== null) {
+		const rawLink = match[1];
 
-			const absoluteUrl = new URL(rawLink, dirUrl).href;
+		if (rawLink === "../" || rawLink === "./" || rawLink.includes("?"))
+			continue;
 
-			const ext = absoluteUrl
-				.substring(absoluteUrl.lastIndexOf("."))
-				.toLowerCase();
+		const absoluteUrl = new URL(rawLink, dirUrl).href;
 
-			if (VIDEO_EXTENSIONS.has(ext)) {
-				const filename = decodeURIComponent(
-					rawLink.split("/").pop() || "Unknown",
-				);
+		const ext = absoluteUrl
+			.substring(absoluteUrl.lastIndexOf("."))
+			.toLowerCase();
 
-				files.push({
-					filename: filename,
-					downloadUrl: absoluteUrl,
-					ext: ext,
-				});
-			}
+		if (VIDEO_EXTENSIONS.has(ext)) {
+			const filename = decodeURIComponent(
+				rawLink.split("/").pop() || "Unknown",
+			);
+
+			files.push({
+				filename: filename,
+				downloadUrl: absoluteUrl,
+				ext: ext,
+			});
 		}
-
-		return files;
-	} catch (err) {
-		logger.error("[OPENDIR] OD Scan Error: ", err);
-		throw new Error("Failed to scan directory. Is the URL correct?");
 	}
+
+	return files;
 };

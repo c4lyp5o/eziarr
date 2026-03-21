@@ -3,12 +3,12 @@ import { SettingsModel } from "../models/settings.model";
 import { SettingsService } from "../services/settings.service";
 
 export const SettingsRoutes = new Elysia({ prefix: "/api/v1/settings" })
-	.get("/", SettingsService.getSettings, {
-		response: SettingsModel.getSettingsResponse,
+	.get("/", SettingsService.getPublicSettings, {
+		response: SettingsModel.getPublicSettingsResponse,
 		detail: {
-			summary: "Get All Settings",
+			summary: "Get Public Settings",
 			description:
-				"Retrieve all current settings and their values for the application.",
+				"Retrieve public current settings and their values for the application.",
 			tags: ["Settings"],
 		},
 	})
