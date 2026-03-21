@@ -1,10 +1,15 @@
-import { getAllSettings, setSetting } from "../db";
-import { resetTelegramClient } from "../telegram"; // <--- FIXED MISSING IMPORT
+import { getAllSettings, getPublicSettings, setSetting } from "../db";
+import { resetTelegramClient } from "../telegram";
 
 export const SettingsService = {
 	getSettings: () => {
 		const allSettings = getAllSettings();
 		return { success: true, settings: allSettings };
+	},
+
+	getPublicSettings: () => {
+		const publicSettings = getPublicSettings();
+		return { success: true, settings: publicSettings };
 	},
 
 	postSettings: async ({ body: { key, value } }) => {
@@ -17,8 +22,13 @@ export const SettingsService = {
 
 	postSettingsBatch: async ({ body }) => {
 		for (const [key, value] of Object.entries(body)) {
+			console.log(key, value);
 			if (value === undefined) continue;
-			if ((key === "password" || key === "username") && value === "") continue;
+			if (key === "password" && value === "") continue;
+			if (key === "password" && value !== "") {
+				const hashedPassword = await Bun.password.hash(value);
+				setSetting(key, hashedPassword);
+			}
 			setSetting(key, value);
 		}
 

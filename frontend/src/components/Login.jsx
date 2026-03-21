@@ -11,11 +11,8 @@ import {
 import { apiCall } from "../utils/apiCall";
 
 const SetUpInitialUserAndPassword = ({ onClose }) => {
-	const [credentials, setCredentials] = useState({
-		username: "",
-		password: "",
-		repeatPassword: "",
-	});
+	const [password, setPassword] = useState("");
+	const [repeatPassword, setRepeatPassword] = useState("");
 	const [error, setError] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 
@@ -23,12 +20,12 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 		e.preventDefault();
 		setError("");
 
-		if (!credentials.username || !credentials.password) {
-			setError("Please enter both username and password.");
+		if (!password) {
+			setError("Please enter your desired password.");
 			return;
 		}
 
-		if (credentials.password !== credentials.repeatPassword) {
+		if (password !== repeatPassword) {
 			setError("Passwords do not match.");
 			return;
 		}
@@ -37,7 +34,7 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 			setIsLoading(true);
 			await apiCall("/api/v1/firsttime", {
 				method: "POST",
-				body: credentials,
+				body: { password },
 			});
 			onClose();
 		} catch (err) {
@@ -46,11 +43,6 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 		} finally {
 			setIsLoading(false);
 		}
-	};
-
-	const handleChange = (e) => {
-		const { name, value } = e.target;
-		setCredentials((prev) => ({ ...prev, [name]: value }));
 	};
 
 	return (
@@ -78,8 +70,7 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 						</div>
 					)}
 
-					<div>
-						{/** biome-ignore lint/a11y/noLabelWithoutControl: false positive */}
+					{/* <div>
 						<label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
 							Username
 						</label>
@@ -99,7 +90,7 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 								autoFocus
 							/>
 						</div>
-					</div>
+					</div> */}
 
 					<div>
 						{/** biome-ignore lint/a11y/noLabelWithoutControl: false positive */}
@@ -113,10 +104,11 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 							<input
 								type="password"
 								name="password"
-								value={credentials.password}
-								onChange={handleChange}
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
 								className="block w-full pl-10 pr-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all disabled:opacity-50"
 								placeholder="••••••••"
+								minLength={8}
 								disabled={isLoading}
 							/>
 						</div>
@@ -134,10 +126,11 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 							<input
 								type="password"
 								name="repeatPassword"
-								value={credentials.repeatPassword}
-								onChange={handleChange}
+								value={repeatPassword}
+								onChange={(e) => setRepeatPassword(e.target.value)}
 								className="block w-full pl-10 pr-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all disabled:opacity-50"
 								placeholder="••••••••"
+								minLength={8}
 								disabled={isLoading}
 							/>
 						</div>
@@ -164,10 +157,7 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 };
 
 const Login = ({ onLoginSuccess }) => {
-	const [credentials, setCredentials] = useState({
-		username: "",
-		password: "",
-	});
+	const [password, setPassword] = useState("");
 	const [rememberMe, setRememberMe] = useState(true);
 
 	const [error, setError] = useState("");
@@ -180,8 +170,8 @@ const Login = ({ onLoginSuccess }) => {
 		e.preventDefault();
 		setError("");
 
-		if (!credentials.username || !credentials.password) {
-			setError("Please enter both username and password.");
+		if (!password) {
+			setError("Please enter your password.");
 			return;
 		}
 
@@ -189,7 +179,7 @@ const Login = ({ onLoginSuccess }) => {
 			setIsLoading(true);
 			await apiCall("/api/v1/login", {
 				method: "POST",
-				body: { ...credentials, rememberMe },
+				body: { password, rememberMe },
 			});
 			onLoginSuccess();
 		} catch (err) {
@@ -198,11 +188,6 @@ const Login = ({ onLoginSuccess }) => {
 		} finally {
 			setIsLoading(false);
 		}
-	};
-
-	const handleChange = (e) => {
-		const { name, value } = e.target;
-		setCredentials((prev) => ({ ...prev, [name]: value }));
 	};
 
 	useEffect(() => {
@@ -244,8 +229,7 @@ const Login = ({ onLoginSuccess }) => {
 							</div>
 						)}
 
-						<div>
-							{/** biome-ignore lint/a11y/noLabelWithoutControl: false positive */}
+						{/* <div>
 							<label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
 								Username
 							</label>
@@ -264,7 +248,7 @@ const Login = ({ onLoginSuccess }) => {
 									disabled={isLoading}
 								/>
 							</div>
-						</div>
+						</div> */}
 
 						<div>
 							{/** biome-ignore lint/a11y/noLabelWithoutControl: false positive */}
@@ -278,11 +262,12 @@ const Login = ({ onLoginSuccess }) => {
 								<input
 									type="password"
 									name="password"
-									value={credentials.password}
-									onChange={handleChange}
+									value={password}
+									onChange={(e) => setPassword(e.target.value)}
 									className="block w-full pl-10 pr-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
 									placeholder="••••••••"
 									autoComplete="current-password"
+									minLength={8}
 									disabled={isLoading}
 								/>
 							</div>

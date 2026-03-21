@@ -221,13 +221,71 @@ export const getAllSettings = () => {
 	}, {});
 };
 
+export const getPublicSettings = () => {
+	const rows = db.query("SELECT * FROM settings").all();
+	const allSettings = rows.reduce((acc, row) => {
+		try {
+			acc[row.key] = JSON.parse(row.value);
+		} catch (err) {
+			logger.warn(
+				`[DB] ⚠️ Failed to parse JSON for setting '${row.key}'. Using raw value. Error: `,
+				err,
+			);
+			acc[row.key] = row.value;
+		}
+		return acc;
+	}, {});
+
+	const safeSettings = {
+		syncEnabled: allSettings.syncEnabled, // Enable or disable the worker sync
+		hunterEnabled: allSettings.hunterEnabled, // Enable or disable the Prowlarr hunter
+		syncInterval: allSettings.syncInterval, // Minutes between *Arr missing syncs
+		hunterInterval: allSettings.hunterInterval, // Minutes between automated Prowlarr searches
+		radarrConfigured: !!(allSettings.radarrUrl && allSettings.radarrApiKey),
+		sonarrConfigured: !!(allSettings.sonarrUrl && allSettings.sonarrApiKey),
+		lidarrConfigured: !!(allSettings.lidarrUrl && allSettings.lidarrApiKey),
+		prowlarrConfigured: !!(
+			allSettings.prowlarrUrl && allSettings.prowlarrApiKey
+		),
+		radarrUrl: allSettings.radarrUrl,
+		sonarrUrl: allSettings.sonarrUrl,
+		lidarrUrl: allSettings.lidarrUrl,
+		prowlarrUrl: allSettings.prowlarrUrl,
+		telegramConfigured: !!(
+			allSettings.telegramApiId && allSettings.telegramApiHash
+		),
+		pathMapRemote: allSettings.pathMapRemote, // e.g., C:\Imports
+	};
+
+	return safeSettings;
+};
+
 export const getAllServices = () => {
-	const s = getAllSettings();
+	const rows = db.query("SELECT * FROM settings").all();
+	const allServices = rows.reduce((acc, row) => {
+		try {
+			acc[row.key] = JSON.parse(row.value);
+		} catch (err) {
+			logger.warn(
+				`[DB] ⚠️ Failed to parse JSON for setting '${row.key}'. Using raw value. Error: `,
+				err,
+			);
+			acc[row.key] = row.value;
+		}
+		return acc;
+	}, {});
+
 	return {
-		radarr: { url: s.radarrUrl, apiKey: s.radarrApiKey },
-		sonarr: { url: s.sonarrUrl, apiKey: s.sonarrApiKey },
-		lidarr: { url: s.lidarrUrl, apiKey: s.lidarrApiKey },
-		prowlarr: { url: s.prowlarrUrl, apiKey: s.prowlarrApiKey },
+		radarr: {
+			url: allServices.radarrUrl,
+			apiKey: allServices.radarrApiKey,
+		},
+		sonarr: { url: allServices.sonarrUrl, apiKey: allServices.sonarrApiKey },
+		lidarr: { url: allServices.lidarrUrl, apiKey: allServices.lidarrApiKey },
+		prowlarr: {
+			url: allServices.prowlarrUrl,
+			apiKey: allServices.prowlarrApiKey,
+		},
 	};
 };
 
@@ -260,7 +318,6 @@ export const setSetting = (key, value) => {
 	});
 };
 
-// tasks
 export const getTasks = () => {
 	return db
 		.query(
@@ -302,7 +359,6 @@ export const markStaleTasks = () => {
   `).run({ $now: Date.now() });
 };
 
-// download queue
 export const getDownloadQueue = () => {
 	return db
 		.query(
@@ -533,7 +589,6 @@ export const unstuckDownloadQueue = (staleMs = 30 * 60_000) => {
 export const pruneDownloadQueue = (maxAgeMs = 3 * 24 * 60 * 60 * 1000) => {
 	const cutoff = Date.now() - maxAgeMs;
 
-	// Keep pending/retry/downloading jobs; clean only terminal states
 	db.query(
 		`
     DELETE FROM download_queue
@@ -638,7 +693,6 @@ export const pruneDownloadHistory = (maxAgeMs = 3 * 24 * 60 * 60 * 1000) => {
 	).run({ $cutoff: cutoff });
 };
 
-// download stats
 export const getDownloadStats = () => {
 	return db
 		.query(`

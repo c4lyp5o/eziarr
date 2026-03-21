@@ -29,7 +29,7 @@ const JWT_SECRET =
 export const app = new Elysia()
 	.onError(({ code, error, set }) => {
 		if (code === "VALIDATION") {
-			process.env.NODE_ENV === "dev" && logger.error(error);
+			process.env.NODE_ENV === "development" && logger.error(error);
 			set.status = 400;
 			return { success: false, message: "Bad request" };
 		}
@@ -41,7 +41,9 @@ export const app = new Elysia()
 		set.status = 500;
 		logger.error(`[SERVER] 💥[${code}] Server Error: `, error);
 		const message =
-			process.env.NODE_ENV === "dev" ? error.message : "Internal Server Error";
+			process.env.NODE_ENV === "development"
+				? error.message
+				: "Internal Server Error";
 		return { success: false, message };
 	})
 
@@ -56,12 +58,11 @@ export const app = new Elysia()
 
 	.use(HealthRoute)
 
-	.use(AuthPlugin)
+	.guard((authApi) => authApi.use(AuthPlugin).use(AuthRoutes))
 
-	.use(AuthRoutes)
-
-	.guard((api) =>
-		api
+	.guard((protectedApi) =>
+		protectedApi
+			.use(AuthPlugin)
 			.use(ProtectorPlugin)
 			.use(MissingRoutes)
 			.use(SettingsRoutes)

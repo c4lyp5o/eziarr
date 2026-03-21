@@ -90,16 +90,17 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 	const logsEndRef = useRef(null);
 
 	const [settings, setSettings] = useState({
-		username: "",
 		password: "",
 		confirmPassword: "",
 		syncEnabled: true,
 		hunterEnabled: true,
 		syncInterval: 10,
 		hunterInterval: 15,
-		telegramApiId: "",
-		telegramApiHash: "",
-		pathMapRemote: "",
+		radarrConfigured: false,
+		sonarrConfigured: false,
+		lidarrConfigured: false,
+		prowlarrConfigured: false,
+		telegramConfigured: false,
 		radarrUrl: "",
 		radarrApiKey: "",
 		sonarrUrl: "",
@@ -108,6 +109,9 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 		lidarrApiKey: "",
 		prowlarrUrl: "",
 		prowlarrApiKey: "",
+		telegramApiId: "",
+		telegramApiHash: "",
+		pathMapRemote: "",
 	});
 	const [isLoadingConfig, setIsLoadingConfig] = useState(false);
 	const [isSavingConfig, setIsSavingConfig] = useState(false);
@@ -166,13 +170,8 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 				try {
 					setIsLoadingConfig(true);
 					const res = await apiCall("/api/v1/settings");
-					setSettings((prev) => ({
-						...prev,
-						...res.settings,
-						password: "",
-						confirmPassword: "",
-					}));
-				} catch (err) {
+					setSettings(res.settings);
+				} catch (_err) {
 					// console.error("Failed to load settings", err);
 					toast.error("Failed to load settings");
 				} finally {
@@ -229,6 +228,9 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 		}
 
 		const noServices =
+			!settings.radarrConfigured &&
+			!settings.sonarrConfigured &&
+			!settings.lidarrConfigured &&
 			!settings.radarrUrl &&
 			!settings.radarrApiKey &&
 			!settings.sonarrUrl &&
@@ -272,7 +274,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 			}));
 			onSaveSuccess();
 			toast.success("Settings saved!");
-		} catch (err) {
+		} catch (_err) {
 			// console.error("Failed to save settings", err);
 			toast.error("Failed to save settings");
 		} finally {
@@ -445,9 +447,8 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 								<h3 className="text-sm font-bold text-red-400 uppercase tracking-wider mb-4 flex items-center gap-2">
 									<Lock size={16} /> Credentials
 								</h3>
-								<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
-									<div>
-										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
+									{/* <div>
 										<label className="block text-xs text-gray-400">
 											Username
 										</label>
@@ -459,7 +460,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 											className={`${ui.input} mt-1`}
 											placeholder="admin"
 										/>
-									</div>
+									</div> */}
 									<div>
 										{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
 										<label className="block text-xs text-gray-400">
@@ -484,7 +485,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 											name="confirmPassword"
 											value={settings.confirmPassword}
 											onChange={handleChange}
-											disabled={!settings.password.trim()}
+											disabled={!settings.password}
 											className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
 											placeholder="Confirm new password"
 										/>
@@ -593,22 +594,33 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 											<h4 className="text-sm font-bold text-yellow-500 flex items-center gap-2">
 												<Film size={16} /> Radarr
 											</h4>
-											<button
-												type="button"
-												onClick={() => handleTestConnection("radarr")}
-												disabled={testStatus.radarr === "loading"}
-												className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${testStatus.radarr === "success" ? "bg-emerald-500/20 text-emerald-400" : testStatus.radarr === "error" ? "bg-red-500/20 text-red-400" : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"}`}
-											>
-												{testStatus.radarr === "loading" && (
-													<Loader2 size={12} className="animate-spin" />
-												)}
-												{testStatus.radarr === "success" && <Check size={12} />}
-												{testStatus.radarr === "error" && <X size={12} />}
-												{testStatus.radarr === "idle" && "Test"}
-												{testStatus.radarr !== "idle" &&
-													testStatus.radarr !== "loading" &&
-													"Success"}
-											</button>
+											{(!settings.radarrConfigured ||
+												settings.radarrApiKey !== "") && (
+												<button
+													type="button"
+													onClick={() => handleTestConnection("radarr")}
+													disabled={testStatus.radarr === "loading"}
+													className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${
+														testStatus.radarr === "success"
+															? "bg-emerald-500/20 text-emerald-400"
+															: testStatus.radarr === "error"
+																? "bg-red-500/20 text-red-400"
+																: "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+													}`}
+												>
+													{testStatus.radarr === "loading" && (
+														<Loader2 size={12} className="animate-spin" />
+													)}
+													{testStatus.radarr === "success" && (
+														<Check size={12} />
+													)}
+													{testStatus.radarr === "error" && <X size={12} />}
+													{testStatus.radarr === "idle" && "Test"}
+													{testStatus.radarr !== "idle" &&
+														testStatus.radarr !== "loading" &&
+														"Success"}
+												</button>
+											)}
 										</div>
 										<div className="space-y-3">
 											<div>
@@ -621,7 +633,9 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 													name="radarrUrl"
 													value={settings.radarrUrl || ""}
 													onChange={handleChange}
-													placeholder="http://192.168.1.50:7878"
+													placeholder={
+														settings.radarrUrl || "http://192.168.1.50:7878"
+													}
 													className={`${ui.input} mt-1`}
 												/>
 											</div>
@@ -635,7 +649,11 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 													name="radarrApiKey"
 													value={settings.radarrApiKey || ""}
 													onChange={handleChange}
-													placeholder="32-character API key"
+													placeholder={
+														settings.radarrConfigured
+															? "Radarr already configured"
+															: "32-character API key"
+													}
 													className={`${ui.input} mt-1`}
 												/>
 											</div>
@@ -648,22 +666,27 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 											<h4 className="text-sm font-bold text-blue-500 flex items-center gap-2">
 												<Tv size={16} /> Sonarr
 											</h4>
-											<button
-												type="button"
-												onClick={() => handleTestConnection("sonarr")}
-												disabled={testStatus.sonarr === "loading"}
-												className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${testStatus.sonarr === "success" ? "bg-emerald-500/20 text-emerald-400" : testStatus.sonarr === "error" ? "bg-red-500/20 text-red-400" : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"}`}
-											>
-												{testStatus.sonarr === "loading" && (
-													<Loader2 size={12} className="animate-spin" />
-												)}
-												{testStatus.sonarr === "success" && <Check size={12} />}
-												{testStatus.sonarr === "error" && <X size={12} />}
-												{testStatus.sonarr === "idle" && "Test"}
-												{testStatus.sonarr !== "idle" &&
-													testStatus.sonarr !== "loading" &&
-													"Tested"}
-											</button>
+											{(!settings.sonarrConfigured ||
+												settings.sonarrApiKey !== "") && (
+												<button
+													type="button"
+													onClick={() => handleTestConnection("sonarr")}
+													disabled={testStatus.sonarr === "loading"}
+													className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${testStatus.sonarr === "success" ? "bg-emerald-500/20 text-emerald-400" : testStatus.sonarr === "error" ? "bg-red-500/20 text-red-400" : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"}`}
+												>
+													{testStatus.sonarr === "loading" && (
+														<Loader2 size={12} className="animate-spin" />
+													)}
+													{testStatus.sonarr === "success" && (
+														<Check size={12} />
+													)}
+													{testStatus.sonarr === "error" && <X size={12} />}
+													{testStatus.sonarr === "idle" && "Test"}
+													{testStatus.sonarr !== "idle" &&
+														testStatus.sonarr !== "loading" &&
+														"Tested"}
+												</button>
+											)}
 										</div>
 										<div className="space-y-3">
 											<div>
@@ -674,9 +697,11 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												<input
 													type="text"
 													name="sonarrUrl"
-													value={settings.sonarrUrl || ""}
+													value={settings.sonarrUrl}
 													onChange={handleChange}
-													placeholder="http://192.168.1.50:8989"
+													placeholder={
+														settings.sonarrUrl || "http://192.168.1.50:8989"
+													}
 													className={`${ui.input} mt-1`}
 												/>
 											</div>
@@ -690,7 +715,11 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 													name="sonarrApiKey"
 													value={settings.sonarrApiKey || ""}
 													onChange={handleChange}
-													placeholder="32-character API key"
+													placeholder={
+														settings.sonarrConfigured
+															? "Sonarr already configured"
+															: "32-character API key"
+													}
 													className={`${ui.input} mt-1`}
 												/>
 											</div>
@@ -703,22 +732,27 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 											<h4 className="text-sm font-bold text-green-500 flex items-center gap-2">
 												<Film size={16} /> Lidarr
 											</h4>
-											<button
-												type="button"
-												onClick={() => handleTestConnection("lidarr")}
-												disabled={testStatus.lidarr === "loading"}
-												className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${testStatus.lidarr === "success" ? "bg-emerald-500/20 text-emerald-400" : testStatus.lidarr === "error" ? "bg-red-500/20 text-red-400" : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"}`}
-											>
-												{testStatus.lidarr === "loading" && (
-													<Loader2 size={12} className="animate-spin" />
-												)}
-												{testStatus.lidarr === "success" && <Check size={12} />}
-												{testStatus.lidarr === "error" && <X size={12} />}
-												{testStatus.lidarr === "idle" && "Test"}
-												{testStatus.lidarr !== "idle" &&
-													testStatus.lidarr !== "loading" &&
-													"Tested"}
-											</button>
+											{(!settings.lidarrConfigured ||
+												settings.lidarrApiKey !== "") && (
+												<button
+													type="button"
+													onClick={() => handleTestConnection("lidarr")}
+													disabled={testStatus.lidarr === "loading"}
+													className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold transition-colors ${testStatus.lidarr === "success" ? "bg-emerald-500/20 text-emerald-400" : testStatus.lidarr === "error" ? "bg-red-500/20 text-red-400" : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"}`}
+												>
+													{testStatus.lidarr === "loading" && (
+														<Loader2 size={12} className="animate-spin" />
+													)}
+													{testStatus.lidarr === "success" && (
+														<Check size={12} />
+													)}
+													{testStatus.lidarr === "error" && <X size={12} />}
+													{testStatus.lidarr === "idle" && "Test"}
+													{testStatus.lidarr !== "idle" &&
+														testStatus.lidarr !== "loading" &&
+														"Tested"}
+												</button>
+											)}
 										</div>
 										<div className="space-y-3">
 											<div>
@@ -729,9 +763,11 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												<input
 													type="text"
 													name="lidarrUrl"
-													value={settings.lidarrUrl || ""}
+													value={settings.lidarrUrl}
 													onChange={handleChange}
-													placeholder="http://192.168.1.50:8686"
+													placeholder={
+														settings.lidarrUrl || "http://192.168.1.50:8686"
+													}
 													className={`${ui.input} mt-1`}
 												/>
 											</div>
@@ -743,9 +779,13 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												<input
 													type="password"
 													name="lidarrApiKey"
-													value={settings.lidarrApiKey || ""}
+													value={settings.lidarrApiKey}
 													onChange={handleChange}
-													placeholder="32-character API key"
+													placeholder={
+														settings.lidarrConfigured
+															? "Lidarr already configured"
+															: "32-character API key"
+													}
 													className={`${ui.input} mt-1`}
 												/>
 											</div>
@@ -768,7 +808,9 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 											name="prowlarrUrl"
 											value={settings.prowlarrUrl}
 											onChange={handleChange}
-											placeholder="http://192.168.1.50:9696"
+											placeholder={
+												settings.prowlarrUrl || "http://192.168.1.50:9696"
+											}
 											className={`${ui.input} mt-1`}
 										/>
 									</div>
@@ -782,7 +824,11 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 											name="prowlarrApiKey"
 											value={settings.prowlarrApiKey}
 											onChange={handleChange}
-											placeholder="32-character API key"
+											placeholder={
+												settings.prowlarrConfigured
+													? "Prowlarr already configured"
+													: "32-character API key"
+											}
 											className={`${ui.input} mt-1`}
 										/>
 									</div>
@@ -805,7 +851,11 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 											name="telegramApiId"
 											value={settings.telegramApiId}
 											onChange={handleChange}
-											placeholder="e.g. 12345678"
+											placeholder={
+												settings.telegramConfigured
+													? "Telegram already configured"
+													: "e.g. 12345678"
+											}
 											className={`${ui.input} mt-1`}
 										/>
 									</div>
@@ -819,7 +869,11 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 											name="telegramApiHash"
 											value={settings.telegramApiHash}
 											onChange={handleChange}
-											placeholder="Your 32-char hash"
+											placeholder={
+												settings.telegramConfigured
+													? "Telegram already configured"
+													: "Your 32-char hash"
+											}
 											className={`${ui.input} mt-1`}
 										/>
 									</div>

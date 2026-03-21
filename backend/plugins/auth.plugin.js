@@ -1,17 +1,16 @@
 import { Elysia } from "elysia";
 
 export const AuthPlugin = new Elysia({ name: "AuthPlugin" }).derive(
-	{ as: "scoped" },
 	async ({ jwt, cookie: c }) => {
 		const token = c.eziarr_access?.value;
-		if (!token) return { user: null };
+		if (!token) return { isAdmin: null };
 
 		try {
 			const payload = await jwt.verify(token);
-			if (!payload?.username) return { user: null };
-			return { user: { username: payload.username } };
+			if (!payload?.isAdmin) return { isAdmin: null };
+			return { isAdmin: payload.isAdmin };
 		} catch {
-			return { user: null };
+			return { isAdmin: null };
 		}
 	},
 );
