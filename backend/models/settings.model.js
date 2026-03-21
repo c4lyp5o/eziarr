@@ -7,7 +7,6 @@ export const SettingsModel = {
 		value: t.Any(),
 	}),
 	postSettingsBatch: t.Object({
-		username: t.Optional(t.String()),
 		password: t.Optional(t.String()),
 		syncEnabled: t.Boolean(),
 		hunterEnabled: t.Boolean(),
@@ -24,13 +23,28 @@ export const SettingsModel = {
 		telegramApiId: t.Optional(t.String()),
 		telegramApiHash: t.Optional(t.String()),
 		pathMapRemote: t.Optional(t.String()),
-		telegramSession: t.Optional(t.String()),
 	}),
 
 	// responses
-	getSettingsResponse: t.Object({
+	getPublicSettingsResponse: t.Object({
 		success: t.Boolean(),
-		settings: t.Record(t.String(), t.Any()),
+		settings: t.Object({
+			syncEnabled: t.Boolean(),
+			hunterEnabled: t.Boolean(),
+			syncInterval: t.Number(),
+			hunterInterval: t.Number(),
+			radarrConfigured: t.Boolean(),
+			sonarrConfigured: t.Boolean(),
+			lidarrConfigured: t.Boolean(),
+			prowlarrConfigured: t.Boolean(),
+			telegramConfigured: t.Boolean(),
+			radarrUrl: t.Optional(t.String()),
+			sonarrUrl: t.Optional(t.String()),
+			lidarrUrl: t.Optional(t.String()),
+			prowlarrUrl: t.Optional(t.String()),
+			telegramApiId: t.Optional(t.String()),
+			pathMapRemote: t.Optional(t.String()),
+		}),
 	}),
 	postSettingsResponse: t.Object({
 		success: t.Boolean(),
