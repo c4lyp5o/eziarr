@@ -90,7 +90,7 @@ export const app = new Elysia()
 		},
 	});
 
-if (process.env.NODE_ENV === "dev") {
+if (process.env.NODE_ENV === "development") {
 	app.use(
 		openapi({
 			exclude: {
@@ -154,7 +154,7 @@ if (process.env.NODE_ENV === "dev") {
 
 try {
 	app.listen(process.env.PORT || 5000);
-	process.env.NODE_ENV === "dev" &&
+	process.env.NODE_ENV === "development" &&
 		logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
 	logger.info(
 		`[SERVER] Eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
