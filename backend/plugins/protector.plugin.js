@@ -2,8 +2,8 @@ import { Elysia } from "elysia";
 
 export const ProtectorPlugin = new Elysia({
 	name: "ProtectorPlugin",
-}).onBeforeHandle({ as: "scoped" }, ({ user, set }) => {
-	if (!user) {
+}).onBeforeHandle(({ isAdmin, set }) => {
+	if (!isAdmin) {
 		set.status = 401;
 		return { success: false, message: "Unauthorized" };
 	}
