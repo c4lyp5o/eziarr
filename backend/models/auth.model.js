@@ -3,10 +3,10 @@ import { t } from "elysia";
 export const AuthModel = {
 	// bodies
 	postFirstTime: t.Object({
-		password: t.String(),
+		password: t.String({ minLength: 8 }),
 	}),
 	login: t.Object({
-		password: t.String(),
+		password: t.String({ minLength: 8 }),
 		rememberMe: t.Optional(t.Boolean()),
 	}),
 
