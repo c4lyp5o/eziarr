@@ -1,7 +1,12 @@
-import axios from "axios";
 import fs from "node:fs";
+import axios from "axios";
 import { MAX_DOWNLOAD_BYTES } from "./config";
-import { isSafeUrl, prepareFileDownload } from "./utils";
+import {
+	isSafeUrl,
+	safeHttpAgent,
+	safeHttpsAgent,
+	prepareFileDownload,
+} from "./utils";
 import { generalLogger as logger } from "./logger";
 
 export const downloadHttpFile = async (url, filename, onProgress) => {
@@ -18,6 +23,8 @@ export const downloadHttpFile = async (url, filename, onProgress) => {
 		responseType: "stream",
 		timeout: 30000,
 		maxRedirects: 0,
+		httpAgent: safeHttpAgent,
+		httpsAgent: safeHttpsAgent,
 		validateStatus: (status) => status >= 200 && status < 300,
 	});
 
