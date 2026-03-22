@@ -113,6 +113,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 		telegramApiHash: "",
 		pathMapRemote: "",
 	});
+	const [initialSettings, setInitialSettings] = useState({});
 	const [isLoadingConfig, setIsLoadingConfig] = useState(false);
 	const [isSavingConfig, setIsSavingConfig] = useState(false);
 
@@ -171,6 +172,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 					setIsLoadingConfig(true);
 					const res = await apiCall("/api/v1/settings");
 					setSettings(res.settings);
+					setInitialSettings(res.settings);
 				} catch (_err) {
 					// console.error("Failed to load settings", err);
 					toast.error("Failed to load settings");
@@ -595,7 +597,9 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												<Film size={16} /> Radarr
 											</h4>
 											{(!settings.radarrConfigured ||
-												settings.radarrApiKey !== "") && (
+												settings.radarrApiKey !== "" ||
+												(settings.radarrUrl || "") !==
+													(initialSettings.radarrUrl || "")) && (
 												<button
 													type="button"
 													onClick={() => handleTestConnection("radarr")}
@@ -667,7 +671,9 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												<Tv size={16} /> Sonarr
 											</h4>
 											{(!settings.sonarrConfigured ||
-												settings.sonarrApiKey !== "") && (
+												settings.sonarrApiKey !== "" ||
+												(settings.sonarrUrl || "") !==
+													(initialSettings.sonarrUrl || "")) && (
 												<button
 													type="button"
 													onClick={() => handleTestConnection("sonarr")}
@@ -733,7 +739,9 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												<Film size={16} /> Lidarr
 											</h4>
 											{(!settings.lidarrConfigured ||
-												settings.lidarrApiKey !== "") && (
+												settings.lidarrApiKey !== "" ||
+												(settings.lidarrUrl || "") !==
+													(initialSettings.lidarrUrl || "")) && (
 												<button
 													type="button"
 													onClick={() => handleTestConnection("lidarr")}
