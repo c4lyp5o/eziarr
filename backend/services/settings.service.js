@@ -1,12 +1,7 @@
-import { getAllSettings, getPublicSettings, setSetting } from "../db";
+import { getPublicSettings, setSetting } from "../db";
 import { resetTelegramClient } from "../telegram";
 
 export const SettingsService = {
-	getSettings: () => {
-		const allSettings = getAllSettings();
-		return { success: true, settings: allSettings };
-	},
-
 	getPublicSettings: () => {
 		const publicSettings = getPublicSettings();
 		return { success: true, settings: publicSettings };
