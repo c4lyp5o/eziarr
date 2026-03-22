@@ -1,8 +1,10 @@
+import { lookup } from "node:dns/promises";
 import fs from "node:fs";
+import http from "node:http";
+import https from "node:https";
+import net from "node:net";
 import path from "node:path";
 import { setTimeout } from "node:timers/promises";
-import { lookup } from "node:dns/promises";
-import net from "node:net";
 import axios from "axios";
 import { getSetting, getAllServices } from "./db";
 import { generalLogger as logger } from "./logger";
@@ -191,6 +193,33 @@ export const isSafeUrl = async (urlString) => {
 		return false;
 	}
 };
+
+const safeDnsLookup = async (hostname, options, callback) => {
+	try {
+		const results = await lookup(hostname, { all: true, verbatim: true });
+		if (!results?.length) {
+			return callback(new Error("ENOTFOUND"), null, null);
+		}
+
+		// Ensure EVERY resolved IP for this hostname is safe
+		for (const r of results) {
+			if (isIpDisallowed(r.address)) {
+				logger.warn(
+					`[SSRF] Blocked connection to ${hostname} resolving to disallowed IP ${r.address}`,
+				);
+				return callback(new Error("SSRF Blocked: Disallowed IP"), null, null);
+			}
+		}
+
+		// If safe, pass the very first resolved IP directly to the socket
+		callback(null, results[0].address, results[0].family);
+	} catch (err) {
+		callback(err, null, null);
+	}
+};
+
+export const safeHttpAgent = new http.Agent({ lookup: safeDnsLookup });
+export const safeHttpsAgent = new https.Agent({ lookup: safeDnsLookup });
 
 export const prepareFileDownload = async (filename) => {
 	const safeFilename = filename.replace(/[/\\?%*:|"<>]/g, " ").trim();

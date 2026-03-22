@@ -5,8 +5,8 @@ import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import { openapi } from "@elysiajs/openapi";
 import staticPlugin from "@elysiajs/static";
+import { getSetting, setSetting } from "./db";
 import { generalLogger as logger } from "./logger";
-
 import { CLIENT_DIR } from "./config";
 
 import { AuthPlugin } from "./plugins/auth.plugin";
@@ -23,8 +23,14 @@ import { IARoutes } from "./routes/ia.route";
 import { OpendirRoutes } from "./routes/opendir.route";
 import { HTTPImportRoutes } from "./routes/httpimport.route";
 
-const JWT_SECRET =
-	process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+	JWT_SECRET = getSetting("jwtSecret");
+	if (!JWT_SECRET) {
+		JWT_SECRET = crypto.randomBytes(32).toString("hex");
+		setSetting("jwtSecret", JWT_SECRET);
+	}
+}
 
 export const app = new Elysia()
 	.onError(({ code, error, set }) => {

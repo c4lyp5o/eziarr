@@ -1,6 +1,6 @@
 import { URL } from "node:url";
 import axios from "axios";
-import { isSafeUrl } from "./utils";
+import { isSafeUrl, safeHttpAgent, safeHttpsAgent } from "./utils";
 import { generalLogger as logger } from "./logger";
 
 const VIDEO_EXTENSIONS = new Set([
@@ -18,12 +18,16 @@ export const scanOpenDir = async (dirUrl) => {
 	if (!(await isSafeUrl(dirUrl)))
 		throw new Error("Invalid or unsafe URL provided.");
 
+	logger.info(`[OPENDIR] Scanning ${dirUrl}`);
+
 	const res = await axios({
 		url: dirUrl,
 		method: "GET",
 		responseType: "text",
 		timeout: 30000,
 		maxRedirects: 0,
+		httpAgent: safeHttpAgent,
+		httpsAgent: safeHttpsAgent,
 		validateStatus: (status) => status >= 200 && status < 300,
 	});
 
