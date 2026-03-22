@@ -7,7 +7,7 @@ export const SettingsModel = {
 		value: t.Any(),
 	}),
 	postSettingsBatch: t.Object({
-		password: t.Optional(t.String()),
+		password: t.Optional(t.String({ minLength: 8 })),
 		syncEnabled: t.Boolean(),
 		hunterEnabled: t.Boolean(),
 		syncInterval: t.Number(),
