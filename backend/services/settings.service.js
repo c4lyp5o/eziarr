@@ -16,12 +16,12 @@ export const SettingsService = {
 	postSettingsBatch: async ({ body }) => {
 		for (const [key, value] of Object.entries(body)) {
 			if (value === undefined || value === null || value === "") continue;
-			if (key === "password") {
-				const hashedPassword = await Bun.password.hash(value);
-				setSetting(key, hashedPassword);
-			}
+
+			let finalValue = value;
+
+			if (key === "password") finalValue = await Bun.password.hash(value);
 			if (key.startsWith("telegram")) await resetTelegramClient();
-			setSetting(key, value);
+			setSetting(key, finalValue);
 		}
 
 		return { success: true, message: "Settings updated" };
