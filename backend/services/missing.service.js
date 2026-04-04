@@ -1,5 +1,4 @@
 import axios from "axios";
-import { generalLogger as logger } from "../logger";
 import {
 	getMissingMedia,
 	unmonitorMissingMedia,
@@ -8,6 +7,7 @@ import {
 	recordForceGrabHistory,
 } from "../db";
 import { coerceNumericId, fetchQueue } from "../utils";
+import { generalLogger as logger } from "../logger";
 
 export const MissingService = {
 	getMissing: async () => {

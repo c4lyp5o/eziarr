@@ -1,7 +1,7 @@
 import axios from "axios";
 import { getAllServices, addToDownloadQueue } from "../db";
-import { generalLogger as logger } from "../logger";
 import { coerceNumericId } from "../utils";
+import { generalLogger as logger } from "../logger";
 
 export const HTTPImportService = {
 	postHTTPImport: async ({ body: { service, serviceId, url, filename } }) => {
