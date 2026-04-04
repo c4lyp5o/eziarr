@@ -23,6 +23,19 @@ export const HTTPImportService = {
 		let perfectName = filename;
 		try {
 			const ext = filename.substring(filename.lastIndexOf("."));
+			if (ext.length > 10) {
+				return { success: false, message: "Invalid filename" };
+			}
+			if (!ext.match(/^\.[a-zA-Z0-9]+$/)) {
+				return { success: false, message: "Invalid filename" };
+			}
+			if (ext.length === 0) {
+				logger.warn(
+					`[SERVER] No valid extension found in filename, using .mp4 as default for fetching title. Original filename: ${filename}`,
+				);
+				perfectName += ".mp4";
+			}
+
 			if (service === "radarr") {
 				const res = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
 					headers: { "X-Api-Key": config.apiKey },
