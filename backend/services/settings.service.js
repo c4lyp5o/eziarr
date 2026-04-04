@@ -9,30 +9,19 @@ export const SettingsService = {
 
 	postSettings: async ({ body: { key, value } }) => {
 		setSetting(key, value);
-
 		if (key.startsWith("telegram")) await resetTelegramClient();
-
 		return { success: true, message: "Setting updated" };
 	},
 
 	postSettingsBatch: async ({ body }) => {
 		for (const [key, value] of Object.entries(body)) {
-			console.log(key, value);
-			if (value === undefined) continue;
-			if (key === "password" && value === "") continue;
-			if (key === "password" && value !== "") {
+			if (value === undefined || value === null || value === "") continue;
+			if (key === "password") {
 				const hashedPassword = await Bun.password.hash(value);
 				setSetting(key, hashedPassword);
 			}
+			if (key.startsWith("telegram")) await resetTelegramClient();
 			setSetting(key, value);
-		}
-
-		if (
-			body.telegramApiId !== undefined ||
-			body.telegramApiHash !== undefined ||
-			body.telegramSession !== undefined
-		) {
-			await resetTelegramClient();
 		}
 
 		return { success: true, message: "Settings updated" };
