@@ -1,4 +1,5 @@
 import { getSetting, setSetting } from "../db";
+import { generalLogger as logger } from "../logger";
 
 function setAuthCookies({ cookie, accessToken, refreshToken, rememberMe }) {
 	cookie.eziarr_access.set({
@@ -48,11 +49,13 @@ export const AuthService = {
 		return { success: true, isFirstTime };
 	},
 
-	postFirstTime: async ({ body: { password } }) => {
-		if (!password) throw new Error("Unauthorized");
-
+	postFirstTime: async ({ body: { password }, status }) => {
 		const isFirstTime = getSetting("isFirstTime");
-		if (isFirstTime === "false") throw new Error("Unauthorized");
+		if (isFirstTime === "false")
+			return status(401, { success: false, message: "Unauthorized" });
+
+		if (!password)
+			return status(401, { success: false, message: "Unauthorized" });
 
 		const hashedPassword = await Bun.password.hash(password);
 		setSetting("password", hashedPassword);
@@ -61,23 +64,35 @@ export const AuthService = {
 		return { success: true, message: "Setting updated." };
 	},
 
-	login: async ({ jwt, cookie, body: { password, rememberMe }, set }) => {
+	login: async ({
+		request,
+		jwt,
+		cookie,
+		body: { password, rememberMe },
+		status,
+	}) => {
 		const isFirstTime = getSetting("isFirstTime");
-		if (isFirstTime === "true" || isFirstTime === null) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
-		}
+		if (isFirstTime === "true" || isFirstTime === null)
+			return status(401, { success: false, message: "Unauthorized" });
 
 		if (!password) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
+			const clientIp =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.ip;
+			logger.warn(
+				`[AUTH] Failed login attempt from ${clientIp} - No password provided`,
+			);
+			return status(401, { success: false, message: "Unauthorized" });
 		}
 
-		const hashedPass = getSetting("password");
-		const comparePassword = await Bun.password.verify(password, hashedPass);
+		const hashedPassword = getSetting("password");
+		const comparePassword = await Bun.password.verify(password, hashedPassword);
 		if (!comparePassword) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
+			const clientIp =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.ip;
+			logger.warn(`[AUTH] Failed login attempt from ${clientIp}`);
+			return status(401, { success: false, message: "Unauthorized" });
 		}
 
 		const accessToken = await jwt.sign({ isAdmin: true }, { expiresIn: "15m" });
@@ -97,45 +112,43 @@ export const AuthService = {
 		return { success: true };
 	},
 
-	me: async ({ jwt, cookie, set }) => {
+	me: async ({ jwt, cookie, status }) => {
 		const isFirstTime = getSetting("isFirstTime");
-		if (isFirstTime === "true" || isFirstTime === null) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
-		}
+		if (isFirstTime === "true" || isFirstTime === null)
+			return status(401, { success: false, message: "Unauthorized" });
 
 		const token = cookie.eziarr_access?.value;
-		if (!token) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
-		}
+		if (!token) return status(401, { success: false, message: "Unauthorized" });
 
 		const payload = await jwt.verify(token);
-		if (!payload?.isAdmin) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
+		if (!payload || !payload.isAdmin) {
+			const clientIp =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.ip;
+			logger.warn(
+				`[AUTH] Unauthorized access attempt to /auth/me from ${clientIp}`,
+			);
+			return status(401, { success: false, message: "Unauthorized" });
 		}
 
 		return { success: true, isAdmin: payload.isAdmin };
 	},
 
-	refresh: async ({ jwt, cookie, set }) => {
+	refresh: async ({ jwt, cookie, status }) => {
 		const isFirstTime = getSetting("isFirstTime");
-		if (isFirstTime === "true" || isFirstTime === null) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
-		}
+		if (isFirstTime === "true" || isFirstTime === null)
+			return status(401, { success: false, message: "Unauthorized" });
 
 		const token = cookie.eziarr_refresh?.value;
-		if (!token) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
-		}
+		if (!token) return status(401, { success: false, message: "Unauthorized" });
 
 		const payload = await jwt.verify(token);
 		if (!payload || payload.type !== "refresh" || !payload.isAdmin) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
+			const clientIp =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.ip;
+			logger.warn(`[AUTH] Unauthorized refresh attempt from ${clientIp}`);
+			return status(401, { success: false, message: "Unauthorized" });
 		}
 
 		const accessToken = await jwt.sign(

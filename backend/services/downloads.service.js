@@ -13,12 +13,11 @@ export const DownloadsService = {
 
 		const arrQueueRaw = [...radarrQ, ...sonarrQ, ...lidarrQ];
 
-		// 3. Normalize the *Arr queue to match Eziarr's SQLite schema so the React UI doesn't crash
 		const arrQueueNormalized = arrQueueRaw.map((item, index) => ({
 			id: `arr-${item.service}-${index}`,
 			type: item.service, // radarr, sonarr, lidarr
 			status: item.status,
-			created_at: Date.now(), // *Arr doesn't expose this easily in the queue endpoint
+			created_at: Date.now(),
 			payload: JSON.stringify({
 				filename: `${item.title} (${item.quality || "Unknown Quality"})`,
 				service: item.service,

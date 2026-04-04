@@ -42,7 +42,6 @@ export const SettingsModel = {
 			sonarrUrl: t.Optional(t.String()),
 			lidarrUrl: t.Optional(t.String()),
 			prowlarrUrl: t.Optional(t.String()),
-			telegramApiId: t.Optional(t.String()),
 			pathMapRemote: t.Optional(t.String()),
 		}),
 	}),
