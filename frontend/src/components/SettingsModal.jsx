@@ -253,20 +253,14 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 			hunterInterval: Math.max(1, Number(settings.hunterInterval) || 1),
 		};
 
-		delete payload.confirmPassword;
 		if (!payload.password) delete payload.password;
+		delete payload.confirmPassword;
 
 		try {
 			setIsSavingConfig(true);
 			await apiCall("/api/v1/settings/batch", {
 				method: "POST",
-				body: {
-					...settings,
-					syncEnabled: Boolean(settings.syncEnabled),
-					hunterEnabled: Boolean(settings.hunterEnabled),
-					syncInterval: Math.max(1, Number(settings.syncInterval) || 1),
-					hunterInterval: Math.max(1, Number(settings.hunterInterval) || 1),
-				},
+				body: payload,
 			});
 			setNoServicesConfiguredPrompt(false);
 			setSettings((prev) => ({
@@ -302,7 +296,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 					<div className="bg-[#0f0f10] border-b border-gray-800 shrink-0">
 						<div className="flex justify-between items-center p-6 pb-4 opacity-50">
 							<h2 className="text-xl font-bold text-gray-400 flex items-center gap-2">
-								<Server className="text-indigo-400/50" size={20} /> System Hub
+								<Server className="text-indigo-400/50" size={20} /> Settings Hub
 							</h2>
 							{/* Disabled close button while loading */}
 							<div className="p-1.5 rounded-lg bg-gray-800/50 text-gray-600">
@@ -349,7 +343,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 				<div className="bg-[#0f0f10] border-b border-gray-800 shrink-0">
 					<div className="flex justify-between items-center p-6 pb-4">
 						<h2 className="text-xl font-bold text-white flex items-center gap-2">
-							<Server className="text-indigo-400" size={20} /> System Hub
+							<Server className="text-indigo-400" size={20} /> Settings Hub
 						</h2>
 						<Button variant="icon" size="sm" onClick={onClose}>
 							<X size={20} />
@@ -471,7 +465,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 										<input
 											type="password"
 											name="password"
-											value={settings.password}
+											value={settings.password || ""}
 											onChange={handleChange}
 											className={`${ui.input} mt-1`}
 											placeholder="Leave blank to keep current"
@@ -485,7 +479,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 										<input
 											type="password"
 											name="confirmPassword"
-											value={settings.confirmPassword}
+											value={settings.confirmPassword || ""}
 											onChange={handleChange}
 											disabled={!settings.password}
 											className={`${ui.input} mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -703,7 +697,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												<input
 													type="text"
 													name="sonarrUrl"
-													value={settings.sonarrUrl}
+													value={settings.sonarrUrl || ""}
 													onChange={handleChange}
 													placeholder={
 														settings.sonarrUrl || "http://192.168.1.50:8989"
@@ -771,7 +765,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												<input
 													type="text"
 													name="lidarrUrl"
-													value={settings.lidarrUrl}
+													value={settings.lidarrUrl || ""}
 													onChange={handleChange}
 													placeholder={
 														settings.lidarrUrl || "http://192.168.1.50:8686"
@@ -787,7 +781,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 												<input
 													type="password"
 													name="lidarrApiKey"
-													value={settings.lidarrApiKey}
+													value={settings.lidarrApiKey || ""}
 													onChange={handleChange}
 													placeholder={
 														settings.lidarrConfigured
@@ -814,7 +808,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 										<input
 											type="text"
 											name="prowlarrUrl"
-											value={settings.prowlarrUrl}
+											value={settings.prowlarrUrl || ""}
 											onChange={handleChange}
 											placeholder={
 												settings.prowlarrUrl || "http://192.168.1.50:9696"
@@ -830,7 +824,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 										<input
 											type="text"
 											name="prowlarrApiKey"
-											value={settings.prowlarrApiKey}
+											value={settings.prowlarrApiKey || ""}
 											onChange={handleChange}
 											placeholder={
 												settings.prowlarrConfigured
@@ -857,7 +851,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 										<input
 											type="text"
 											name="telegramApiId"
-											value={settings.telegramApiId}
+											value={settings.telegramApiId || ""}
 											onChange={handleChange}
 											placeholder={
 												settings.telegramConfigured
@@ -875,7 +869,7 @@ const SettingsModal = ({ isOpen, onClose, onSaveSuccess }) => {
 										<input
 											type="password"
 											name="telegramApiHash"
-											value={settings.telegramApiHash}
+											value={settings.telegramApiHash || ""}
 											onChange={handleChange}
 											placeholder={
 												settings.telegramConfigured
