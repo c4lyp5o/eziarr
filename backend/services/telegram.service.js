@@ -6,8 +6,8 @@ import {
 	searchChannel,
 } from "../telegram";
 import { getAllServices, addToDownloadQueue } from "../db";
-import { generalLogger as logger } from "../logger";
 import { coerceNumericId } from "../utils";
+import { generalLogger as logger } from "../logger";
 
 export const TelegramService = {
 	getTelegramStatus: async () => {
@@ -50,7 +50,25 @@ export const TelegramService = {
 	},
 
 	postTelegramSearch: async ({ body: { channel, query } }) => {
-		const files = await searchChannel(channel, query);
+		let files = await searchChannel(channel, query);
+
+		let altQuery = null;
+		if (query.includes("&")) {
+			altQuery = query.replace(/&/g, "and");
+		} else if (query.toLowerCase().includes(" and ")) {
+			altQuery = query.replace(/ and /gi, " & ");
+		}
+
+		if (altQuery) {
+			const altFiles = await searchChannel(channel, altQuery);
+
+			const combined = [...files, ...altFiles];
+			files = combined.filter(
+				(file, index, self) =>
+					index === self.findIndex((t) => t.id === file.id),
+			);
+		}
+
 		return { success: true, files };
 	},
 
@@ -119,7 +137,7 @@ export const TelegramService = {
 
 		return {
 			success: true,
-			message: `Added to download queue! Check Active Tasks.`,
+			message: "Added to download queue! Check Active Tasks.",
 		};
 	},
 };
