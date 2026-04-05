@@ -10,6 +10,7 @@ import {
 	LayoutGrid,
 	Settings as SettingsIcon,
 	LogOut,
+	Download,
 } from "lucide-react";
 import useSWR from "swr";
 
@@ -108,7 +109,7 @@ function App() {
 				mutate();
 				setSearchingId(null);
 			}, 5000);
-		} catch (err) {
+		} catch (_err) {
 			// console.error("Search failed", err);
 			toast.error("Search failed");
 			setSearchingId(null);
@@ -248,6 +249,19 @@ function App() {
 
 					{/* DESKTOP STATUS & SETTINGS */}
 					<div className="hidden md:flex items-center gap-3 shrink-0">
+						{/* App Status */}
+						{sysStatus?.updateAvailable && (
+							<a
+								href="https://github.com/c4lyp5o/eziarr/releases/latest"
+								target="_blank"
+								rel="noreferrer"
+								className="flex items-center gap-2 text-xs font-bold text-orange-950 bg-orange-500 px-3 py-1.5 rounded-lg hover:bg-orange-400 transition-colors animate-pulse shadow-lg shadow-orange-500/20"
+								title={`Update to v${sysStatus.latestVersion}`}
+							>
+								<Download size={14} /> Update Available
+							</a>
+						)}
+						{/* Sync Status */}
 						<div className="flex items-center gap-2 text-xs font-mono text-gray-500 bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-800">
 							<RefreshCw
 								size={12}
@@ -255,6 +269,7 @@ function App() {
 							/>
 							<span>{isLoading ? "SYNCING..." : "LIVE"}</span>
 						</div>
+						{/* Settings Button */}
 						<Button
 							size="sm"
 							variant="btnIcon"
@@ -263,6 +278,7 @@ function App() {
 						>
 							<SettingsIcon size={20} />
 						</Button>
+						{/* Log Out Button */}
 						<Button
 							size="sm"
 							variant="btnIcon"
@@ -380,6 +396,19 @@ function App() {
 
 			{/* MOBILE STATUS & SETTINGS */}
 			<div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0a]/90 backdrop-blur-xl border-t border-white/5 p-4 flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+				{/* App Status */}
+				{sysStatus?.updateAvailable && (
+					<a
+						href="https://github.com/c4lyp5o/eziarr/releases/latest"
+						target="_blank"
+						rel="noreferrer"
+						className="flex items-center gap-2 text-xs font-bold text-orange-950 bg-orange-500 px-3 py-1.5 rounded-lg hover:bg-orange-400 transition-colors animate-pulse shadow-lg shadow-orange-500/20"
+						title={`Update to v${sysStatus.latestVersion}`}
+					>
+						<Download size={14} /> Update Available
+					</a>
+				)}
+				{/* Sync Status */}
 				<div className="flex items-center gap-2 text-xs font-mono text-gray-400 bg-gray-900/80 px-3 py-2 rounded-lg border border-gray-800">
 					<RefreshCw
 						size={14}
@@ -387,7 +416,7 @@ function App() {
 					/>
 					<span>{isLoading ? "SYNCING..." : "LIVE"}</span>
 				</div>
-
+				{/* Settings Button */}
 				<Button
 					size="sm"
 					variant="btnIcon"
@@ -395,7 +424,7 @@ function App() {
 				>
 					<SettingsIcon size={20} />
 				</Button>
-
+				{/* Log Out Button */}
 				<Button
 					size="sm"
 					variant="btnIcon"
