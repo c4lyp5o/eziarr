@@ -21,19 +21,27 @@ export const HTTPImportService = {
 		const sid = coerceNumericId(serviceId, "serviceId");
 
 		let perfectName = filename;
+		let ext = "";
+
 		try {
-			const ext = filename.substring(filename.lastIndexOf("."));
-			if (ext.length > 10) {
-				return { success: false, message: "Invalid filename" };
-			}
-			if (!ext.match(/^\.[a-zA-Z0-9]+$/)) {
-				return { success: false, message: "Invalid filename" };
-			}
-			if (ext.length === 0) {
+			const lastDotIndex = filename.lastIndexOf(".");
+
+			const defaultExt = service === "lidarr" ? ".mp3" : ".mp4";
+
+			if (lastDotIndex === -1) {
 				logger.warn(
-					`[SERVER] No valid extension found in filename, using .mp4 as default for fetching title. Original filename: ${filename}`,
+					`[SERVER] No extension found in filename. Using ${defaultExt} as default. Original: ${filename}`,
 				);
-				perfectName += ".mp4";
+				ext = defaultExt;
+			} else {
+				ext = filename.substring(lastDotIndex).toLowerCase();
+
+				if (ext.length > 10 || !ext.match(/^\.[a-z0-9]+$/)) {
+					logger.warn(
+						`[SERVER] Invalid extension extracted (${ext}). Falling back to ${defaultExt}.`,
+					);
+					ext = defaultExt;
+				}
 			}
 
 			if (service === "radarr") {
@@ -61,6 +69,7 @@ export const HTTPImportService = {
 				});
 				perfectName = `${alRes.data.artist.artistName} - ${alRes.data.title}${ext}`;
 			}
+
 			perfectName = perfectName.replace(/[/\\?%*:|"<>]/g, "");
 		} catch (err) {
 			logger.warn(
