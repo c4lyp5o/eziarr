@@ -58,15 +58,31 @@ Eziarr's backend is modularized to ensure clean separation of concerns:
 | `status` | TEXT | `pending`, `downloading`, `retry`, or `failed` |
 | `attempts` | INTEGER| Exponential backoff tracker |
 
+**Table: `download_history`** (Audit Log & Analytics)
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `id` | TEXT | Primary Key |
+| `type` | TEXT | Source of download (`telegram`, `http`, `forcegrab`) |
+| `status` | TEXT | `completed` or `failed` |
+| `duration_ms` | INTEGER | Time taken to download and import |
+| `download_bytes` | INTEGER| File size for bandwidth analytics |
+
+**Table: `settings`** (User Config & Application State)
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `key` | TEXT | Primary Key (e.g., `telegramSession`, `password`, `radarrUrl`) |
+| `value` | TEXT | The raw string or JSON-stringified value of the setting |
+
 ## 🔌 Core API Routes
 
 * `GET /api/v1/system/tasks`: Returns active background tasks running on the Worker.
 * `GET /api/v1/missing`: Returns a combined payload of local DB missing items and live *Arr queues.
 * `POST /api/v1/missing/forcegrab`: Pushes a release directly to the *Arr client, temporarily bypassing quality profiles if rejected.
-* `POST /api/v1/telegram/import`: Fetches exact metadata, renames the file perfectly, and inserts a job into the SQLite `download_queue`.
+* `POST /api/v1/telegram/import`: Downloader for Telegram channels. Fetches exact metadata, renames the file, and inserts a job into the `download_queue`.
+* `POST /api/v1/http/import`: Generic downloader for Internet Archive and Open Directories. Enforces strict SSRF protection, downloads in streams, and pushes to *Arr.
 
 ## 🛠️ Development Notes
 
 1. **State Management:** The Telegram session is stored as a `StringSession` in the `settings` table.
 2. **Database Thrashing:** Because `worker.js` constantly polls the queue and updates progress bars, it relies heavily on WAL mode. Do not remove `PRAGMA journal_mode = WAL;`.
-3. **Authentication:** The frontend relies on HttpOnly cookies (`eziarr_access`, `eziarr_refresh`). Local development requires `same-origin` fetch configurations.
+3. **Authentication:** User passwords are encrypted using Bun's native `Argon2` hasher. The frontend relies on HttpOnly cookies (`eziarr_access`, `eziarr_refresh`) for session management, and requires `credentials: "same-origin"` fetch configurations in local development.
