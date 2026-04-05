@@ -51,7 +51,6 @@ export const SystemService = {
 			const pkgPath = path.join(import.meta.dir, "../../package.json");
 			const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
 			currentVersion = pkg.version;
-			console.log(`Current version: ${currentVersion}`);
 		} catch (_err) {
 			// ignore
 		}
