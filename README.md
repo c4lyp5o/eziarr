@@ -5,7 +5,7 @@ Eziarr is a powerful, production-ready missing-media manager designed to work al
 ## ✨ Key Features
 
 * **Unified Dashboard:** View all your missing media from Radarr, Sonarr, and Lidarr in one clean, filterable interface.
-* **Periodical Searches:** A background worker continuously monitors your missing items and periodically triggers automated searches on your indexers to find old releases.
+* **Periodical Searches:** A background worker continuously monitors your missing items and periodically triggers automated searches on your indexers to find missing items.
 * **Asynchronous IPC Queue:** Downloads are handled by a dedicated background worker communicating via a high-performance SQLite WAL queue, keeping the UI fast and preventing memory crashes.
 * **Deep Search Capabilities:** * **Telegram (MTProto):** Connect your Telegram account to search channels and download large media files directly bypassing bot limits.
   * **Internet Archive:** Search and download public domain or archived media directly from archive.org.
