@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-04-05
+
+### Added
+- **App Updates:** Added an indicator in the UI when a new version of Eziarr is available.
+
+### Fixed
+- **Telegram Search:** Better handling of edge cases in Telegram search queries, including more aggressive punctuation stripping and additional query permutations to improve hit rates on channels with inconsistent naming conventions. Also added original message text for easier matching.
+
 ## [1.0.1] - 2026-04-05
 
 ### Added

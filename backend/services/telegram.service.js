@@ -50,25 +50,7 @@ export const TelegramService = {
 	},
 
 	postTelegramSearch: async ({ body: { channel, query } }) => {
-		let files = await searchChannel(channel, query);
-
-		let altQuery = null;
-		if (query.includes("&")) {
-			altQuery = query.replace(/&/g, "and");
-		} else if (query.toLowerCase().includes(" and ")) {
-			altQuery = query.replace(/ and /gi, " & ");
-		}
-
-		if (altQuery) {
-			const altFiles = await searchChannel(channel, altQuery);
-
-			const combined = [...files, ...altFiles];
-			files = combined.filter(
-				(file, index, self) =>
-					index === self.findIndex((t) => t.id === file.id),
-			);
-		}
-
+		const files = await searchChannel(channel, query);
 		return { success: true, files };
 	},
 
