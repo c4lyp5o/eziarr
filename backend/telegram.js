@@ -111,38 +111,59 @@ export const searchChannel = async (channelIdentifier, query) => {
 	try {
 		const entity = await resolveEntity(client, channelIdentifier);
 
-		logger.info(
-			`[TELEGRAM] 🔍 Searching "${entity.title || channelIdentifier}" for "${query}"...`,
+		const queriesToTry = new Set([query]);
+
+		let swappedQuery = query;
+		if (query.includes("&")) {
+			swappedQuery = query.replace(/&/g, "and");
+			queriesToTry.add(swappedQuery);
+		} else if (query.toLowerCase().includes(" and ")) {
+			swappedQuery = query.replace(/ and /gi, " & ");
+			queriesToTry.add(swappedQuery);
+		}
+
+		const cleanPunctuation = (str) =>
+			str
+				.replace(/[!?.:,'"-]/g, " ")
+				.replace(/\s+/g, " ")
+				.trim();
+
+		queriesToTry.add(cleanPunctuation(query));
+		queriesToTry.add(cleanPunctuation(swappedQuery));
+
+		let allMsgs = [];
+
+		for (const q of queriesToTry) {
+			if (!q) continue;
+
+			logger.info(
+				`[TELEGRAM] 🔍 Searching "${entity.title || channelIdentifier}" for "${q}"...`,
+			);
+
+			const result = await client.invoke(
+				new Api.messages.Search({
+					peer: entity,
+					q: q,
+					filter: new Api.InputMessagesFilterEmpty(),
+					minDate: 0,
+					maxDate: 0,
+					offsetId: 0,
+					addOffset: 0,
+					limit: 50,
+					maxId: 0,
+					minId: 0,
+					hash: BigInt(0),
+				}),
+			);
+
+			allMsgs = [...allMsgs, ...(result.messages || [])];
+		}
+
+		const uniqueMsgs = allMsgs.filter(
+			(msg, index, self) => index === self.findIndex((t) => t.id === msg.id),
 		);
 
-		const result = await client.invoke(
-			new Api.messages.Search({
-				peer: entity,
-				q: query,
-				filter: new Api.InputMessagesFilterEmpty(),
-				minDate: 0,
-				maxDate: 0,
-				offsetId: 0,
-				addOffset: 0,
-				limit: 50,
-				maxId: 0,
-				minId: 0,
-				hash: BigInt(0),
-			}),
-		);
-
-		const msgs = result.messages || [];
-
-		// console.log(
-		// 	"Raw search results:",
-		// 	msgs.map((m) => ({
-		// 		id: m.id,
-		// 		text: m.message,
-		// 		media: m.media ? m.media.toJSON() : null,
-		// 	})),
-		// );
-
-		return msgs
+		return uniqueMsgs
 			.map((msg) => {
 				const doc = msg.media?.document;
 				if (!doc) return null;
