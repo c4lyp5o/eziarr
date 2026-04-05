@@ -17,6 +17,9 @@ export const SystemModel = {
 	getSystemStatusResponse: t.Object({
 		success: t.Boolean(),
 		isSetup: t.Boolean(),
+		currentVersion: t.String(),
+		latestVersion: t.Optional(t.String()),
+		updateAvailable: t.Boolean(),
 		features: t.Object({
 			radarr: t.Boolean(),
 			sonarr: t.Boolean(),
