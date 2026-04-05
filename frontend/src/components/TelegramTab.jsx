@@ -345,6 +345,9 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 										</div>
 										<div className="min-w-0">
 											<h4 className="text-sm font-medium text-white truncate pr-4">
+												{msg.messageText}
+											</h4>
+											<h4 className="text-sm font-medium text-white truncate pr-4">
 												{msg.filename}
 											</h4>
 											<div className="flex gap-3 text-xs text-gray-400 mt-1">
