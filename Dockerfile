@@ -25,6 +25,9 @@ ENV TZ=Asia/Kuala_Lumpur
 # Install PM2 globally using Bun
 RUN bun add -g pm2
 
+# Non-root user that runs the service (this app downloads untrusted media)
+RUN addgroup -S eziarr && adduser -S eziarr -G eziarr -h /home/eziarr
+
 # Copy backend and install deps
 COPY backend/package.json ./backend/
 RUN cd backend && bun install --production
@@ -39,8 +42,11 @@ COPY ecosystem.config.js ./
 # Copy built client bundle
 COPY --from=builder /app/client ./client
 
-# Set proper permissions so the user can write to them
-# RUN chown -R 1000:1000 /app/downloads
+# Writable runtime directories (db, downloads, logs) owned by the app user
+RUN mkdir -p /app/db /app/downloads /app/logs \
+	&& chown -R eziarr:eziarr /app
+
+USER eziarr
 
 EXPOSE 5000
 
