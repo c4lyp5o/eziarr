@@ -222,13 +222,23 @@ export const safeHttpAgent = new http.Agent({ lookup: safeDnsLookup });
 export const safeHttpsAgent = new https.Agent({ lookup: safeDnsLookup });
 
 export const prepareFileDownload = async (filename) => {
-	const safeFilename = filename.replace(/[/\\?%*:|"<>]/g, " ").trim();
-	const folderName = path.parse(safeFilename).name;
+	// basename strips directory components (.., /etc/.., C:\..) so filenames
+	// coming from remote metadata can never escape DOWNLOAD_DIR; the regex
+	// then removes filesystem-hostile characters.
+	let safeFilename = path
+		.basename(String(filename))
+		.replace(/[/\\?%*:|"<>]/g, " ")
+		.trim();
+
+	if (!safeFilename || safeFilename === "." || safeFilename === "..") {
+		safeFilename = `download_${Date.now()}`;
+	}
+
+	const folderName = path.parse(safeFilename).name || "download";
 	const outputDir = path.join(DOWNLOAD_DIR, folderName);
 	const outputPath = path.join(outputDir, safeFilename);
 	if (!fs.existsSync(outputDir)) {
 		fs.mkdirSync(outputDir, { recursive: true });
-		await setTimeout(10000);
 	}
 	return { outputDir, outputPath };
 };

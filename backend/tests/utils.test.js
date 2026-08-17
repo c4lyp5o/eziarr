@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { isSafeUrl, translatePath } from "../utils.js";
+import { isSafeUrl, translatePath, prepareFileDownload } from "../utils.js";
 import { setSetting } from "../db.js";
+import path from "node:path";
+import { DOWNLOAD_DIR } from "../config.js";
 
 describe("Security: SSRF Protection", () => {
 	it("Should allow safe, external HTTP/HTTPS URLs", async () => {
@@ -69,5 +71,36 @@ describe("Utility: Cross-OS Path Translator", () => {
 		const translated = translatePath(original);
 
 		expect(translated).toBe("\\\\Truenas\\Media\\Downloads\\movie\\movie.mkv");
+	});
+});
+
+describe("Security: Download Filename Sanitization", () => {
+	it("Should keep a normal filename inside the downloads directory", async () => {
+		const { outputDir, outputPath } = await prepareFileDownload("Movie (2026).mkv");
+
+		expect(outputPath.startsWith(DOWNLOAD_DIR)).toBe(true);
+		expect(path.basename(outputPath)).toBe("Movie (2026).mkv");
+		expect(path.basename(outputDir)).toBe("Movie (2026)");
+	});
+
+	it("Should strip directory components from traversal filenames", async () => {
+		const { outputPath } = await prepareFileDownload("../../etc/passwd");
+
+		expect(outputPath.startsWith(DOWNLOAD_DIR)).toBe(true);
+		expect(path.basename(outputPath)).toBe("passwd");
+	});
+
+	it("Should never resolve a .. filename outside the downloads directory", async () => {
+		const { outputDir, outputPath } = await prepareFileDownload("..");
+
+		expect(outputPath.startsWith(DOWNLOAD_DIR)).toBe(true);
+		expect(path.basename(outputDir)).not.toBe("..");
+	});
+
+	it("Should fall back to a generated name for empty filenames", async () => {
+		const { outputPath } = await prepareFileDownload("");
+
+		expect(outputPath.startsWith(DOWNLOAD_DIR)).toBe(true);
+		expect(path.basename(outputPath)).toMatch(/^download_\d+$/);
 	});
 });
