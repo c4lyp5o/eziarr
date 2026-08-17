@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { isSafeUrl, translatePath, prepareFileDownload } from "../utils.js";
+import {
+	isSafeUrl,
+	translatePath,
+	prepareFileDownload,
+	getClientIp,
+} from "../utils.js";
 import { setSetting } from "../db.js";
 import path from "node:path";
 import { DOWNLOAD_DIR } from "../config.js";
@@ -102,5 +107,38 @@ describe("Security: Download Filename Sanitization", () => {
 
 		expect(outputPath.startsWith(DOWNLOAD_DIR)).toBe(true);
 		expect(path.basename(outputPath)).toMatch(/^download_\d+$/);
+	});
+});
+
+describe("Security: Client IP Resolution", () => {
+	it("Should use the direct socket peer when no X-Forwarded-For is present", () => {
+		const request = new Request("http://localhost/api/v1/login");
+		const server = { requestIP: () => ({ address: "::ffff:127.0.0.1" }) };
+
+		expect(getClientIp(request, server)).toBe("127.0.0.1");
+	});
+
+	it("Should trust X-Forwarded-For only when the direct peer is a proxy", () => {
+		const request = new Request("http://localhost/api/v1/login", {
+			headers: { "x-forwarded-for": "203.0.113.9, 10.0.0.2" },
+		});
+		const proxyPeer = { requestIP: () => ({ address: "10.0.0.2" }) };
+
+		expect(getClientIp(request, proxyPeer)).toBe("203.0.113.9");
+	});
+
+	it("Should ignore spoofed X-Forwarded-For from a public direct peer", () => {
+		const request = new Request("http://localhost/api/v1/login", {
+			headers: { "x-forwarded-for": "203.0.113.9" },
+		});
+		const publicPeer = { requestIP: () => ({ address: "198.51.100.7" }) };
+
+		expect(getClientIp(request, publicPeer)).toBe("198.51.100.7");
+	});
+
+	it("Should fall back to unknown when no peer info is available", () => {
+		const request = new Request("http://localhost/api/v1/login");
+
+		expect(getClientIp(request, null)).toBe("unknown");
 	});
 });

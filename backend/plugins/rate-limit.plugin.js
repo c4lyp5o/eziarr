@@ -1,22 +1,19 @@
+import { getClientIp } from "../utils";
+
 const buckets = new Map();
 const MAX_BUCKET_ENTRIES = 10000;
-
-const getClientIp = (request) => {
-	const xff = request.headers.get("x-forwarded-for");
-	if (xff) return xff.split(",")[0].trim();
-	return request.ip ?? "unknown";
-};
 
 // Exported so tests can start from a clean slate.
 export const resetRateLimitBuckets = () => buckets.clear();
 
 // Simple in-memory sliding-window rate limiter.
 // Buckets live in this process only; a restart resets them.
-// x-forwarded-for is trusted, so this must sit behind your reverse proxy,
-// otherwise clients can spoof their way around it.
+// Client IP comes from getClientIp(): X-Forwarded-For is only trusted when
+// the direct peer is a reverse proxy (private/loopback), otherwise the real
+// socket peer is used so the limiter can't be spoofed or globally collapsed.
 export const rateLimitHandler = ({ limit = 10, windowMs = 60000 } = {}) => {
-	return ({ request, set }) => {
-		const key = getClientIp(request);
+	return ({ request, set, server }) => {
+		const key = getClientIp(request, server);
 		const now = Date.now();
 		const windowStart = now - windowMs;
 

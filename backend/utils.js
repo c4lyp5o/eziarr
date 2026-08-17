@@ -135,6 +135,24 @@ const isIpDisallowed = (ip) => {
 	return true;
 };
 
+// Real client IP for rate limiting / audit logs.
+// Bun's Request has no .ip property; the socket peer is only reachable via
+// server.requestIP(request) (Elysia injects `server` into hooks and handlers).
+export const getClientIp = (request, server) => {
+	const directIp =
+		server?.requestIP?.(request)?.address?.replace(/^::ffff:/, "") ?? null;
+
+	const xff = request.headers.get("x-forwarded-for");
+	// Only trust X-Forwarded-For when the direct peer is private/loopback
+	// (i.e. a reverse proxy in front). Otherwise a public client could spoof
+	// the header to bypass rate limiting.
+	if (xff && directIp && isIpDisallowed(directIp)) {
+		return xff.split(",")[0].trim();
+	}
+
+	return directIp ?? "unknown";
+};
+
 export const isSafeUrl = async (urlString) => {
 	let url;
 	try {
