@@ -41,7 +41,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 	it("POST /api/v1/login - Should fail with wrong credentials", async () => {
 		setSetting("isFirstTime", "false");
 		setSetting("username", "admin");
-		setSetting("password", "correctpassword");
+		setSetting("password", await Bun.password.hash("correctpassword"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
@@ -59,7 +59,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 	it("POST /api/v1/login - Should succeed and set HttpOnly Cookies", async () => {
 		setSetting("isFirstTime", "false");
 		setSetting("username", "admin");
-		setSetting("password", "correctpassword");
+		setSetting("password", await Bun.password.hash("correctpassword"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
@@ -85,7 +85,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 	it("GET /api/v1/me - Should decode cookie and return username", async () => {
 		setSetting("isFirstTime", "false");
 		setSetting("username", "admin");
-		setSetting("password", "testpass");
+		setSetting("password", await Bun.password.hash("testpass"));
 
 		const loginReq = new Request("http://localhost/api/v1/login", {
 			method: "POST",
@@ -112,7 +112,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 	it("POST /api/v1/refresh - Should issue a new access token from refresh cookie", async () => {
 		setSetting("isFirstTime", "false");
 		setSetting("username", "admin");
-		setSetting("password", "testpass");
+		setSetting("password", await Bun.password.hash("testpass"));
 
 		const loginReq = new Request("http://localhost/api/v1/login", {
 			method: "POST",

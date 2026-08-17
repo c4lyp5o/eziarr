@@ -4,7 +4,7 @@ import { setSetting } from "../db.js";
 export const getAuthCookie = async () => {
 	setSetting("isFirstTime", "false");
 	setSetting("username", "admin");
-	setSetting("password", "testpass");
+	setSetting("password", await Bun.password.hash("testpass"));
 
 	const req = new Request("http://localhost/api/v1/login", {
 		method: "POST",
