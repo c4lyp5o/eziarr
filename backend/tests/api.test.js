@@ -59,4 +59,20 @@ describe("Eziarr Core API Flows", () => {
 		expect(getRes.status).toBe(200);
 		expect(getBody.settings.syncEnabled).toBe(false);
 	});
+
+	it("POST /api/v1/settings - Should reject unknown keys (mass assignment guard)", async () => {
+		const postReq = new Request("http://localhost/api/v1/settings", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Cookie: authCookie,
+			},
+			body: JSON.stringify({ key: "isFirstTime", value: "true" }),
+		});
+		const postRes = await app.handle(postReq);
+		const postBody = await postRes.json();
+
+		expect(postRes.status).toBe(400);
+		expect(postBody.success).toBe(false);
+	});
 });
