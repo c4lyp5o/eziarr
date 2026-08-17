@@ -137,6 +137,76 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 		expect(res.headers.get("set-cookie")).toContain("eziarr_access=");
 	});
 
+	it("GET /api/v1/me - Should return 401 for an invalid access token instead of crashing", async () => {
+		setSetting("isFirstTime", "false");
+
+		const req = new Request("http://localhost/api/v1/me", {
+			headers: { Cookie: "eziarr_access=not.a.valid.token" },
+		});
+		const res = await app.handle(req);
+		const body = await res.json();
+
+		expect(res.status).toBe(401);
+		expect(body.success).toBe(false);
+	});
+
+	it("POST /api/v1/refresh - Should return 401 for an invalid refresh token instead of crashing", async () => {
+		setSetting("isFirstTime", "false");
+
+		const req = new Request("http://localhost/api/v1/refresh", {
+			method: "POST",
+			headers: { Cookie: "eziarr_refresh=not.a.valid.token" },
+		});
+		const res = await app.handle(req);
+		const body = await res.json();
+
+		expect(res.status).toBe(401);
+		expect(body.success).toBe(false);
+	});
+
+	it("POST /api/v1/login - Should issue non-secure cookies over plain http", async () => {
+		setSetting("isFirstTime", "false");
+		setSetting("username", "admin");
+		setSetting("password", await Bun.password.hash("testpass"));
+
+		const req = new Request("http://localhost/api/v1/login", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ username: "admin", password: "testpass" }),
+		});
+		const res = await app.handle(req);
+		const cookies = res.headers.get("set-cookie") || "";
+
+		expect(res.status).toBe(200);
+		expect(cookies).toContain("eziarr_access=");
+		expect(cookies).not.toContain("Secure");
+	});
+
+	it("POST /api/v1/login - Should issue secure cookies when COOKIE_SECURE=true", async () => {
+		setSetting("isFirstTime", "false");
+		setSetting("username", "admin");
+		setSetting("password", await Bun.password.hash("testpass"));
+
+		const oldOverride = process.env.COOKIE_SECURE;
+		process.env.COOKIE_SECURE = "true";
+
+		try {
+			const req = new Request("http://localhost/api/v1/login", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ username: "admin", password: "testpass" }),
+			});
+			const res = await app.handle(req);
+			const cookies = res.headers.get("set-cookie") || "";
+
+			expect(res.status).toBe(200);
+			expect(cookies).toContain("Secure");
+		} finally {
+			if (oldOverride === undefined) delete process.env.COOKIE_SECURE;
+			else process.env.COOKIE_SECURE = oldOverride;
+		}
+	});
+
 	it("POST /api/v1/logout - Should destroy the session cookies", async () => {
 		const req = new Request("http://localhost/api/v1/logout", {
 			method: "POST",
