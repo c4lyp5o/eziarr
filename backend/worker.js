@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { setTimeout } from "node:timers/promises";
 import axios from "axios";
 import {
 	upsertMissingMedia,
@@ -377,9 +376,6 @@ const processDownloadQueue = async () => {
 			100,
 		);
 
-		await setTimeout(10000);
-
-		// --- Trigger *Arr Import ---
 		const arrPath = translatePath(result.filePath);
 		const SERVICES = getAllServices();
 		const config = SERVICES[payload.service];
