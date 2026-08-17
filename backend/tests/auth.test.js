@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { app } from "../index.js";
 import { setSetting } from "../db.js";
+import { resetRateLimitBuckets } from "../plugins/rate-limit.plugin.js";
 
 describe("Authentication & Cookie Lifecycle Flow", () => {
 	beforeEach(() => {
+		resetRateLimitBuckets();
 		setSetting("isFirstTime", "true");
 		setSetting("username", "");
 		setSetting("password", "");
@@ -205,6 +207,26 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 			if (oldOverride === undefined) delete process.env.COOKIE_SECURE;
 			else process.env.COOKIE_SECURE = oldOverride;
 		}
+	});
+
+	it("POST /api/v1/login - Should rate limit after 10 attempts per minute", async () => {
+		resetRateLimitBuckets();
+		setSetting("isFirstTime", "false");
+		setSetting("username", "admin");
+		setSetting("password", await Bun.password.hash("testpass"));
+
+		let lastStatus = 0;
+		for (let i = 0; i < 12; i++) {
+			const req = new Request("http://localhost/api/v1/login", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ username: "admin", password: "wrongpass" }),
+			});
+			const res = await app.handle(req);
+			lastStatus = res.status;
+		}
+
+		expect(lastStatus).toBe(429);
 	});
 
 	it("POST /api/v1/logout - Should destroy the session cookies", async () => {
