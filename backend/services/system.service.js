@@ -4,6 +4,7 @@ import axios from "axios";
 import { getAllSettings, getTasks } from "../db";
 import { LOG_DIR } from "../config";
 import { generalLogger as logger } from "../logger";
+import { isSafeUrl, safeHttpAgent, safeHttpsAgent } from "../utils";
 
 let latestVersionCache = null;
 let lastVersionCheck = 0;
@@ -74,7 +75,21 @@ export const SystemService = {
 		};
 	},
 
-	postSystemTest: async ({ body: { service, url, apiKey } }) => {
+	postSystemTest: async ({ body: { service, url, apiKey }, status }) => {
+		if (!["radarr", "sonarr", "lidarr", "prowlarr"].includes(service)) {
+			return status(400, {
+				success: false,
+				message: "Invalid service",
+			});
+		}
+
+		if (!(await isSafeUrl(url))) {
+			return status(400, {
+				success: false,
+				message: "Invalid or unsafe URL provided.",
+			});
+		}
+
 		const cleanUrl = url.replace(/\/$/, "");
 
 		const apiVer = service === "lidarr" || service === "prowlarr" ? "v1" : "v3";
@@ -82,6 +97,8 @@ export const SystemService = {
 		await axios.get(`${cleanUrl}/api/${apiVer}/system/status`, {
 			headers: { "X-Api-Key": apiKey },
 			timeout: 5000,
+			httpAgent: safeHttpAgent,
+			httpsAgent: safeHttpsAgent,
 		});
 		return { success: true, message: "Test successful" };
 	},
