@@ -82,7 +82,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 		expect(cookies).toContain("eziarr_refresh=");
 	});
 
-	it("GET /api/v1/me - Should decode cookie and return username", async () => {
+	it("GET /api/v1/me - Should decode cookie and return admin status", async () => {
 		setSetting("isFirstTime", "false");
 		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
@@ -106,7 +106,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 		expect(res.status).toBe(200);
 		expect(body.success).toBe(true);
-		expect(body.user.username).toBe("admin");
+		expect(body.isAdmin).toBe(true);
 	});
 
 	it("POST /api/v1/refresh - Should issue a new access token from refresh cookie", async () => {

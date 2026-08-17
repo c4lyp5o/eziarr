@@ -112,7 +112,7 @@ export const AuthService = {
 		return { success: true };
 	},
 
-	me: async ({ jwt, cookie, status }) => {
+	me: async ({ request, jwt, cookie, status }) => {
 		const isFirstTime = getSetting("isFirstTime");
 		if (isFirstTime === "true" || isFirstTime === null)
 			return status(401, { success: false, message: "Unauthorized" });
