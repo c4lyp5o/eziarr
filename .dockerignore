@@ -1,0 +1,17 @@
+.git
+.gitignore
+**/node_modules
+**/*.sqlite
+db
+downloads
+logs
+client
+out
+dist
+coverage
+.env
+.env.*
+*.tgz
+.DS_Store
+.idea
+.vscode

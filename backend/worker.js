@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { setTimeout } from "node:timers/promises";
 import axios from "axios";
 import {
 	upsertMissingMedia,
@@ -367,9 +366,23 @@ const processDownloadQueue = async () => {
 		}
 
 		if (!result || !result.filePath)
-			throw new Error("File path missing after download");
+				throw new Error("File path missing after download");
 
-		upsertTask(
+			// Wait for file to be ready on filesystem (handles cross-OS mount latency)
+			const waitForFile = async (filePath, timeoutMs = 15000) => {
+				const start = Date.now();
+				while (Date.now() - start < timeoutMs) {
+					if (fs.existsSync(filePath)) return true;
+					await new Promise(r => setTimeout(r, 200));
+				}
+				return false;
+			};
+
+			if (!(await waitForFile(result.filePath))) {
+				throw new Error(`File not ready after 15s: ${result.filePath}`);
+			}
+
+			upsertTask(
 			job.id,
 			"Importing",
 			"running",
@@ -377,9 +390,6 @@ const processDownloadQueue = async () => {
 			100,
 		);
 
-		await setTimeout(10000);
-
-		// --- Trigger *Arr Import ---
 		const arrPath = translatePath(result.filePath);
 		const SERVICES = getAllServices();
 		const config = SERVICES[payload.service];

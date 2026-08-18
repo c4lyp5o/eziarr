@@ -39,7 +39,7 @@ describe("Eziarr Core API Flows", () => {
 				"Content-Type": "application/json",
 				Cookie: authCookie,
 			},
-			body: JSON.stringify({ key: "test_config_key", value: "vitest_rulez" }),
+			body: JSON.stringify({ key: "syncEnabled", value: false }),
 		});
 		const postRes = await app.handle(postReq);
 		const postBody = await postRes.json();
@@ -57,6 +57,22 @@ describe("Eziarr Core API Flows", () => {
 		const getBody = await getRes.json();
 
 		expect(getRes.status).toBe(200);
-		expect(getBody.settings.test_config_key).toBe("vitest_rulez");
+		expect(getBody.settings.syncEnabled).toBe(false);
+	});
+
+	it("POST /api/v1/settings - Should reject unknown keys (mass assignment guard)", async () => {
+		const postReq = new Request("http://localhost/api/v1/settings", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Cookie: authCookie,
+			},
+			body: JSON.stringify({ key: "isFirstTime", value: "true" }),
+		});
+		const postRes = await app.handle(postReq);
+		const postBody = await postRes.json();
+
+		expect(postRes.status).toBe(400);
+		expect(postBody.success).toBe(false);
 	});
 });

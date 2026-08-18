@@ -2,6 +2,7 @@ import { TelegramClient, Api } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { getSetting, setSetting } from "./db";
 import { prepareFileDownload } from "./utils";
+import { MAX_DOWNLOAD_BYTES } from "./config";
 import { generalLogger as logger } from "./logger";
 
 let tClient = null;
@@ -205,6 +206,16 @@ export const downloadTelegramFile = async (
 	const messages = await client.getMessages(entity, { ids: [messageId] });
 	const message = messages[0];
 	if (!message?.media) throw new Error("No media");
+
+	// Reject oversized files up front so we don't fill the disk (mirrors the HTTP path cap)
+	const docSize = message.media.document?.size
+		? Number(message.media.document.size)
+		: 0;
+	if (docSize > MAX_DOWNLOAD_BYTES) {
+		throw new Error(
+			`Remote file is too large (${docSize} bytes > ${MAX_DOWNLOAD_BYTES} bytes)`,
+		);
+	}
 
 	const { outputDir, outputPath } = await prepareFileDownload(filename);
 

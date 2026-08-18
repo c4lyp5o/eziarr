@@ -25,4 +25,4 @@ export const DB_DIR = path.join(import.meta.dir, "../db");
 export const LOG_DIR = path.join(import.meta.dir, "../logs");
 export const CLIENT_DIR = path.join(import.meta.dir, "../client");
 
-export const MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024 * 1024;
+export const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;

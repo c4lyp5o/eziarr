@@ -1,12 +1,25 @@
 import { getSetting, setSetting } from "../db";
 import { generalLogger as logger } from "../logger";
+import { getClientIp } from "../utils";
 
-function setAuthCookies({ cookie, accessToken, refreshToken, rememberMe }) {
+const shouldSecureCookies = (request) => {
+	// Explicit env override wins (COOKIE_SECURE=true/false)
+	const envOverride = process.env.COOKIE_SECURE;
+	if (envOverride !== undefined) return envOverride === "true";
+
+	// Otherwise derive from the request: HTTPS directly or via a trusted reverse proxy
+	const forwardedProto = request.headers.get("x-forwarded-proto");
+	if (forwardedProto) return forwardedProto.split(",")[0].trim() === "https";
+
+	return request.url.startsWith("https://");
+};
+
+function setAuthCookies({ cookie, accessToken, refreshToken, rememberMe, request }) {
 	cookie.eziarr_access.set({
 		value: accessToken,
 		httpOnly: true,
 		sameSite: "strict",
-		secure: process.env.NODE_ENV === "production",
+		secure: shouldSecureCookies(request),
 		path: "/",
 		maxAge: 60 * 15,
 	});
@@ -16,18 +29,18 @@ function setAuthCookies({ cookie, accessToken, refreshToken, rememberMe }) {
 		value: refreshToken,
 		httpOnly: true,
 		sameSite: "strict",
-		secure: process.env.NODE_ENV === "production",
+		secure: shouldSecureCookies(request),
 		path: "/api/v1",
 		maxAge: refreshMaxAge,
 	});
 }
 
-function clearAuthCookies({ cookie }) {
+function clearAuthCookies({ cookie, request }) {
 	cookie.eziarr_access.set({
 		value: "",
 		httpOnly: true,
 		sameSite: "strict",
-		secure: process.env.NODE_ENV === "production",
+		secure: shouldSecureCookies(request),
 		path: "/",
 		maxAge: 0,
 	});
@@ -36,7 +49,7 @@ function clearAuthCookies({ cookie }) {
 		value: "",
 		httpOnly: true,
 		sameSite: "strict",
-		secure: process.env.NODE_ENV === "production",
+		secure: shouldSecureCookies(request),
 		path: "/api/v1",
 		maxAge: 0,
 	});
@@ -66,6 +79,7 @@ export const AuthService = {
 
 	login: async ({
 		request,
+		server,
 		jwt,
 		cookie,
 		body: { password, rememberMe },
@@ -76,11 +90,8 @@ export const AuthService = {
 			return status(401, { success: false, message: "Unauthorized" });
 
 		if (!password) {
-			const clientIp =
-				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-				request.ip;
 			logger.warn(
-				`[AUTH] Failed login attempt from ${clientIp} - No password provided`,
+				`[AUTH] Failed login attempt from ${getClientIp(request, server)} - No password provided`,
 			);
 			return status(401, { success: false, message: "Unauthorized" });
 		}
@@ -88,10 +99,9 @@ export const AuthService = {
 		const hashedPassword = getSetting("password");
 		const comparePassword = await Bun.password.verify(password, hashedPassword);
 		if (!comparePassword) {
-			const clientIp =
-				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-				request.ip;
-			logger.warn(`[AUTH] Failed login attempt from ${clientIp}`);
+			logger.warn(
+				`[AUTH] Failed login attempt from ${getClientIp(request, server)}`,
+			);
 			return status(401, { success: false, message: "Unauthorized" });
 		}
 
@@ -107,12 +117,13 @@ export const AuthService = {
 			accessToken,
 			refreshToken,
 			rememberMe: !!rememberMe,
+			request,
 		});
 
 		return { success: true };
 	},
 
-	me: async ({ jwt, cookie, status }) => {
+	me: async ({ request, server, jwt, cookie, status }) => {
 		const isFirstTime = getSetting("isFirstTime");
 		if (isFirstTime === "true" || isFirstTime === null)
 			return status(401, { success: false, message: "Unauthorized" });
@@ -122,11 +133,8 @@ export const AuthService = {
 
 		const payload = await jwt.verify(token);
 		if (!payload || !payload.isAdmin) {
-			const clientIp =
-				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-				request.ip;
 			logger.warn(
-				`[AUTH] Unauthorized access attempt to /auth/me from ${clientIp}`,
+				`[AUTH] Unauthorized access attempt to /auth/me from ${getClientIp(request, server)}`,
 			);
 			return status(401, { success: false, message: "Unauthorized" });
 		}
@@ -134,7 +142,7 @@ export const AuthService = {
 		return { success: true, isAdmin: payload.isAdmin };
 	},
 
-	refresh: async ({ jwt, cookie, status }) => {
+	refresh: async ({ request, server, jwt, cookie, status }) => {
 		const isFirstTime = getSetting("isFirstTime");
 		if (isFirstTime === "true" || isFirstTime === null)
 			return status(401, { success: false, message: "Unauthorized" });
@@ -144,10 +152,9 @@ export const AuthService = {
 
 		const payload = await jwt.verify(token);
 		if (!payload || payload.type !== "refresh" || !payload.isAdmin) {
-			const clientIp =
-				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-				request.ip;
-			logger.warn(`[AUTH] Unauthorized refresh attempt from ${clientIp}`);
+			logger.warn(
+				`[AUTH] Unauthorized refresh attempt from ${getClientIp(request, server)}`,
+			);
 			return status(401, { success: false, message: "Unauthorized" });
 		}
 
@@ -160,7 +167,7 @@ export const AuthService = {
 			value: accessToken,
 			httpOnly: true,
 			sameSite: "strict",
-			secure: process.env.NODE_ENV === "production",
+			secure: shouldSecureCookies(request),
 			path: "/",
 			maxAge: 60 * 15,
 		});
@@ -168,8 +175,8 @@ export const AuthService = {
 		return { success: true };
 	},
 
-	logout: async ({ cookie }) => {
-		clearAuthCookies({ cookie });
+	logout: async ({ request, cookie }) => {
+		clearAuthCookies({ cookie, request });
 		return { success: true };
 	},
 };
