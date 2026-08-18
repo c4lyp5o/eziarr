@@ -11,6 +11,7 @@ import { CLIENT_DIR } from "./config";
 
 import { AuthPlugin } from "./plugins/auth.plugin";
 import { ProtectorPlugin } from "./plugins/protector.plugin";
+import { rateLimitHandler } from "./plugins/rate-limit.plugin";
 
 import { HealthRoute } from "./routes/health.route";
 import { AuthRoutes } from "./routes/auth.route";
@@ -64,7 +65,12 @@ export const app = new Elysia()
 
 	.use(HealthRoute)
 
-	.guard((authApi) => authApi.use(AuthPlugin).use(AuthRoutes))
+	.guard((authApi) =>
+		authApi
+			.onBeforeHandle(rateLimitHandler({ limit: 10, windowMs: 60000 }))
+			.use(AuthPlugin)
+			.use(AuthRoutes),
+	)
 
 	.guard((protectedApi) =>
 		protectedApi

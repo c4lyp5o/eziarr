@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { app } from "../index.js";
 import { setSetting } from "../db.js";
+import { resetRateLimitBuckets } from "../plugins/rate-limit.plugin.js";
 
 describe("Authentication & Cookie Lifecycle Flow", () => {
 	beforeEach(() => {
+		resetRateLimitBuckets();
 		setSetting("isFirstTime", "true");
 		setSetting("username", "");
 		setSetting("password", "");
@@ -41,7 +43,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 	it("POST /api/v1/login - Should fail with wrong credentials", async () => {
 		setSetting("isFirstTime", "false");
 		setSetting("username", "admin");
-		setSetting("password", "correctpassword");
+		setSetting("password", await Bun.password.hash("correctpassword"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
@@ -59,7 +61,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 	it("POST /api/v1/login - Should succeed and set HttpOnly Cookies", async () => {
 		setSetting("isFirstTime", "false");
 		setSetting("username", "admin");
-		setSetting("password", "correctpassword");
+		setSetting("password", await Bun.password.hash("correctpassword"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
@@ -82,10 +84,10 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 		expect(cookies).toContain("eziarr_refresh=");
 	});
 
-	it("GET /api/v1/me - Should decode cookie and return username", async () => {
+	it("GET /api/v1/me - Should decode cookie and return admin status", async () => {
 		setSetting("isFirstTime", "false");
 		setSetting("username", "admin");
-		setSetting("password", "testpass");
+		setSetting("password", await Bun.password.hash("testpass"));
 
 		const loginReq = new Request("http://localhost/api/v1/login", {
 			method: "POST",
@@ -106,13 +108,13 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 		expect(res.status).toBe(200);
 		expect(body.success).toBe(true);
-		expect(body.user.username).toBe("admin");
+		expect(body.isAdmin).toBe(true);
 	});
 
 	it("POST /api/v1/refresh - Should issue a new access token from refresh cookie", async () => {
 		setSetting("isFirstTime", "false");
 		setSetting("username", "admin");
-		setSetting("password", "testpass");
+		setSetting("password", await Bun.password.hash("testpass"));
 
 		const loginReq = new Request("http://localhost/api/v1/login", {
 			method: "POST",
@@ -135,6 +137,96 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 		expect(res.status).toBe(200);
 		expect(body.success).toBe(true);
 		expect(res.headers.get("set-cookie")).toContain("eziarr_access=");
+	});
+
+	it("GET /api/v1/me - Should return 401 for an invalid access token instead of crashing", async () => {
+		setSetting("isFirstTime", "false");
+
+		const req = new Request("http://localhost/api/v1/me", {
+			headers: { Cookie: "eziarr_access=not.a.valid.token" },
+		});
+		const res = await app.handle(req);
+		const body = await res.json();
+
+		expect(res.status).toBe(401);
+		expect(body.success).toBe(false);
+	});
+
+	it("POST /api/v1/refresh - Should return 401 for an invalid refresh token instead of crashing", async () => {
+		setSetting("isFirstTime", "false");
+
+		const req = new Request("http://localhost/api/v1/refresh", {
+			method: "POST",
+			headers: { Cookie: "eziarr_refresh=not.a.valid.token" },
+		});
+		const res = await app.handle(req);
+		const body = await res.json();
+
+		expect(res.status).toBe(401);
+		expect(body.success).toBe(false);
+	});
+
+	it("POST /api/v1/login - Should issue non-secure cookies over plain http", async () => {
+		setSetting("isFirstTime", "false");
+		setSetting("username", "admin");
+		setSetting("password", await Bun.password.hash("testpass"));
+
+		const req = new Request("http://localhost/api/v1/login", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ username: "admin", password: "testpass" }),
+		});
+		const res = await app.handle(req);
+		const cookies = res.headers.get("set-cookie") || "";
+
+		expect(res.status).toBe(200);
+		expect(cookies).toContain("eziarr_access=");
+		expect(cookies).not.toContain("Secure");
+	});
+
+	it("POST /api/v1/login - Should issue secure cookies when COOKIE_SECURE=true", async () => {
+		setSetting("isFirstTime", "false");
+		setSetting("username", "admin");
+		setSetting("password", await Bun.password.hash("testpass"));
+
+		const oldOverride = process.env.COOKIE_SECURE;
+		process.env.COOKIE_SECURE = "true";
+
+		try {
+			const req = new Request("http://localhost/api/v1/login", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ username: "admin", password: "testpass" }),
+			});
+			const res = await app.handle(req);
+			const cookies = res.headers.get("set-cookie") || "";
+
+			expect(res.status).toBe(200);
+			expect(cookies).toContain("Secure");
+		} finally {
+			if (oldOverride === undefined) delete process.env.COOKIE_SECURE;
+			else process.env.COOKIE_SECURE = oldOverride;
+		}
+	});
+
+	it("POST /api/v1/login - Should rate limit after 10 attempts per minute", async () => {
+		resetRateLimitBuckets();
+		setSetting("isFirstTime", "false");
+		setSetting("username", "admin");
+		setSetting("password", await Bun.password.hash("testpass"));
+
+		let lastStatus = 0;
+		for (let i = 0; i < 12; i++) {
+			const req = new Request("http://localhost/api/v1/login", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ username: "admin", password: "wrongpass" }),
+			});
+			const res = await app.handle(req);
+			lastStatus = res.status;
+		}
+
+		expect(lastStatus).toBe(429);
 	});
 
 	it("POST /api/v1/logout - Should destroy the session cookies", async () => {

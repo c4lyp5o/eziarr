@@ -135,6 +135,24 @@ const isIpDisallowed = (ip) => {
 	return true;
 };
 
+// Real client IP for rate limiting / audit logs.
+// Bun's Request has no .ip property; the socket peer is only reachable via
+// server.requestIP(request) (Elysia injects `server` into hooks and handlers).
+export const getClientIp = (request, server) => {
+	const directIp =
+		server?.requestIP?.(request)?.address?.replace(/^::ffff:/, "") ?? null;
+
+	const xff = request.headers.get("x-forwarded-for");
+	// Only trust X-Forwarded-For when the direct peer is private/loopback
+	// (i.e. a reverse proxy in front). Otherwise a public client could spoof
+	// the header to bypass rate limiting.
+	if (xff && directIp && isIpDisallowed(directIp)) {
+		return xff.split(",")[0].trim();
+	}
+
+	return directIp ?? "unknown";
+};
+
 export const isSafeUrl = async (urlString) => {
 	let url;
 	try {
@@ -222,13 +240,23 @@ export const safeHttpAgent = new http.Agent({ lookup: safeDnsLookup });
 export const safeHttpsAgent = new https.Agent({ lookup: safeDnsLookup });
 
 export const prepareFileDownload = async (filename) => {
-	const safeFilename = filename.replace(/[/\\?%*:|"<>]/g, " ").trim();
-	const folderName = path.parse(safeFilename).name;
+	// basename strips directory components (.., /etc/.., C:\..) so filenames
+	// coming from remote metadata can never escape DOWNLOAD_DIR; the regex
+	// then removes filesystem-hostile characters.
+	let safeFilename = path
+		.basename(String(filename))
+		.replace(/[/\\?%*:|"<>]/g, " ")
+		.trim();
+
+	if (!safeFilename || safeFilename === "." || safeFilename === "..") {
+		safeFilename = `download_${Date.now()}`;
+	}
+
+	const folderName = path.parse(safeFilename).name || "download";
 	const outputDir = path.join(DOWNLOAD_DIR, folderName);
 	const outputPath = path.join(outputDir, safeFilename);
 	if (!fs.existsSync(outputDir)) {
 		fs.mkdirSync(outputDir, { recursive: true });
-		await setTimeout(10000);
 	}
 	return { outputDir, outputPath };
 };

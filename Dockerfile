@@ -22,8 +22,11 @@ WORKDIR /app
 RUN apk add --no-cache tzdata curl
 ENV TZ=Asia/Kuala_Lumpur
 
-# Install PM2 globally using Bun
-RUN bun add -g pm2
+# Non-root user that runs the service (this app downloads untrusted media)
+RUN addgroup -S eziarr && adduser -S eziarr -G eziarr -h /home/eziarr
+# Bun global bins for the app user (pm2 is installed below as eziarr,
+# because /root/.bun is unreachable once we drop privileges)
+ENV PATH="/home/eziarr/.bun/bin:${PATH}"
 
 # Copy backend and install deps
 COPY backend/package.json ./backend/
@@ -39,8 +42,16 @@ COPY ecosystem.config.js ./
 # Copy built client bundle
 COPY --from=builder /app/client ./client
 
-# Set proper permissions so the user can write to them
-# RUN chown -R 1000:1000 /app/downloads
+# Writable runtime directories (db, downloads, logs) owned by the app user
+RUN mkdir -p /app/db /app/downloads /app/logs \
+	&& chown -R eziarr:eziarr /app
+
+USER eziarr
+
+# Install PM2 as the app user so it runs without root. The oven/bun image
+# pins BUN_INSTALL_BIN=/usr/local/bin (root-owned), so redirect the global
+# bin dir to a user-writable dir that is already on PATH above.
+RUN BUN_INSTALL_BIN=/home/eziarr/.bun/bin bun add -g pm2
 
 EXPOSE 5000
 

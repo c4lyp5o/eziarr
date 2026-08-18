@@ -25,11 +25,7 @@ export const AuthModel = {
 	}),
 	meResponse: t.Object({
 		success: t.Boolean(),
-		user: t.Optional(
-			t.Object({
-				isAdmin: t.Boolean(),
-			}),
-		),
+		isAdmin: t.Boolean(),
 		message: t.Optional(t.String()),
 	}),
 	refreshResponse: t.Object({
