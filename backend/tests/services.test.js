@@ -192,4 +192,45 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 			}),
 		);
 	});
+
+	it("POST /api/v1/system/test - Should reject internal URLs (SSRF guard)", async () => {
+		const req = new Request("http://localhost/api/v1/system/test", {
+			method: "POST",
+			headers: {
+				Cookie: authCookie,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				service: "radarr",
+				url: "http://127.0.0.1:7878",
+				apiKey: "x",
+			}),
+		});
+		const res = await app.handle(req);
+		const body = await res.json();
+
+		expect(res.status).toBe(400);
+		expect(body.success).toBe(false);
+		expect(axios.get).not.toHaveBeenCalled();
+	});
+
+	it("POST /api/v1/system/test - Should allow safe external URLs", async () => {
+		axios.get.mockResolvedValueOnce({ data: {} });
+
+		const req = new Request("http://localhost/api/v1/system/test", {
+			method: "POST",
+			headers: {
+				Cookie: authCookie,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				service: "radarr",
+				url: "https://example.com",
+				apiKey: "x",
+			}),
+		});
+		const res = await app.handle(req);
+
+		expect(res.status).toBe(200);
+	});
 });
