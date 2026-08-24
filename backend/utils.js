@@ -252,9 +252,10 @@ export const prepareFileDownload = async (filename) => {
 		safeFilename = `download_${Date.now()}`;
 	}
 
-	const folderName = path.parse(safeFilename).name || "download";
-	const outputDir = path.join(DOWNLOAD_DIR, folderName);
-	const outputPath = path.join(outputDir, safeFilename);
+	// Write the file flat into DOWNLOAD_DIR — no per-file subfolder.
+	// The *Arr import path chokes on files nested in a folder.
+	const outputDir = DOWNLOAD_DIR;
+	const outputPath = path.join(DOWNLOAD_DIR, safeFilename);
 	if (!fs.existsSync(outputDir)) {
 		fs.mkdirSync(outputDir, { recursive: true });
 	}
