@@ -80,12 +80,12 @@ describe("Utility: Cross-OS Path Translator", () => {
 });
 
 describe("Security: Download Filename Sanitization", () => {
-	it("Should keep a normal filename inside the downloads directory", async () => {
+	it("Should keep a normal filename flat inside the downloads directory", async () => {
 		const { outputDir, outputPath } = await prepareFileDownload("Movie (2026).mkv");
 
 		expect(outputPath.startsWith(DOWNLOAD_DIR)).toBe(true);
 		expect(path.basename(outputPath)).toBe("Movie (2026).mkv");
-		expect(path.basename(outputDir)).toBe("Movie (2026)");
+		expect(outputDir).toBe(DOWNLOAD_DIR);
 	});
 
 	it("Should strip directory components from traversal filenames", async () => {
