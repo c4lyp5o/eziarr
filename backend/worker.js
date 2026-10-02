@@ -16,14 +16,16 @@ import {
 	unstuckDownloadQueue,
 	scheduleRetryDownloadQueue,
 	markAsFailedDownloadQueue,
+	markDownloadedPayload,
 	finalizeDownloadQueue,
 	pruneDownloadQueue,
 	// pruneDownloadHistory,
 } from "./db";
 import { downloadTelegramFile } from "./telegram";
 import { downloadHttpFile } from "./downloader";
+import { triggerArrImport, verifyArrImport, isImportableService } from "./import";
 import { generalLogger as logger, hunterLogger } from "./logger";
-import { getPosterUrl, translatePath } from "./utils";
+import { getPosterUrl } from "./utils";
 import { DEFAULT_SETTINGS, DOWNLOAD_DIR } from "./config";
 
 const MAX_ATTEMPTS = 5;
@@ -336,6 +338,16 @@ const processDownloadQueue = async () => {
 	try {
 		let result;
 
+		// A retry left over from a failed IMPORT must not pull the bytes again:
+		// the file already landed on a previous attempt, so reuse it and go
+		// straight to the *Arr scan.
+		if (payload.downloadedPath && fs.existsSync(payload.downloadedPath)) {
+			logger.info(
+				`[WORKER] ♻️ Reusing downloaded file, retrying import only: ${payload.downloadedPath}`,
+			);
+			result = { filePath: payload.downloadedPath, path: path.dirname(payload.downloadedPath) };
+		}
+
 		let lastPercent = -1;
 		const progressCallback = (percent) => {
 			if (percent !== lastPercent && percent >= 0 && percent <= 100) {
@@ -350,23 +362,32 @@ const processDownloadQueue = async () => {
 			}
 		};
 
-		if (job.type === "telegram") {
-			result = await downloadTelegramFile(
-				payload.channel,
-				payload.messageId,
-				payload.filename,
-				progressCallback,
-			);
-		} else if (job.type === "http") {
-			result = await downloadHttpFile(
-				payload.url,
-				payload.filename,
-				progressCallback,
-			);
+		if (!result) {
+			if (job.type === "telegram") {
+				result = await downloadTelegramFile(
+					payload.channel,
+					payload.messageId,
+					payload.filename,
+					progressCallback,
+				);
+			} else if (job.type === "http") {
+				result = await downloadHttpFile(
+					payload.url,
+					payload.filename,
+					progressCallback,
+				);
+			}
 		}
 
 		if (!result || !result.filePath)
 				throw new Error("File path missing after download");
+
+		// Persist the completed download before the import scan, so a later
+		// import failure retries the scan instead of re-downloading gigabytes.
+		if (!payload.downloadedPath) {
+			payload.downloadedPath = result.filePath;
+			markDownloadedPayload(job.id, result.filePath);
+		}
 
 			// Wait for file to be ready on filesystem (handles cross-OS mount latency)
 			const waitForFile = async (filePath, timeoutMs = 15000) => {
@@ -390,7 +411,9 @@ const processDownloadQueue = async () => {
 			100,
 		);
 
-		const arrPath = translatePath(result.filePath);
+		// Scan the SHARED drop folder. Pointing the scan at the file path
+		// itself looks right but silently no-ops: *Arr only accepts a bare file
+		// path via the Manual Import mechanism, never as a scan target.
 		const SERVICES = getAllServices();
 		const config = SERVICES[payload.service];
 
@@ -399,29 +422,35 @@ const processDownloadQueue = async () => {
 				`${payload.service} is not configured. Cannot import file.`,
 			);
 
-		const commandName =
-			payload.service === "radarr"
-				? "DownloadedMoviesScan"
-				: payload.service === "sonarr"
-					? "DownloadedEpisodesScan"
-					: "DownloadedAlbumsScan";
-
-		const commandPayload = {
-			name: commandName,
-			path: arrPath,
-			importMode: "Move",
-		};
-		if (payload.service === "radarr")
-			commandPayload.movieId = payload.serviceId;
-
-		const apiVer = payload.service === "lidarr" ? "v1" : "v3";
-
-		await axios.post(`${config.url}/api/${apiVer}/command`, commandPayload, {
-			headers: { "X-Api-Key": config.apiKey },
-			timeout: 30000,
+		const commandPayload = await triggerArrImport({
+			config,
+			service: payload.service,
+			serviceId: payload.serviceId,
 		});
 
-		logger.info(`[WORKER] ✅ Download & Import complete: ${payload.filename}`);
+		if (isImportableService(payload.service)) {
+			const verdict = await verifyArrImport({
+				config,
+				service: payload.service,
+				serviceId: payload.serviceId,
+				filePath: result.filePath,
+			});
+			if (!verdict.imported) {
+				// Nothing imported — fail loudly instead of a hollow ✅, so the
+				// job surfaces (and retries) instead of vanishing until the
+				// sweeper deletes the evidence 24h later.
+				throw new Error(
+					`${payload.filename} downloaded but ${payload.service} never imported it: ${verdict.reason}`,
+				);
+			}
+			logger.info(`[WORKER] ✅ Download & Import complete: ${payload.filename}`);
+		} else {
+			// Unverifiable service: the scan was queued, but we can't prove it
+			// imported, so don't claim it did.
+			logger.info(
+				`[WORKER] ⏳ Download complete, scan queued for ${payload.filename} (${payload.service} scan is not verifiable): ${commandPayload.name}`,
+			);
+		}
 		finalizeDownloadQueue(job.id, "completed", result);
 	} catch (err) {
 		const msg = err?.message ?? String(err);

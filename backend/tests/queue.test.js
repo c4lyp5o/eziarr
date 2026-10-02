@@ -6,6 +6,7 @@ import {
 	claimNextDownloadQueue,
 	scheduleRetryDownloadQueue,
 	finalizeDownloadQueue,
+	markDownloadedPayload,
 	getDownloadQueue,
 	getDownloadHistory,
 } from "../db.js";
@@ -72,5 +73,37 @@ describe("SQLite Queue State Machine", () => {
 		expect(history[0].id).toBe(jobId);
 		expect(history[0].status).toBe("completed");
 		expect(history[0].download_bytes).toBe(1048576);
+	});
+
+	it("Should remember a completed download so an import retry does not re-fetch", () => {
+		const jobId = addToDownloadQueue("telegram", {
+			filename: "Polong (2026).mp4",
+			channel: "-100123",
+			messageId: 594,
+			service: "radarr",
+			serviceId: 2099,
+		});
+
+		markDownloadedPayload(jobId, "/app/downloads/Polong (2026).mp4");
+
+		const claimed = claimNextDownloadQueue();
+		expect(claimed.id).toBe(jobId);
+		expect(JSON.parse(claimed.payload).downloadedPath).toBe(
+			"/app/downloads/Polong (2026).mp4",
+		);
+
+		// Still retryable normally: the marker must not stop the state machine.
+		scheduleRetryDownloadQueue(jobId, "Radarr never imported it");
+		const retried = getDownloadQueue();
+		expect(retried[0].status).toBe("retry");
+		expect(JSON.parse(retried[0].payload).downloadedPath).toBe(
+			"/app/downloads/Polong (2026).mp4",
+		);
+	});
+
+	it("Should not corrupt payload when marking an unknown job", () => {
+		expect(() =>
+			markDownloadedPayload("does-not-exist", "/app/downloads/x.mp4"),
+		).not.toThrow();
 	});
 });
