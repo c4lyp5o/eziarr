@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"module": "index.js",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"scripts": {
 		"test": "vitest run",
 		"test:watch": "vitest"
@@ -11,16 +11,16 @@
 	"dependencies": {
 		"@elysiajs/cookie": "^0.8.0",
 		"@elysiajs/jwt": "^1.4.2",
-		"@elysiajs/openapi": "^1.4.15",
+		"@elysiajs/openapi": "^1.4.16",
 		"@elysiajs/static": "^1.4.10",
-		"axios": "^1.19.0",
+		"axios": "^1.20.0",
 		"deadslog": "^1.3.1",
-		"elysia": "^1.4.29",
+		"elysia": "^1.4.30",
 		"telegram": "^2.26.22"
 	},
 	"devDependencies": {
 		"@types/bun": "1.3.11",
-		"vitest": "^4.1.10"
+		"vitest": "^4.1.11"
 	},
 	"peerDependencies": {
 		"typescript": "^5.9.3"

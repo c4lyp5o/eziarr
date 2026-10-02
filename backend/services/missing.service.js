@@ -145,8 +145,110 @@ export const MissingService = {
 		}
 	},
 
+	// --- Language bypass helpers (Fix A + Fix B) -------------------------
+	// Ground truth measured live 2026-10-03:
+	//   Radarr: /languageprofile = 404. Language lives on qualityProfile.language
+	//           (all 6 shipped profiles = {id:1,English}). /language has id -1="Any".
+	//           POST /qualityprofile with language:{id:-1} works (201) and DELETEs (200).
+	//   Sonarr: /languageprofile exists but only returns one "Deprecated" profile
+	//           (English only). Its POST and PUT both return 202 but NEVER persist —
+	//           no writable path to allow non-English. So Sonarr cannot be bypassed
+	//           by profile swap; it fails honestly instead of silently.
+
+	// Find (or create, on Radarr only) a quality profile whose language is "Any".
+	// Returns {id, created} or null when there is no writable path.
+	_ensureAnyLanguageProfile: async (config) => {
+		try {
+			const res = await axios.get(`${config.url}/api/v3/qualityprofile`, {
+				headers: { "X-Api-Key": config.apiKey },
+				timeout: 30000,
+			});
+			const profiles = res.data;
+			const existing = profiles.find((p) => p.language?.id === -1);
+			if (existing) return { id: existing.id, created: false };
+
+			// Clone the first profile but set language = Any. Radarr-only: Sonarr's
+			// quality profiles carry no `language` field at all.
+			const clone = {
+				...profiles[0],
+				id: 0,
+				name: "eziarr-any-language",
+				language: { id: -1, name: "Any" },
+			};
+			const created = await axios.post(
+				`${config.url}/api/v3/qualityprofile`,
+				clone,
+				{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
+			);
+			// Verify it actually persisted — a 2xx echo that didn't write is the
+			// exact bug we fixed in PR #40, so never trust the status code alone.
+			if (!created.data?.id) return null;
+			return { id: created.data.id, created: true };
+		} catch (err) {
+			logger.warn(
+				`[SERVER] ⚠️ Could not ensure Any-language profile: ${err.message}`,
+			);
+			return null;
+		}
+	},
+
+	// Decide whether the release's language is allowed for this title (Fix B).
+	// We only bypass when the release language matches the title's original
+	// language (or the title's original language is Unknown/Original, i.e. we
+	// have no signal). A German rip of an English title stays rejected.
+	// ReleasLanguages comes from release/push's `languages` field (plural).
+	_languageAllowsBypass: async (config, service, sid, releaseLanguages, forceLanguage) => {
+		if (forceLanguage) return { allowed: true, reason: "forceLanguage override" };
+		if (!Array.isArray(releaseLanguages) || releaseLanguages.length === 0)
+			return { allowed: true, reason: "no release language signal, proceeding" };
+
+		// Read the title's original language.
+		let originalLanguage = null;
+		try {
+			if (service === "radarr") {
+				const m = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
+				});
+				originalLanguage = m.data?.originalLanguage;
+			} else if (service === "sonarr") {
+				const ep = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
+					headers: { "X-Api-Key": config.apiKey },
+					timeout: 30000,
+				});
+				const s = await axios.get(
+					`${config.url}/api/v3/series/${ep.data.seriesId}`,
+					{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
+				);
+				originalLanguage = s.data?.originalLanguage;
+			}
+		} catch (err) {
+			logger.warn(
+				`[SERVER] ⚠️ Could not read original language for ${service}:${sid}: ${err.message}`,
+			);
+			// No signal — allow, but the caller logs it. Fail-open here because we
+			// genuinely don't know; the guard's job is to catch clear mismatches.
+			return { allowed: true, reason: "original language unavailable" };
+		}
+
+		// id -2 = Original, 0 = Unknown, or missing => no reliable guard target.
+		if (!originalLanguage || [0, -2, undefined].includes(originalLanguage.id))
+			return { allowed: true, reason: "title original language is Unknown/Original" };
+
+		const origName = (originalLanguage.name || "").toLowerCase();
+		const matches = releaseLanguages.some(
+			(rl) => (rl?.name || "").toLowerCase() === origName,
+		);
+		if (matches) return { allowed: true, reason: `release matches ${originalLanguage.name}` };
+
+		return {
+			allowed: false,
+			reason: `release is ${releaseLanguages.map((l) => l?.name).join("/") || "unknown"} but ${service} title's original language is ${originalLanguage.name}`,
+		};
+	},
+
 	postMissingForceGrab: async ({
-		body: { service, serviceId, title, downloadUrl },
+		body: { service, serviceId, title, downloadUrl, forceLanguage },
 	}) => {
 		const SERVICES = getAllServices();
 		const config = SERVICES[service];
@@ -190,6 +292,8 @@ export const MissingService = {
 		let actionsTaken = false;
 		let originalItem = null;
 		let itemEndpoint = "";
+		let createdProfileId = null;
+		let forcedProfileId = null;
 
 		if (
 			rejections.includes("profile") ||
@@ -201,22 +305,57 @@ export const MissingService = {
 			rejections.includes("english") ||
 			rejections.includes("size")
 		) {
+			// --- Fix B: decide the language bypass BEFORE touching anything ---
+			// A wrong-language release for a title whose original language differs
+			// must be rejected outright (unless forceLanguage). release/push's
+			// response carries `languages` (plural).
+			const releaseLanguages = res.data[0]?.languages || [];
+			const langGate = await MissingService._languageAllowsBypass(
+				config,
+				service,
+				sid,
+				releaseLanguages,
+				forceLanguage,
+			);
+			if (!langGate.allowed) {
+				logger.warn(
+					`[SERVER] 🚫 [${service}] Language mismatch, not bypassing: ${langGate.reason}`,
+				);
+				recordForceGrabHistory(service, sid, title, downloadUrl, false, langGate.reason);
+				return {
+					success: false,
+					message: `Not grabbing: ${langGate.reason}. Pass forceLanguage=true to grab anyway.`,
+				};
+			}
+			if (langGate.reason !== "forceLanguage override") {
+				logger.info(`[SERVER] ℹ️ [${service}] Language gate: ${langGate.reason}`);
+			}
+
 			logger.info(
 				`[SERVER] 🔄 [${service}] Temporarily dropping restrictions...`,
 			);
 
-			const profilesRes = await axios.get(
-				`${config.url}/api/v3/qualityprofile`,
-				{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
-			);
-			const anyProfile =
-				profilesRes.data.find((p) => p.name.toLowerCase() === "any") ||
-				profilesRes.data[0];
-
+			// --- Fix A: lift the LANGUAGE restriction the swap used to miss ---
+			// Radarr's blocker is qualityProfile.language=English, so swap the
+			// movie onto an "Any"-language profile. Sonarr's language profile is
+			// not writable (202 no-op), so there we cannot lift it — but a
+			// language-matching release won't be rejected for language anyway.
 			let targetId = sid;
+			let isLanguageBypass = false;
 
 			if (service === "radarr") {
 				itemEndpoint = "/api/v3/movie";
+				if (rejections.includes("language") || rejections.includes("english")) {
+					const anyLangProfile =
+						await MissingService._ensureAnyLanguageProfile(config);
+					if (anyLangProfile) {
+						createdProfileId = anyLangProfile.created
+							? anyLangProfile.id
+							: null;
+						isLanguageBypass = true;
+						forcedProfileId = anyLangProfile.id;
+					}
+				}
 			} else if (service === "sonarr") {
 				const epRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
 					headers: { "X-Api-Key": config.apiKey },
@@ -239,35 +378,31 @@ export const MissingService = {
 
 			let needsUpdate = false;
 
-			if (item.qualityProfileId !== anyProfile.id) {
-				item.qualityProfileId = anyProfile.id;
-				needsUpdate = true;
+			if (service === "radarr" && isLanguageBypass) {
+				// Language bypass: point at the Any-language profile.
+				if (item.qualityProfileId !== forcedProfileId) {
+					item.qualityProfileId = forcedProfileId;
+					needsUpdate = true;
+				}
+			} else {
+				// Non-language rejections (profile/cutoff/size/score): keep the
+				// original "relax the quality profile" behaviour.
+				const profilesRes = await axios.get(
+					`${config.url}/api/v3/qualityprofile`,
+					{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
+				);
+				const anyProfile =
+					profilesRes.data.find((p) => p.name.toLowerCase() === "any") ||
+					profilesRes.data[0];
+				if (item.qualityProfileId !== anyProfile.id) {
+					item.qualityProfileId = anyProfile.id;
+					needsUpdate = true;
+				}
 			}
 
 			if (item.tags && item.tags.length > 0) {
 				item.tags = [];
 				needsUpdate = true;
-			}
-
-			if (service === "sonarr" && item.languageProfileId) {
-				try {
-					const langRes = await axios.get(
-						`${config.url}/api/v3/languageprofile`,
-						{
-							headers: { "X-Api-Key": config.apiKey },
-							timeout: 10000,
-						},
-					);
-					const anyLang =
-						langRes.data.find((p) => p.name.toLowerCase() === "any") ||
-						langRes.data[0];
-					if (anyLang && item.languageProfileId !== anyLang.id) {
-						item.languageProfileId = anyLang.id;
-						needsUpdate = true;
-					}
-				} catch (_err) {
-					// Ignored
-				}
 			}
 
 			if (needsUpdate) {
@@ -368,6 +503,24 @@ export const MissingService = {
 					} catch (restoreErr) {
 						logger.error(
 							`[SERVER] Failed to restore original item settings: ${restoreErr.message}`,
+						);
+					}
+				}
+
+				// Delete the temporary Any-language profile we created, so repeated
+				// force-grabs don't accumulate junk profiles on Radarr.
+				if (createdProfileId) {
+					try {
+						await axios.delete(
+							`${config.url}/api/v3/qualityprofile/${createdProfileId}`,
+							{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
+						);
+						logger.info(
+							`[SERVER] 🧹 [${service}] Removed temp Any-language profile ${createdProfileId}`,
+						);
+					} catch (delErr) {
+						logger.warn(
+							`[SERVER] ⚠️ Could not delete temp profile ${createdProfileId}: ${delErr.message}`,
 						);
 					}
 				}

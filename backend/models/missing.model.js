@@ -27,6 +27,11 @@ export const MissingModel = {
 		serviceId: t.Union([t.String(), t.Number()]),
 		title: t.String(),
 		downloadUrl: t.String(),
+		// Optional override: bypass the original-language guard and force the
+		// grab through even when the release's language doesn't match the
+		// title's original language (e.g. an English title with a German rip).
+		// Default false — a mismatched grab stays rejected unless asked for.
+		forceLanguage: t.Optional(t.Boolean()),
 	}),
 	postMissingUnmonitor: t.Object({
 		service: t.Union([
