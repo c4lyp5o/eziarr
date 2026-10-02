@@ -539,6 +539,31 @@ export const finalizeDownloadQueue = (id, finalStatus, result = {}) => {
 	db.query("DELETE FROM download_queue WHERE id = $id").run({ $id: id });
 };
 
+/**
+ * Remember that a job's file already finished downloading, so a retry only
+ * re-runs the *Arr import instead of pulling the same gigabytes again.
+ * A retry caused by a failed import must never re-download the payload.
+ */
+export const markDownloadedPayload = (id, filePath) => {
+	const row = db
+		.query("SELECT payload FROM download_queue WHERE id = $id")
+		.get({ $id: id });
+	if (!row?.payload) return;
+
+	let payload = {};
+	try {
+		payload = JSON.parse(row.payload);
+	} catch {
+		return;
+	}
+	payload.downloadedPath = filePath;
+
+	db.query("UPDATE download_queue SET payload = $payload WHERE id = $id").run({
+		$id: id,
+		$payload: JSON.stringify(payload),
+	});
+};
+
 export const scheduleRetryDownloadQueue = (id, errMessage) => {
 	const row = db
 		.query("SELECT attempts FROM download_queue WHERE id = $id")
