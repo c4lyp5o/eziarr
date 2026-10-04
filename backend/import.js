@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import axios from "axios";
 import { translatePath } from "./utils";
-import { DOWNLOAD_DIR } from "./config";
 import { generalLogger as logger } from "./logger";
 
 const API_VER = (service) => (service === "lidarr" ? "v1" : "v3");
@@ -15,26 +14,30 @@ const scanCommandName = (service) => {
 /**
  * Ask the *Arr to import the file we just downloaded.
  *
- * `path` must be the SHARED IMPORT FOLDER (D:\Eziarr), not the file path. A
- * bare file path is only understood by the Manual Import (list) mechanism, so
- * a `DownloadedMoviesScan` pointed at a file silently no-ops: the command is
- * accepted (HTTP 201, status queued) and nothing is ever imported. That is
- * exactly how Polong (2026) downloaded but never imported.
+ * `path` must be the FILE path (D:\Eziarr\Title (Year).ext), NOT the drop
+ * folder. Measured on Radarr 6.4.4 (2026-10-04, live production):
+ *   - file-path DownloadedMoviesScan -> imports the single file, hasFile
+ *     flips true, Move consumes it out of the drop folder.
+ *   - folder-path scan -> command "completed" in <5s but imported NOTHING
+ *     for flat files in the drop folder. Silent no-op. This is what broke
+ *     Tiada Tajuk (2133) + Keluang Man (2283) on 2026-10-03.
+ *   - POST /api/v3/manualimport -> 200 but imports nothing (dead end).
+ * Do NOT "fix" this back to a folder path without re-measuring on the live
+ * Radarr; commit 9bff467 did exactly that from a wrong assumption.
  *
  * On scoping — measured, not assumed:
  *   Radarr silently DROPS `movieId` from DownloadedMoviesScan (it does not
  *   appear in the echoed command body), and Sonarr drops `seriesId` and
  *   `episodeIds` the same way. So the scan is unscoped: it processes every
- *   file sitting in the drop folder. `movieId` is still sent because it is
+ *   file matching its parsed filename. `movieId` is still sent because it is
  *   harmless and future *Arr versions may honour it, but what actually
  *   prevents a wrong-item import is that each file is matched by its PARSED
  *   FILENAME ("Polong (2026).mp4" -> Polong), plus the hasFile verification
  *   below, which fails the job rather than reporting a hollow success.
  */
-export const buildScanCommand = ({ service, serviceId }) => {
-	// Derived here, never passed in: no caller can hand us a file path by
-	// mistake (that is exactly how the silent no-op was introduced).
-	const arrPath = translatePath(DOWNLOAD_DIR);
+export const buildScanCommand = ({ service, serviceId, filePath }) => {
+	if (!filePath) throw new Error("buildScanCommand requires filePath");
+	const arrPath = translatePath(filePath);
 	const payload = {
 		name: scanCommandName(service),
 		path: arrPath,
@@ -47,8 +50,13 @@ export const buildScanCommand = ({ service, serviceId }) => {
 	return payload;
 };
 
-export const triggerArrImport = async ({ config, service, serviceId }) => {
-	const payload = buildScanCommand({ service, serviceId });
+export const triggerArrImport = async ({
+	config,
+	service,
+	serviceId,
+	filePath,
+}) => {
+	const payload = buildScanCommand({ service, serviceId, filePath });
 
 	await axios.post(
 		`${config.url}/api/${API_VER(service)}/command`,

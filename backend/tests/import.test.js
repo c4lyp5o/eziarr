@@ -18,7 +18,6 @@ import {
 } from "../import.js";
 import { translatePath } from "../utils.js";
 import { setSetting } from "../db.js";
-import { DOWNLOAD_DIR } from "../config.js";
 
 vi.mock("axios", () => {
 	return {
@@ -31,34 +30,56 @@ vi.mock("axios", () => {
 	};
 });
 
+// The production drop folder is /app/downloads, mapped to the Windows share
+// D:\Eziarr. Measured on Radarr 6.4.4 (2026-10-04): a FILE-path scan imports
+// the single file; a folder-path scan completes but silently imports nothing.
+const CONTAINER_FILE = "/app/downloads/Tiada Tajuk (2019).mp4";
+
 describe("Import: scan command shape", () => {
 	beforeEach(() => setSetting("pathMapRemote", ""));
 
-	// The production drop folder is the container path below, mapped to the
-	// Windows share. A bare FILE path is only understood by Manual Import, so a
-	// scan pointed at one is accepted (HTTP 201) and then silently does nothing.
-	const CONTAINER_DROP_FOLDER = "/app/downloads";
-
-	it("Should target the shared drop folder, never the file path", () => {
+	it("Should target the file path, translated to the remote share", () => {
 		setSetting("pathMapRemote", "D:\\Eziarr");
 
-		expect(translatePath(CONTAINER_DROP_FOLDER)).toBe("D:\\Eziarr");
+		expect(translatePath(CONTAINER_FILE)).toBe(
+			"D:\\Eziarr\\Tiada Tajuk (2019).mp4",
+		);
 
-		const payload = buildScanCommand({ service: "radarr", serviceId: 2099 });
-		expect(payload.path).not.toMatch(/\.(mp4|mkv)$/i);
-		expect(payload.path).toBe(translatePath(DOWNLOAD_DIR));
+		const payload = buildScanCommand({
+			service: "radarr",
+			serviceId: 2099,
+			filePath: CONTAINER_FILE,
+		});
+		expect(payload.path).toBe("D:\\Eziarr\\Tiada Tajuk (2019).mp4");
 	});
 
-	it("Should keep the container path when no path mapping is set", () => {
-		const payload = buildScanCommand({ service: "radarr", serviceId: 2099 });
-		expect(payload.path).toBe(DOWNLOAD_DIR);
+	// Regression guard for the 2026-10-03 outage (Tiada Tajuk + Keluang Man):
+	// commit 9bff467 switched the scan to the folder path on a wrong assumption.
+	// Folder scans silently no-op on Radarr 6.4.4 — keep the scan on the FILE.
+	it("Should require a file path and reject a folder scan payload", () => {
+		expect(() =>
+			buildScanCommand({ service: "radarr", serviceId: 2099 }),
+		).toThrow(/filePath/);
+	});
+
+	it("Should keep the container file path when no path mapping is set", () => {
+		const payload = buildScanCommand({
+			service: "radarr",
+			serviceId: 2099,
+			filePath: CONTAINER_FILE,
+		});
+		expect(payload.path).toBe(CONTAINER_FILE);
 	});
 
 	// movieId is sent, but Radarr silently drops it (measured: it never appears
 	// in the echoed command body), so the scan itself is unscoped. What pins the
 	// result to the right title is filename parsing plus verifyArrImport.
 	it("Should send movieId for the movie that was just downloaded", () => {
-		const payload = buildScanCommand({ service: "radarr", serviceId: 2099 });
+		const payload = buildScanCommand({
+			service: "radarr",
+			serviceId: 2099,
+			filePath: CONTAINER_FILE,
+		});
 		expect(payload.name).toBe("DownloadedMoviesScan");
 		expect(payload.importMode).toBe("Move");
 		expect(payload.movieId).toBe(2099);
@@ -66,34 +87,46 @@ describe("Import: scan command shape", () => {
 
 	it("Should omit movieId when the id is missing or not numeric", () => {
 		for (const serviceId of [undefined, null, "abc", -5, 0]) {
-			const payload = buildScanCommand({ service: "radarr", serviceId });
+			const payload = buildScanCommand({
+				service: "radarr",
+				serviceId,
+				filePath: CONTAINER_FILE,
+			});
 			expect(payload.movieId).toBeUndefined();
 		}
 	});
 
 	it("Should not send a movieId to Sonarr", () => {
-		const payload = buildScanCommand({ service: "sonarr", serviceId: 42 });
+		const payload = buildScanCommand({
+			service: "sonarr",
+			serviceId: 42,
+			filePath: CONTAINER_FILE,
+		});
 		expect(payload.name).toBe("DownloadedEpisodesScan");
 		expect(payload.movieId).toBeUndefined();
 	});
 
 	it("Should use the Lidarr v1 endpoint command name", () => {
-		expect(buildScanCommand({ service: "lidarr", serviceId: 7 }).name).toBe(
-			"DownloadedAlbumsScan",
-		);
+		expect(
+			buildScanCommand({
+				service: "lidarr",
+				serviceId: 7,
+				filePath: CONTAINER_FILE,
+			}).name,
+		).toBe("DownloadedAlbumsScan");
 	});
 });
 
-describe("Import: triggerArrImport posts the translated folder", () => {
+describe("Import: triggerArrImport posts the translated file path", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		setSetting("pathMapRemote", "");
+		setSetting("pathMapRemote", "D:\\Eziarr");
 		axios.post.mockResolvedValue({ data: { status: "queued" } });
 	});
 
 	afterEach(() => vi.resetAllMocks());
 
-	it("Should POST the drop folder with movieId", async () => {
+	it("Should POST the downloaded file path with movieId", async () => {
 		const config = {
 			url: "https://radarr.example",
 			apiKey: "secret",
@@ -102,6 +135,7 @@ describe("Import: triggerArrImport posts the translated folder", () => {
 			config,
 			service: "radarr",
 			serviceId: 2099,
+			filePath: CONTAINER_FILE,
 		});
 
 		expect(axios.post).toHaveBeenCalledTimes(1);
@@ -112,7 +146,7 @@ describe("Import: triggerArrImport posts the translated folder", () => {
 			importMode: "Move",
 			movieId: 2099,
 		});
-		expect(body.path).not.toMatch(/\.mp4$/);
+		expect(body.path).toBe("D:\\Eziarr\\Tiada Tajuk (2019).mp4");
 		expect(opts.headers["X-Api-Key"]).toBe("secret");
 	});
 });
