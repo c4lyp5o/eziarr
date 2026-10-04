@@ -411,9 +411,8 @@ const processDownloadQueue = async () => {
 			100,
 		);
 
-		// Scan the SHARED drop folder. Pointing the scan at the file path
-		// itself looks right but silently no-ops: *Arr only accepts a bare file
-		// path via the Manual Import mechanism, never as a scan target.
+		// Scan targets the FILE path (measured on Radarr 6.4.4: a folder-path
+		// scan completes but silently imports nothing for flat drop-folder files).
 		const SERVICES = getAllServices();
 		const config = SERVICES[payload.service];
 
@@ -426,6 +425,7 @@ const processDownloadQueue = async () => {
 			config,
 			service: payload.service,
 			serviceId: payload.serviceId,
+			filePath: result.filePath,
 		});
 
 		if (isImportableService(payload.service)) {
