@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-10-22
+
+### Fixed
+- **Server crash-loop with `EZIARR_PASSWORD`:** PM2 loads the server with
+  `require()`, and the top-level `await` added for first-boot setup made
+  Bun refuse it whenever setup really had to wait (hashing the env
+  password). Fresh installs using `EZIARR_PASSWORD` never came up.
+  Installs with a password already set, or using the setup code, were not
+  affected.
+- **The worker still wrote `general.log` under PM2:** it was told apart by
+  its entry file, which under PM2 is PM2's wrapper. `ecosystem.config.js`
+  now sets `EZIARR_ROLE=worker`, so it writes `worker.log` as intended.
+
 ## [1.4.0] - 2026-10-22
 
 > **Upgrading:** behind a reverse proxy, set `TRUST_PROXY=1` (see Security).

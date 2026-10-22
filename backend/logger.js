@@ -6,7 +6,12 @@ import { LOG_DIR } from "./config";
 // so two processes rotating one file would leave each writing into the other's
 // renamed copy. The worker therefore keeps its own general log; the Logs tab
 // merges general.log and worker.log by timestamp (see logtail.js).
-const isWorker = path.basename(Bun.main ?? "") === "worker.js";
+// Under PM2 every app's entry point is PM2's wrapper script, so the role
+// comes from EZIARR_ROLE (set in ecosystem.config.js); Bun.main covers
+// running worker.js directly (`bun run dev`).
+const isWorker =
+	process.env.EZIARR_ROLE === "worker" ||
+	path.basename(Bun.main ?? "") === "worker.js";
 
 const fileOutput = (name) => ({
 	enabled: true,
