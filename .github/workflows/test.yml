@@ -65,3 +65,8 @@ jobs:
 
       - name: 🏗️ Build
         run: bun run build
+
+      # The built UI against tests/mock-api.js in the runner's Chrome:
+      # sign-in, the wall, grouping, filters, selection, the live stream.
+      - name: 🌐 Browser smoke test
+        run: bun run smoke

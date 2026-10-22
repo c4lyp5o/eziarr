@@ -8,6 +8,7 @@
 		"build": "vite build",
 		"lint": "biome lint",
 		"check": "biome check",
+		"smoke": "bun test tests/smoke.test.js",
 		"preview": "vite preview"
 	},
 	"dependencies": {
