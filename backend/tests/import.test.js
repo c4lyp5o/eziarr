@@ -16,6 +16,7 @@ import {
 	verifyArrImport,
 	isImportableService,
 	getMovieFileId,
+	buildImportFilename,
 } from "../import.js";
 import { translatePath } from "../utils.js";
 import { setSetting } from "../db.js";
@@ -323,3 +324,44 @@ describe("Import: scope guard", () => {
 		expect(isImportableService("lidarr")).toBe(false);
 	});
 });
+
+describe("Import: the name a download is saved under", () => {
+	const config = { url: "http://radarr.lan", apiKey: "k" };
+	beforeEach(() => vi.clearAllMocks());
+
+	it("Should name a movie 'Title (Year)' and keep the source extension", async () => {
+		axios.get.mockResolvedValueOnce({ data: { title: "Polong", year: 2026 } });
+		const name = await buildImportFilename({
+			config,
+			service: "radarr",
+			sid: 2099,
+			filename: "polong.2026.1080p.WEB.MKV",
+		});
+		expect(name).toBe("Polong (2026).mkv");
+	});
+
+	it("Should name an episode 'Series SxxEyy' and strip path characters", async () => {
+		axios.get
+			.mockResolvedValueOnce({ data: { seriesId: 7, seasonNumber: 2, episodeNumber: 7 } })
+			.mockResolvedValueOnce({ data: { title: "Severance: Outie" } });
+		const name = await buildImportFilename({
+			config,
+			service: "sonarr",
+			sid: 88411,
+			filename: "x.mp4",
+		});
+		expect(name).toBe("Severance Outie S02E07.mp4");
+	});
+
+	it("Should fall back to the source filename when the *Arr can't be asked", async () => {
+		axios.get.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+		const name = await buildImportFilename({
+			config,
+			service: "radarr",
+			sid: 1,
+			filename: "Original Name.mp4",
+		});
+		expect(name).toBe("Original Name.mp4");
+	});
+});
+

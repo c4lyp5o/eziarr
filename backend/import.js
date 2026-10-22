@@ -171,3 +171,70 @@ export const verifyArrImport = async ({
 			: `Scan imported nothing for movie ${serviceId} within ${Math.round(timeoutMs / 1000)}s`,
 	};
 };
+
+/**
+ * The name a download is saved under, so the *Arr can parse it: "Title (Year)"
+ * for a movie, "Series SxxEyy" for an episode, "Artist - Album" for an album,
+ * keeping the source file's extension. Falls back to the source filename when
+ * the *Arr can't be asked.
+ */
+export const buildImportFilename = async ({ config, service, sid, filename }) => {
+	let perfectName = filename;
+	let ext = "";
+
+	try {
+		const lastDotIndex = filename.lastIndexOf(".");
+
+		const defaultExt = service === "lidarr" ? ".mp3" : ".mp4";
+
+		if (lastDotIndex === -1) {
+			logger.warn(
+				`[SERVER] No extension found in filename. Using ${defaultExt} as default. Original: ${filename}`,
+			);
+			ext = defaultExt;
+		} else {
+			ext = filename.substring(lastDotIndex).toLowerCase();
+
+			if (ext.length > 10 || !ext.match(/^\.[a-z0-9]+$/)) {
+				logger.warn(
+					`[SERVER] Invalid extension extracted (${ext}). Falling back to ${defaultExt}.`,
+				);
+				ext = defaultExt;
+			}
+		}
+
+		if (service === "radarr") {
+			const res = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
+				headers: { "X-Api-Key": config.apiKey },
+				timeout: 10000,
+			});
+			perfectName = `${res.data.title} (${res.data.year})${ext}`;
+		} else if (service === "sonarr") {
+			const epRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
+				headers: { "X-Api-Key": config.apiKey },
+				timeout: 10000,
+			});
+			const sRes = await axios.get(
+				`${config.url}/api/v3/series/${epRes.data.seriesId}`,
+				{ headers: { "X-Api-Key": config.apiKey }, timeout: 10000 },
+			);
+			const sn = epRes.data.seasonNumber.toString().padStart(2, "0");
+			const en = epRes.data.episodeNumber.toString().padStart(2, "0");
+			perfectName = `${sRes.data.title} S${sn}E${en}${ext}`;
+		} else if (service === "lidarr") {
+			const alRes = await axios.get(`${config.url}/api/v1/album/${sid}`, {
+				headers: { "X-Api-Key": config.apiKey },
+				timeout: 10000,
+			});
+			perfectName = `${alRes.data.artist.artistName} - ${alRes.data.title}${ext}`;
+		}
+
+		perfectName = perfectName.replace(/[/\\?%*:|"<>]/g, "");
+	} catch (err) {
+		logger.warn(
+			`[SERVER] Failed to fetch exact title for renaming, falling back to original: ${err.message}`,
+		);
+	}
+
+	return perfectName;
+};
