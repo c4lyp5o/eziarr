@@ -27,7 +27,8 @@ Use Bun, not npm/node, for everything. There is no Vitest package: `bun test` pr
 8. **Never clean up from a partial list.** Sync removes titles an *Arr no longer lists only when that *Arr's whole list (every page) arrived.
 9. **One process per log file.** `deadslog` tracks size within a process; the server writes `general.log`, the worker `worker.log`.
 10. **Docker installs use `--frozen-lockfile`; the backend also uses `--ignore-scripts`.** Bun 1.4 otherwise deletes `bufferutil` on Alpine and the server crashes on boot. Smoke-test a built image after changing the Dockerfile or the Bun version.
-11. **Frontend colours come from tokens** (`bg-surface`, `text-ink`, `text-muted`, `bg-accent`, … in `src/index.css`), never raw Tailwind palette classes, so light and dark both work. Motion animates transform and opacity only.
+11. **No top-level `await` in `backend/index.js` or `worker.js`.** PM2 loads them with `require()`, which Bun refuses when a top-level await really suspends; the server crash-looped in 1.4.0. `tests/pm2-load.test.js` loads `index.js` the PM2 way. Likewise, don't detect the process from `Bun.main` (under PM2 it's PM2's wrapper); use `EZIARR_ROLE` from `ecosystem.config.js`.
+12. **Frontend colours come from tokens** (`bg-surface`, `text-ink`, `text-muted`, `bg-accent`, … in `src/index.css`), never raw Tailwind palette classes, so light and dark both work. Motion animates transform and opacity only.
 
 ## Conventions
 

@@ -159,17 +159,21 @@ if (process.env.NODE_ENV === "development") {
 	);
 }
 
-try {
-	// First boot: an env password completes setup, otherwise this prints the
-	// one-time setup code on stdout (see setup.js).
-	await prepareSetup();
-	app.listen(process.env.PORT || 5000);
-	process.env.NODE_ENV === "development" &&
-		logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
-	logger.info(
-		`[SERVER] Eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
-	);
-} catch (err) {
-	logger.error("[SERVER] Failed to start server: ", err);
-	process.exit(1);
-}
+// First boot: an env password completes setup, otherwise this prints the
+// one-time setup code on stdout (see setup.js); then start listening.
+// No top-level await here: PM2 loads this file with require(), and Bun
+// refuses to require() a module whose top-level await really suspends
+// (hashing EZIARR_PASSWORD does), which crash-looped the server.
+prepareSetup()
+	.then(() => {
+		app.listen(process.env.PORT || 5000);
+		process.env.NODE_ENV === "development" &&
+			logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
+		logger.info(
+			`[SERVER] Eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
+		);
+	})
+	.catch((err) => {
+		logger.error("[SERVER] Failed to start server: ", err);
+		process.exit(1);
+	});
