@@ -10,6 +10,11 @@ import { Button } from "./Buttons";
 import { ListItem } from "./ListItem";
 import { ui } from "../ui/styles";
 
+// The server's match score (backend/match.js): about 1 means the title is in
+// the file name; below WEAK the name barely resembles it.
+const STRONG = 0.9;
+const WEAK = 0.5;
+
 const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 	const { toast } = useToast();
 
@@ -27,6 +32,9 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 	const [availableChannels, setAvailableChannels] = useState([]);
 	const [selectedChannel, setSelectedChannel] = useState("");
 	const [telegramSearchResults, setTelegramSearchResults] = useState([]);
+	// Filled in with the title; editable, because channels name files their
+	// own way and only a person knows to try "5cm" for "5 cm".
+	const [searchText, setSearchText] = useState(query ?? "");
 	const [grabbingId, setGrabbingId] = useState(null);
 
 	const [isLoading, setIsLoading] = useState(false);
@@ -108,7 +116,12 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 			setTelegramSearchResults([]);
 			const { files } = await apiCall("/api/v1/telegram/search", {
 				method: "POST",
-				body: { channel: selectedChannel, query },
+				body: {
+					channel: selectedChannel,
+					query: searchText.trim() || query,
+					service,
+					serviceId,
+				},
 			});
 			if (files.length === 0) {
 				toast.warning("No results found in Telegram");
@@ -265,9 +278,30 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 				// --- CONNECTED: SEARCH UI ---
 				<>
 					<Panel className="p-4 mb-6">
+						<label
+							htmlFor="telegram-query"
+							className="block text-xs font-semibold text-faint mb-2"
+						>
+							Search for
+						</label>
+						<input
+							id="telegram-query"
+							value={searchText}
+							onChange={(e) => setSearchText(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") handleSearchFromTelegram();
+							}}
+							className={`${ui.input} mb-1`}
+							placeholder={query}
+							maxLength={200}
+						/>
+						<p className="text-xs text-faint mb-4">
+							Also tries other spellings (“5 cm” and “5cm”) and the title's
+							alternate names from your *Arr.
+						</p>
 						{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
 						<label className="block text-xs font-semibold text-faint mb-2">
-							Target Channel
+							Channel
 						</label>
 						<div className="flex gap-2 items-center">
 							<div className="relative flex-1">
@@ -329,8 +363,13 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 						)}
 
 						<div className="space-y-2">
-							{telegramSearchResults.map((msg) => (
-								<ListItem key={msg.id}>
+							{telegramSearchResults.map((msg, i) => (
+								<ListItem
+									key={msg.id}
+									className={
+										msg.score != null && msg.score < WEAK ? "opacity-60" : ""
+									}
+								>
 									<div
 										className="flex items-center gap-4 overflow-hidden"
 										title={msg.filename}
@@ -345,7 +384,13 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 											<h4 className="text-sm font-medium text-ink truncate pr-4">
 												{msg.filename}
 											</h4>
-											<div className="flex gap-3 text-xs text-muted mt-1">
+											<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted mt-1">
+												{i === 0 && msg.score >= STRONG && (
+													<span className={ui.pillPositive}>Best match</span>
+												)}
+												{msg.score != null && msg.score < WEAK && (
+													<span className={ui.pillNeutral}>Weak match</span>
+												)}
 												<span>{formatSize(msg.size)}</span>
 												<span>•</span>
 												<span>
