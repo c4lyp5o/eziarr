@@ -34,7 +34,6 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 	beforeEach(() => {
 		resetRateLimitBuckets();
 		setSetting("isFirstTime", "true");
-		setSetting("username", "");
 		setSetting("password", "");
 	});
 
@@ -69,13 +68,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/login - Should fail with wrong credentials", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("correctpassword"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username: "admin", password: "wrongpassword" }),
+			body: JSON.stringify({ password: "wrongpassword" }),
 		});
 
 		const res = await app.handle(req);
@@ -87,14 +85,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/login - Should succeed and set HttpOnly Cookies", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("correctpassword"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				username: "admin",
 				password: "correctpassword",
 				rememberMe: true,
 			}),
@@ -113,13 +109,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("GET /api/v1/me - Should decode cookie and return admin status", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		const loginReq = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username: "admin", password: "testpass" }),
+			body: JSON.stringify({ password: "testpass" }),
 		});
 		const loginRes = await app.handle(loginReq);
 		const rawSetCookie = loginRes.headers.get("set-cookie") || "";
@@ -140,13 +135,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/refresh - Should issue a new access token from refresh cookie", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		const loginReq = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username: "admin", password: "testpass" }),
+			body: JSON.stringify({ password: "testpass" }),
 		});
 		const loginRes = await app.handle(loginReq);
 		const rawSetCookie = loginRes.headers.get("set-cookie") || "";
@@ -195,13 +189,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/login - Should issue non-secure cookies over plain http", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username: "admin", password: "testpass" }),
+			body: JSON.stringify({ password: "testpass" }),
 		});
 		const res = await app.handle(req);
 		const cookies = res.headers.get("set-cookie") || "";
@@ -213,7 +206,6 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/login - Should issue secure cookies when COOKIE_SECURE=true", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		const oldOverride = process.env.COOKIE_SECURE;
@@ -223,7 +215,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 			const req = new Request("http://localhost/api/v1/login", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ username: "admin", password: "testpass" }),
+				body: JSON.stringify({ password: "testpass" }),
 			});
 			const res = await app.handle(req);
 			const cookies = res.headers.get("set-cookie") || "";
@@ -239,7 +231,6 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 	it("POST /api/v1/login - Should rate limit after 10 attempts per minute", async () => {
 		resetRateLimitBuckets();
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		let lastStatus = 0;
@@ -247,7 +238,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 			const req = new Request("http://localhost/api/v1/login", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ username: "admin", password: "wrongpass" }),
+				body: JSON.stringify({ password: "wrongpass" }),
 			});
 			const res = await app.handle(req);
 			lastStatus = res.status;

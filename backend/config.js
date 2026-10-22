@@ -1,7 +1,6 @@
 import path from "node:path";
 
 export const DEFAULT_SETTINGS = {
-	username: "",
 	password: "",
 	syncEnabled: true, // Enable or disable the worker sync
 	hunterEnabled: true, // Enable or disable the Prowlarr hunter

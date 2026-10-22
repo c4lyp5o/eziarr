@@ -22,19 +22,6 @@ export default function ConfigTab({ settings, setSettings, initialSettings, hand
 						<Lock size={16} /> Credentials
 					</h3>
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-surface p-4 rounded-2xl">
-						{/* <div>
-							<label className="block text-xs text-muted">
-								Username
-							</label>
-							<input
-								type="text"
-								name="username"
-								value={settings.username || ""}
-								onChange={handleChange}
-								className={`${ui.input} mt-1`}
-								placeholder="admin"
-							/>
-						</div> */}
 						<div>
 							{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
 							<label className="block text-xs text-muted">

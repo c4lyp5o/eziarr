@@ -151,15 +151,6 @@ if (process.env.NODE_ENV === "development") {
 						description: "Database and worker configuration",
 					},
 				],
-				// components: {
-				// 	securitySchemes: {
-				// 		ApiKeyAuth: {
-				// 			type: "apiKey",
-				// 			in: "header",
-				// 			name: "X-Api-Key",
-				// 		},
-				// 	},
-				// },
 			},
 		}),
 	);

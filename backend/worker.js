@@ -17,7 +17,6 @@ import {
 	getQueuedDownloadedPaths,
 	finalizeDownloadQueue,
 	pruneDownloadQueue,
-	// pruneDownloadHistory,
 } from "./db";
 import { downloadTelegramFile } from "./telegram";
 import { syncMissingItems } from "./sync";
@@ -370,13 +369,10 @@ const main = async () => {
 	pruneDownloadQueue();
 	markStaleTasks();
 	cleanupOldDownloads();
-	// pruneDownloadHistory();
 	await settingsWatcher();
 	// set recurring tasks
 	setInterval(settingsWatcher, 10000);
 	setInterval(cleanupOldDownloads, 60 * 60 * 1000);
-	// setInterval(pruneDownloadQueue, 60 * 60 * 1000);
-	// setInterval(pruneDownloadHistory, 60 * 60 * 1000);
 	setInterval(processDownloadQueue, 5000);
 	logger.info("[WORKER] ✅ Worker initialized.");
 };

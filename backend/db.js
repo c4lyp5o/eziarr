@@ -738,16 +738,6 @@ export const recordForceGrabHistory = (
 	});
 };
 
-export const pruneDownloadHistory = (maxAgeMs = 3 * 24 * 60 * 60 * 1000) => {
-	const cutoff = Date.now() - maxAgeMs;
-	db.query(
-		`
-    DELETE FROM download_history
-    WHERE finished_at IS NOT NULL AND finished_at < $cutoff
-  `,
-	).run({ $cutoff: cutoff });
-};
-
 export const getDownloadStats = () => {
 	return db
 		.query(`
