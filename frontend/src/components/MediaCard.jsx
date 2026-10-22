@@ -61,9 +61,11 @@ const MediaCard = ({
 	};
 
 	const heading = item.seriesTitle || item.title;
-	const subheading = item.seriesTitle
-		? [episodeCode(item.title), episodeName(item)].filter(Boolean).join(" · ")
-		: null;
+	const subheading = !item.seriesTitle
+		? null
+		: item.service === "sonarr"
+			? [episodeCode(item.title), episodeName(item)].filter(Boolean).join(" · ")
+			: item.title;
 	const upcoming = isUpcoming(item);
 
 	return (

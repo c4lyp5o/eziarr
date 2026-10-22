@@ -3,6 +3,7 @@
 //   COUNT=3000   repeat the sample titles to production scale
 //   EMPTY=1      nothing missing ("All caught up")
 //   ANON=1       signed out (shows the sign-in screen)
+//   FIRST_TIME=1 with ANON=1: the first-start setup screen
 //   DONE_AFTER=5 the first download finishes after 5 s (arrival toast);
 //                the smoke test finishes it on demand instead
 const PORT = Number(process.env.PORT || 5000);
@@ -251,12 +252,10 @@ Bun.serve({
 		}
 		switch (p) {
 			case "/api/v1/me":
-				return ANON || (await Bun.file(`${import.meta.dir}/anon`).exists())
-					? json({ error: "Unauthorized" }, 401)
-					: json({ ok: true });
+				return ANON ? json({ error: "Unauthorized" }, 401) : json({ ok: true });
 			case "/api/v1/firsttime":
 				return json({
-					isFirstTime: await Bun.file(`${import.meta.dir}/firsttime`).exists(),
+					isFirstTime: process.env.FIRST_TIME === "1",
 				});
 			case "/api/v1/login":
 				return json({ error: "Wrong password" }, 401);

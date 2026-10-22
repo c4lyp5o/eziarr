@@ -32,6 +32,7 @@ export const useLiveMissing = (enabled, { onUpdate } = {}) => {
 		let stopped = false;
 
 		const merge = (patch) => {
+			setLive(true);
 			mutate((prev) => ({ success: true, ...prev, ...patch }), {
 				revalidate: false,
 			});
@@ -40,7 +41,9 @@ export const useLiveMissing = (enabled, { onUpdate } = {}) => {
 
 		const open = () => {
 			source = new EventSource(STREAM);
-			source.onopen = () => setLive(true);
+			// Live only once an event arrives, not on open: a proxy that
+			// buffers the stream would otherwise leave the wall frozen with
+			// polling switched off.
 			source.addEventListener("missing", (e) =>
 				merge({ missing: JSON.parse(e.data) }),
 			);
