@@ -1,4 +1,4 @@
-import axios from "axios";
+import { arr } from "./arr";
 import { getAllServices, applyMissingSync, upsertTask, removeTask } from "./db";
 import { generalLogger as logger } from "./logger";
 import { getPosterUrl } from "./utils";
@@ -11,7 +11,7 @@ const MAX_PAGES = 200;
 // Where each *Arr keeps its missing list, and how one record becomes a row.
 const SOURCES = {
 	radarr: {
-		path: "/api/v3/wanted/missing",
+		path: "/wanted/missing",
 		params: { sortKey: "releaseDate", sortDir: "desc" },
 		toRow: (m) => ({
 			id: `radarr-${m.id}`,
@@ -25,7 +25,7 @@ const SOURCES = {
 		}),
 	},
 	sonarr: {
-		path: "/api/v3/wanted/missing",
+		path: "/wanted/missing",
 		params: { sortKey: "airDateUtc", sortDir: "desc", includeSeries: true },
 		toRow: (ep) => ({
 			id: `sonarr-${ep.id}`,
@@ -40,7 +40,7 @@ const SOURCES = {
 		}),
 	},
 	lidarr: {
-		path: "/api/v1/wanted/missing",
+		path: "/wanted/missing",
 		params: { sortKey: "releaseDate", sortDir: "desc" },
 		toRow: (album) => ({
 			id: `lidarr-${album.id}`,
@@ -63,10 +63,8 @@ export const fetchAllMissing = async (service, conf) => {
 	const { path, params, toRow } = SOURCES[service];
 	const rows = [];
 	for (let page = 1; page <= MAX_PAGES; page++) {
-		const res = await axios.get(`${conf.url}${path}`, {
+		const res = await arr(conf, service).get(path, {
 			params: { ...params, page, pageSize: PAGE_SIZE },
-			headers: { "X-Api-Key": conf.apiKey },
-			timeout: 30000,
 		});
 		const records = res.data?.records ?? [];
 		rows.push(...records.map(toRow));

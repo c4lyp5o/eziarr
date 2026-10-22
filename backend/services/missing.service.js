@@ -1,4 +1,4 @@
-import axios from "axios";
+import { arr } from "../arr";
 import {
 	getMissingMedia,
 	unmonitorMissingMedia,
@@ -72,32 +72,12 @@ export const MissingService = {
 
 		const sid = coerceNumericId(id, "id");
 
-		let endpoint = "";
-		let payload = {};
-		let apiKey = "";
-		let baseUrl = "";
-
-		if (service === "radarr") {
-			baseUrl = SERVICES.radarr.url;
-			apiKey = SERVICES.radarr.apiKey;
-			endpoint = "/api/v3/command";
-			payload = { name: "MoviesSearch", movieIds: [sid] };
-		} else if (service === "sonarr") {
-			baseUrl = SERVICES.sonarr.url;
-			apiKey = SERVICES.sonarr.apiKey;
-			endpoint = "/api/v3/command";
-			payload = { name: "EpisodeSearch", episodeIds: [sid] };
-		} else if (service === "lidarr") {
-			baseUrl = SERVICES.lidarr.url;
-			apiKey = SERVICES.lidarr.apiKey;
-			endpoint = "/api/v1/command";
-			payload = { name: "AlbumSearch", albumIds: [sid] };
-		}
-
-		await axios.post(`${baseUrl}${endpoint}`, payload, {
-			headers: { "X-Api-Key": apiKey },
-			timeout: 30000,
-		});
+		const SEARCH_COMMAND = {
+			radarr: { name: "MoviesSearch", movieIds: [sid] },
+			sonarr: { name: "EpisodeSearch", episodeIds: [sid] },
+			lidarr: { name: "AlbumSearch", albumIds: [sid] },
+		};
+		await arr(config, service).post("/command", SEARCH_COMMAND[service]);
 
 		return {
 			success: true,
@@ -118,14 +98,12 @@ export const MissingService = {
 			type === "movie" ? [2000] : type === "episode" ? [5000] : [3000];
 
 		{
-			const res = await axios.get(`${SERVICES.prowlarr.url}/api/v1/search`, {
+			const res = await arr(SERVICES.prowlarr, "prowlarr").get("/search", {
 				params: {
 					query,
 					categories: categories.join(","),
 					type: "search",
 				},
-				headers: { "X-Api-Key": SERVICES.prowlarr.apiKey },
-				timeout: 30000,
 			});
 
 			const torrents = res.data
@@ -159,10 +137,7 @@ export const MissingService = {
 	// Returns {id, created} or null when there is no writable path.
 	_ensureAnyLanguageProfile: async (config) => {
 		try {
-			const res = await axios.get(`${config.url}/api/v3/qualityprofile`, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
-			});
+			const res = await arr(config, "radarr").get("/qualityprofile");
 			const profiles = res.data;
 			const existing = profiles.find((p) => p.language?.id === -1);
 			if (existing) return { id: existing.id, created: false };
@@ -175,11 +150,7 @@ export const MissingService = {
 				name: "eziarr-any-language",
 				language: { id: -1, name: "Any" },
 			};
-			const created = await axios.post(
-				`${config.url}/api/v3/qualityprofile`,
-				clone,
-				{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
-			);
+			const created = await arr(config, "radarr").post("/qualityprofile", clone);
 			// Verify it actually persisted — a 2xx echo that didn't write is the
 			// exact bug we fixed in PR #40, so never trust the status code alone.
 			if (!created.data?.id) return null;
@@ -206,20 +177,11 @@ export const MissingService = {
 		let originalLanguage = null;
 		try {
 			if (service === "radarr") {
-				const m = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
-					headers: { "X-Api-Key": config.apiKey },
-					timeout: 30000,
-				});
+				const m = await arr(config, service).get(`/movie/${sid}`);
 				originalLanguage = m.data?.originalLanguage;
 			} else if (service === "sonarr") {
-				const ep = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
-					headers: { "X-Api-Key": config.apiKey },
-					timeout: 30000,
-				});
-				const s = await axios.get(
-					`${config.url}/api/v3/series/${ep.data.seriesId}`,
-					{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
-				);
+				const ep = await arr(config, service).get(`/episode/${sid}`);
+				const s = await arr(config, service).get(`/series/${ep.data.seriesId}`);
 				originalLanguage = s.data?.originalLanguage;
 			}
 		} catch (err) {
@@ -268,16 +230,12 @@ export const MissingService = {
 		const sid = coerceNumericId(serviceId, "serviceId");
 
 		const pushRelease = async () => {
-			return axios.post(
-				`${config.url}/api/v3/release/push`,
-				{
+			return arr(config, service).post("/release/push", {
 					title: title,
 					downloadUrl: downloadUrl,
 					protocol: "Torrent",
 					publishDate: new Date().toISOString(),
-				},
-				{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
-			);
+				});
 		};
 
 		let res = await pushRelease();
@@ -350,7 +308,7 @@ export const MissingService = {
 			let isLanguageBypass = false;
 
 			if (service === "radarr") {
-				itemEndpoint = "/api/v3/movie";
+				itemEndpoint = "/movie";
 				if (isLanguageRejection) {
 					const anyLangProfile =
 						await MissingService._ensureAnyLanguageProfile(config);
@@ -363,20 +321,14 @@ export const MissingService = {
 					}
 				}
 			} else if (service === "sonarr") {
-				const epRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
-					headers: { "X-Api-Key": config.apiKey },
-					timeout: 30000,
-				});
+				const epRes = await arr(config, service).get(`/episode/${sid}`);
 				targetId = epRes.data.seriesId;
-				itemEndpoint = "/api/v3/series";
+				itemEndpoint = "/series";
 			} else if (service === "lidarr") {
-				itemEndpoint = "/api/v1/album";
+				itemEndpoint = "/album";
 			}
 
-			const itemRes = await axios.get(
-				`${config.url}${itemEndpoint}/${targetId}`,
-				{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
-			);
+			const itemRes = await arr(config, service).get(`${itemEndpoint}/${targetId}`);
 
 			const item = itemRes.data;
 
@@ -393,10 +345,7 @@ export const MissingService = {
 			} else {
 				// Non-language rejections (profile/cutoff/size/score): keep the
 				// original "relax the quality profile" behaviour.
-				const profilesRes = await axios.get(
-					`${config.url}/api/v3/qualityprofile`,
-					{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
-				);
+				const profilesRes = await arr(config, service).get("/qualityprofile");
 				const anyProfile =
 					profilesRes.data.find((p) => p.name.toLowerCase() === "any") ||
 					profilesRes.data[0];
@@ -412,10 +361,7 @@ export const MissingService = {
 			}
 
 			if (needsUpdate) {
-				await axios.put(`${config.url}${itemEndpoint}/${item.id}`, item, {
-					headers: { "X-Api-Key": config.apiKey },
-					timeout: 30000,
-				});
+				await arr(config, service).put(`${itemEndpoint}/${item.id}`, item);
 				actionsTaken = true;
 			}
 		}
@@ -428,11 +374,7 @@ export const MissingService = {
 				`[SERVER] 🔄 [${service}] Removing blocking item from Queue...`,
 			);
 
-			const apiVer = service === "lidarr" ? "v1" : "v3";
-			const queueRes = await axios.get(`${config.url}/api/${apiVer}/queue`, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
-			});
+			const queueRes = await arr(config, service).get("/queue");
 
 			const idKey =
 				service === "radarr"
@@ -447,13 +389,7 @@ export const MissingService = {
 
 			for (const item of blockingItems) {
 				try {
-					await axios.delete(
-						`${config.url}/api/${apiVer}/queue/${item.id}?removeFromClient=true&blocklist=true`,
-						{
-							headers: { "X-Api-Key": config.apiKey },
-							timeout: 30000,
-						},
-					);
+					await arr(config, service).delete(`/queue/${item.id}?removeFromClient=true&blocklist=true`);
 					logger.info(
 						`[SERVER] 🔄 [${service}] Deleted queue item: ${item.id}`,
 					);
@@ -498,14 +434,7 @@ export const MissingService = {
 						`[SERVER] 🔄 [${service}] Restoring original settings for "${originalItem.title}"...`,
 					);
 					try {
-						await axios.put(
-							`${config.url}${itemEndpoint}/${originalItem.id}`,
-							originalItem,
-							{
-								headers: { "X-Api-Key": config.apiKey },
-								timeout: 30000,
-							},
-						);
+						await arr(config, service).put(`${itemEndpoint}/${originalItem.id}`, originalItem);
 					} catch (restoreErr) {
 						logger.error(
 							`[SERVER] Failed to restore original item settings: ${restoreErr.message}`,
@@ -517,10 +446,7 @@ export const MissingService = {
 				// force-grabs don't accumulate junk profiles on Radarr.
 				if (createdProfileId) {
 					try {
-						await axios.delete(
-							`${config.url}/api/v3/qualityprofile/${createdProfileId}`,
-							{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
-						);
+						await arr(config, service).delete(`/qualityprofile/${createdProfileId}`);
 						logger.info(
 							`[SERVER] 🧹 [${service}] Removed temp Any-language profile ${createdProfileId}`,
 						);
@@ -557,38 +483,20 @@ export const MissingService = {
 		const sid = coerceNumericId(serviceId, "serviceId");
 
 		if (service === "radarr") {
-			const getRes = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
-			});
+			const getRes = await arr(config, service).get(`/movie/${sid}`);
 			const movie = getRes.data;
 			movie.monitored = false;
-			await axios.put(`${config.url}/api/v3/movie/${sid}`, movie, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
-			});
+			await arr(config, service).put(`/movie/${sid}`, movie);
 		} else if (service === "sonarr") {
-			const getRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
-			});
+			const getRes = await arr(config, service).get(`/episode/${sid}`);
 			const episode = getRes.data;
 			episode.monitored = false;
-			await axios.put(`${config.url}/api/v3/episode/${sid}`, episode, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
-			});
+			await arr(config, service).put(`/episode/${sid}`, episode);
 		} else if (service === "lidarr") {
-			const getRes = await axios.get(`${config.url}/api/v1/album/${sid}`, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
-			});
+			const getRes = await arr(config, service).get(`/album/${sid}`);
 			const album = getRes.data;
 			album.monitored = false;
-			await axios.put(`${config.url}/api/v1/album/${sid}`, album, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 30000,
-			});
+			await arr(config, service).put(`/album/${sid}`, album);
 		}
 
 		unmonitorMissingMedia(`${service}-${sid}`);

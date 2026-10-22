@@ -5,7 +5,7 @@ import https from "node:https";
 import net from "node:net";
 import path from "node:path";
 import { setTimeout } from "node:timers/promises";
-import axios from "axios";
+import { arr } from "./arr";
 import { getSetting, getAllServices } from "./db";
 import { generalLogger as logger } from "./logger";
 import { DOWNLOAD_DIR } from "./config";
@@ -47,14 +47,9 @@ const fetchQueueUncached = async (serviceName) => {
 	const conf = SERVICES[serviceName];
 	if (!conf.url || !conf.apiKey) return [];
 
-	// Lidarr uses v1, others v3
-	const apiVer = serviceName === "lidarr" ? "v1" : "v3";
 	const idKey = QUEUE_ID_KEYS[serviceName];
 
-	const res = await axios.get(`${conf.url}/api/${apiVer}/queue`, {
-		headers: { "X-Api-Key": conf.apiKey },
-		timeout: 10000,
-	});
+	const res = await arr(conf, serviceName).get("/queue", { timeout: 10000 });
 
 	return res.data.records
 		.filter((item) => !["completed", "warning"].includes(item.status))

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import axios from "axios";
+import { arr } from "../arr";
 import { getAllSettings, getTasks } from "../db";
 import { LOG_DIR } from "../config";
 import { generalLogger as logger } from "../logger";
@@ -101,12 +102,9 @@ export const SystemService = {
 
 		const cleanUrl = url.replace(/\/$/, "");
 
-		const apiVer = service === "lidarr" || service === "prowlarr" ? "v1" : "v3";
-
-		await axios.get(`${cleanUrl}/api/${apiVer}/system/status`, {
-			headers: { "X-Api-Key": apiKey },
-			timeout: 5000,
-		});
+		await arr({ url: cleanUrl, apiKey }, service, { timeout: 5000 }).get(
+			"/system/status",
+		);
 		return { success: true, message: "Test successful" };
 	},
 

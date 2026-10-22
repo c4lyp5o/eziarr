@@ -1,9 +1,7 @@
 import fs from "node:fs";
-import axios from "axios";
+import { arr } from "./arr";
 import { translatePath } from "./utils";
 import { generalLogger as logger } from "./logger";
-
-const API_VER = (service) => (service === "lidarr" ? "v1" : "v3");
 
 const scanCommandName = (service) => {
 	if (service === "radarr") return "DownloadedMoviesScan";
@@ -58,11 +56,7 @@ export const triggerArrImport = async ({
 }) => {
 	const payload = buildScanCommand({ service, serviceId, filePath });
 
-	await axios.post(
-		`${config.url}/api/${API_VER(service)}/command`,
-		payload,
-		{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
-	);
+	await arr(config, service).post("/command", payload);
 
 	return payload;
 };
@@ -74,9 +68,6 @@ const hasFile = (item) =>
 
 export const isImportableService = (service) => service === "radarr";
 
-const movieUrl = (config, service, serviceId) =>
-	`${config.url}/api/${API_VER(service)}/movie/${Number(serviceId)}`;
-
 /**
  * Snapshot the movie's current file id BEFORE the scan, so verification can
  * tell a fresh import apart from a file the movie already had (an upgrade or
@@ -85,8 +76,7 @@ const movieUrl = (config, service, serviceId) =>
  */
 export const getMovieFileId = async ({ config, service, serviceId }) => {
 	try {
-		const res = await axios.get(movieUrl(config, service, serviceId), {
-			headers: { "X-Api-Key": config.apiKey },
+		const res = await arr(config, service).get(`/movie/${Number(serviceId)}`, {
 			timeout: 15000,
 		});
 		return res.data?.movieFile?.id ?? null;
@@ -133,8 +123,7 @@ export const verifyArrImport = async ({
 
 	do {
 		try {
-			const res = await axios.get(movieUrl(config, service, serviceId), {
-				headers: { "X-Api-Key": config.apiKey },
+			const res = await arr(config, service).get(`/movie/${Number(serviceId)}`, {
 				timeout: 15000,
 			});
 			if (landedNewFile(res.data, previousFileId)) {
@@ -204,28 +193,16 @@ export const buildImportFilename = async ({ config, service, sid, filename }) =>
 		}
 
 		if (service === "radarr") {
-			const res = await axios.get(`${config.url}/api/v3/movie/${sid}`, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 10000,
-			});
+			const res = await arr(config, service).get(`/movie/${sid}`, { timeout: 10000 });
 			perfectName = `${res.data.title} (${res.data.year})${ext}`;
 		} else if (service === "sonarr") {
-			const epRes = await axios.get(`${config.url}/api/v3/episode/${sid}`, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 10000,
-			});
-			const sRes = await axios.get(
-				`${config.url}/api/v3/series/${epRes.data.seriesId}`,
-				{ headers: { "X-Api-Key": config.apiKey }, timeout: 10000 },
-			);
+			const epRes = await arr(config, service).get(`/episode/${sid}`, { timeout: 10000 });
+			const sRes = await arr(config, service).get(`/series/${epRes.data.seriesId}`, { timeout: 10000 });
 			const sn = epRes.data.seasonNumber.toString().padStart(2, "0");
 			const en = epRes.data.episodeNumber.toString().padStart(2, "0");
 			perfectName = `${sRes.data.title} S${sn}E${en}${ext}`;
 		} else if (service === "lidarr") {
-			const alRes = await axios.get(`${config.url}/api/v1/album/${sid}`, {
-				headers: { "X-Api-Key": config.apiKey },
-				timeout: 10000,
-			});
+			const alRes = await arr(config, service).get(`/album/${sid}`, { timeout: 10000 });
 			perfectName = `${alRes.data.artist.artistName} - ${alRes.data.title}${ext}`;
 		}
 

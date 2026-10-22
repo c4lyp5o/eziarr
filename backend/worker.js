@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import axios from "axios";
+import { arr } from "./arr";
 import {
 	getNextItemToSearchMissingMedia,
 	markAsSearchedMissingMedia,
@@ -52,7 +52,6 @@ const runHunter = async () => {
 			`[WORKER/HUNTER] Service is not configured. Aborting.`,
 		);
 
-	let endpoint = "/api/v3/command";
 	let payload = {};
 
 	if (item.service === "radarr") {
@@ -60,7 +59,6 @@ const runHunter = async () => {
 	} else if (item.service === "sonarr") {
 		payload = { name: "EpisodeSearch", episodeIds: [item.serviceId] };
 	} else if (item.service === "lidarr") {
-		endpoint = "/api/v1/command";
 		payload = { name: "AlbumSearch", albumIds: [item.serviceId] };
 	}
 
@@ -74,10 +72,7 @@ const runHunter = async () => {
 		hunterLogger.info(
 			`[WORKER/HUNTER] 🎯 Searching [${item.service}] ${item.title}`,
 		);
-		await axios.post(`${serviceConfig.url}${endpoint}`, payload, {
-			headers: { "X-Api-Key": serviceConfig.apiKey },
-			timeout: 30000,
-		});
+		await arr(serviceConfig, item.service).post("/command", payload);
 	} catch (err) {
 		hunterLogger.error(`[WORKER/HUNTER] Failed searching ${item.title}: `, err);
 	} finally {
