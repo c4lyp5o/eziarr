@@ -202,6 +202,73 @@ describe("The wall", () => {
 		expect(await polls()).toBe(before);
 	}, 25000);
 
+	// Deep search for "Tiada Tajuk" (Radarr 2133), on a fresh page.
+	const openDeepSearch = async () => {
+		await fresh();
+		await setValue("input[type=search]", "tiada");
+		const button = `document.querySelector('[aria-label="Deep search other sources for Tiada Tajuk"]')`;
+		await browser.waitFor(button);
+		await click(button);
+		await browser.waitFor(`document.querySelector('[role="dialog"]')`);
+	};
+
+	it("shows what each indexer release is, best first", async () => {
+		await openDeepSearch();
+		await browser.waitFor(
+			`document.querySelector('[role="dialog"]')?.textContent.includes("Camera rip")`,
+		);
+		const rows = await browser.evaluate(
+			`[...document.querySelectorAll('[role="dialog"] li')].map(li => li.textContent)`,
+		);
+		// Seven results, one duplicated across two indexers.
+		expect(rows).toHaveLength(6);
+		expect(rows[0]).not.toMatch(/Camera rip|No seeders|Small for/);
+		expect(rows.at(-1)).toContain("HDCAM");
+		const dialog = rows.join(" ");
+		for (const text of [
+			"1080p",
+			"WEB-DL",
+			"Freeleech",
+			"No seeders",
+			"Small for 1080p",
+			"Usenet",
+			"MalaysiaBits, TorrentLeech",
+		])
+			expect(dialog).toContain(text);
+	}, 20000);
+
+	it("lets the Telegram search be edited and sends the title along", async () => {
+		await openDeepSearch();
+		await click(byText('[role="dialog"] [role=tab]', /Telegram/));
+		await browser.waitFor(`document.getElementById("telegram-query")`);
+		expect(
+			await browser.evaluate(`document.getElementById("telegram-query").value`),
+		).toBe("Tiada Tajuk");
+		await setValue("#telegram-query", "tiada  tajuk 2019");
+		await browser.evaluate(`(() => {
+			const s = document.querySelector('[role="dialog"] select');
+			Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(s, s.options[1].value);
+			s.dispatchEvent(new Event("change", { bubbles: true }));
+		})()`);
+		await click(byText('[role="dialog"] button', /^Search$/));
+		await browser.waitFor(
+			`document.querySelector('[role="dialog"]').textContent.includes("Weak match")`,
+		);
+		const sent = await (
+			await fetch(`http://localhost:${API_PORT}/api/mock/telegram`)
+		).json();
+		expect(sent).toMatchObject({
+			query: "tiada  tajuk 2019",
+			service: "radarr",
+			serviceId: 2133,
+		});
+		expect(
+			await browser.evaluate(
+				`document.querySelector('[role="dialog"]').textContent.includes("Best match")`,
+			),
+		).toBe(true);
+	}, 20000);
+
 	it("logged no errors", () => {
 		expect(browser.errors).toEqual([]);
 	});

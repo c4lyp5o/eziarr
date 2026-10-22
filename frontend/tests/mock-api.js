@@ -99,6 +99,7 @@ let finished = false;
 let finishNow = false;
 let finishedAt = 0;
 let polls = 0;
+let lastTelegramSearch = null;
 const queue = () => {
 	const t = (Date.now() - started) / 1000;
 	if ((finishNow || (DONE_AFTER && t > DONE_AFTER)) && !finished) {
@@ -237,6 +238,7 @@ Bun.serve({
 		// Test hooks: how often the list was polled, and state switches:
 		// POST /api/mock/state {"anon":true} or {"empty":true}.
 		if (p === "/api/mock/polls") return json({ polls });
+		if (p === "/api/mock/telegram") return json(lastTelegramSearch);
 		if (p === "/api/mock/state" && req.method === "POST") {
 			const body = await req.json();
 			if ("anon" in body) ANON = Boolean(body.anon);
@@ -338,36 +340,88 @@ Bun.serve({
 				);
 				return json({ success: true });
 			}
-			case "/api/v1/missing/deepsearch":
+			case "/api/v1/missing/deepsearch": {
+				const ago = (h) => new Date(Date.now() - h * 3.6e6).toISOString();
+				const t = (o) => ({
+					leechers: 2,
+					grabs: 40,
+					protocol: "torrent",
+					freeleech: false,
+					infoUrl: null,
+					downloadUrl: "x",
+					...o,
+				});
 				return json({
 					success: true,
 					torrents: [
-						{
+						t({
+							guid: "cam",
+							title: "Tiada.Tajuk.2019.HDCAM.x264-NOGRP",
+							size: 912261120,
+							seeders: 310,
+							indexer: "1337x",
+							publishDate: ago(30),
+							grabs: 2400,
+						}),
+						t({
 							guid: "a",
 							title: "Tiada.Tajuk.2019.1080p.WEB-DL.DDP5.1.H.264-MALAY",
-							size: 2147483648,
+							size: 4294967296,
 							seeders: 48,
+							leechers: 5,
 							indexer: "MalaysiaBits",
-							downloadUrl: "x",
-						},
-						{
+							publishDate: ago(52),
+							grabs: 310,
+							freeleech: true,
+							infoUrl: "https://tracker.example/details/1",
+						}),
+						t({
+							guid: "a2",
+							title: "Tiada Tajuk 2019 1080p WEB-DL DDP5.1 H.264-MALAY",
+							size: 4294967296,
+							seeders: 21,
+							indexer: "TorrentLeech",
+							publishDate: ago(50),
+						}),
+						t({
 							guid: "b",
 							title: "Tiada.Tajuk.2019.720p.WEBRip.x264-HMM",
 							size: 1073741824,
 							seeders: 7,
 							indexer: "1337x",
-							downloadUrl: "y",
-						},
-						{
+							publishDate: ago(400),
+						}),
+						t({
 							guid: "c",
-							title: "Tiada.Tajuk.2019.2160p.NF.WEB-DL.HDR",
+							title: "Tiada.Tajuk.2019.2160p.NF.WEB-DL.DV.HDR.Atmos.H.265",
 							size: 9663676416,
 							seeders: 0,
+							leechers: 0,
 							indexer: "TorrentLeech",
-							downloadUrl: "z",
-						},
+							publishDate: ago(900),
+						}),
+						t({
+							guid: "d",
+							title: "Tiada.Tajuk.2019.1080p.WEB.x265",
+							size: 314572800,
+							seeders: 95,
+							indexer: "1337x",
+							publishDate: ago(20),
+						}),
+						t({
+							guid: "u",
+							title: "Tiada.Tajuk.2019.1080p.BluRay.x264-NZB",
+							size: 8589934592,
+							seeders: null,
+							leechers: null,
+							grabs: 12,
+							protocol: "usenet",
+							indexer: "NZBgeek",
+							publishDate: ago(2000),
+						}),
 					],
 				});
+			}
 			case "/api/v1/missing/forcegrab":
 				return json({ success: true, message: "Grabbed successfully" });
 			case "/api/v1/settings":
@@ -480,7 +534,10 @@ Bun.serve({
 						{ id: -100456, title: "Drama Bersiri" },
 					],
 				});
-			case "/api/v1/telegram/search":
+			case "/api/v1/telegram/search": {
+				// Echoes the query so the smoke test can see what was sent.
+				const sent = await req.json();
+				lastTelegramSearch = sent;
 				return json({
 					files: [
 						{
@@ -501,8 +558,18 @@ Bun.serve({
 							date: 1711500000,
 							messageText: "Tiada Tajuk 720p",
 						},
-					],
+						{
+							id: 640,
+							messageId: 640,
+							channel: "-100123",
+							filename: "Tajuk Lain (2015).mkv",
+							size: 981116006,
+							date: 1711600000,
+							messageText: "",
+						},
+					].map((f, i) => ({ ...f, score: [1.15, 0.95, 0.2][i] })),
 				});
+			}
 			case "/api/v1/ia/search":
 				return json({
 					success: true,

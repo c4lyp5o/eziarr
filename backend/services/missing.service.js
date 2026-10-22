@@ -175,18 +175,26 @@ export const MissingService = {
 				},
 			});
 
+			// Prowlarr doesn't parse quality; the UI reads it from the title.
 			const torrents = res.data
 				.map((r) => ({
 					title: r.title,
 					size: r.size,
 					indexer: r.indexer,
-					seeders: r.seeders,
-					leechers: r.leechers,
+					seeders: r.seeders ?? null, // null for usenet
+					leechers: r.leechers ?? null,
+					grabs: r.grabs ?? null,
 					age: r.age,
+					publishDate: r.publishDate ?? null,
+					protocol: r.protocol ?? "torrent",
+					freeleech: (r.indexerFlags ?? []).some((f) =>
+						/freeleech/i.test(String(f)),
+					),
+					infoUrl: r.infoUrl ?? null,
 					downloadUrl: r.downloadUrl || r.magnetUrl,
 					guid: r.guid,
 				}))
-				.sort((a, b) => b.seeders - a.seeders);
+				.sort((a, b) => (b.seeders ?? 0) - (a.seeders ?? 0));
 
 			return { success: true, torrents };
 		}
@@ -293,7 +301,7 @@ export const MissingService = {
 		oneAtATime(ctx.body.service, () => MissingService._forceGrab(ctx)),
 
 	_forceGrab: async ({
-		body: { service, serviceId, title, downloadUrl, forceLanguage },
+		body: { service, serviceId, title, downloadUrl, forceLanguage, protocol },
 	}) => {
 		const SERVICES = getAllServices();
 		const config = SERVICES[service];
@@ -316,7 +324,9 @@ export const MissingService = {
 			return arr(config, service).post("/release/push", {
 					title: title,
 					downloadUrl: downloadUrl,
-					protocol: "Torrent",
+					// Usenet results must say so, or the *Arr hands the NZB to
+					// the torrent client.
+					protocol: protocol === "usenet" ? "Usenet" : "Torrent",
 					publishDate: new Date().toISOString(),
 				});
 		};

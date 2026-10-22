@@ -364,4 +364,24 @@ describe("Force-grab language bypass", () => {
 		const run = (id) => [`put ${id} profile 99`, `put ${id} profile 2`, "delete 99"];
 		expect([[...run(40), ...run(41)], [...run(41), ...run(40)]]).toContainEqual(events);
 	});
+
+	it("Pushes a usenet result as Usenet, and anything else as Torrent", async () => {
+		axios.post.mockResolvedValue({ data: [{ rejected: false }] });
+		const push = async (extra) => {
+			const res = await app.handle(
+				forceGrab({
+					service: "radarr",
+					serviceId: 41,
+					title: "Some.Movie.2026.1080p.BluRay",
+					downloadUrl: "https://nzb.example/get/1",
+					...extra,
+				}),
+			);
+			expect((await res.json()).success).toBe(true);
+			return axios.post.mock.calls.at(-1)[1].protocol;
+		};
+		expect(await push({ protocol: "usenet" })).toBe("Usenet");
+		expect(await push({ protocol: "torrent" })).toBe("Torrent");
+		expect(await push({})).toBe("Torrent");
+	});
 });

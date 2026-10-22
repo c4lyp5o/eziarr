@@ -9,6 +9,7 @@
 		"lint": "biome lint",
 		"check": "biome check",
 		"smoke": "bun test tests/smoke.test.js",
+		"test:unit": "bun test tests/unit",
 		"preview": "vite preview"
 	},
 	"dependencies": {
