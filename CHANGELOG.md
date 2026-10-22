@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] - 2026-10-22
+
+> **Upgrading:** behind a reverse proxy, set `TRUST_PROXY=1` (see Security).
+> A fresh install now asks for a one-time setup code from the server log.
 
 ### Security
 - **CRITICAL: the API required no login.** The auth plugins' hooks were
