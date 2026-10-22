@@ -42,7 +42,7 @@ jobs:
         run: bun test
 
   frontend:
-    name: Frontend build
+    name: Frontend lint & build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -58,6 +58,10 @@ jobs:
 
       - name: 📦 Install dependencies
         run: bun install --frozen-lockfile
+
+      # Lint and formatting (biome.json); never writes in CI.
+      - name: 🧹 Lint
+        run: bunx biome ci
 
       - name: 🏗️ Build
         run: bun run build
