@@ -263,4 +263,105 @@ describe("Force-grab language bypass", () => {
 			expect.anything(),
 		);
 	});
+
+	// --- Temp profile handling (review follow-up) ---
+	const RADARR = "http://fake-radarr:7878/api/v3";
+	const languageRejection = () => ({
+		data: [
+			{
+				rejected: true,
+				rejections: ["English is wanted, but found Japanese"],
+				languages: [{ id: 8, name: "Japanese" }],
+			},
+		],
+	});
+	// Route radarr calls by URL; release/push rejects first, then accepts.
+	const radarr = ({ profiles, pushes = [languageRejection(), { data: [{ rejected: false }] }] }) => {
+		const queue = [...pushes];
+		axios.get.mockImplementation(async (url) => {
+			if (url === `${RADARR}/qualityprofile`) return { data: profiles };
+			if (url.startsWith(`${RADARR}/movie/`))
+				return {
+					data: {
+						id: Number(url.split("/").pop()),
+						title: "Audition",
+						qualityProfileId: 2,
+						tags: [],
+						originalLanguage: { id: 8, name: "Japanese" },
+					},
+				};
+			throw new Error(`unrouted GET ${url}`);
+		});
+		axios.post.mockImplementation(async (url, body) => {
+			if (url === `${RADARR}/release/push`) return queue.shift() ?? { data: [{ rejected: false }] };
+			if (url === `${RADARR}/qualityprofile`) return { data: { ...body, id: 99 } };
+			throw new Error(`unrouted POST ${url}`);
+		});
+		axios.put.mockResolvedValue({ data: {} });
+		axios.delete.mockResolvedValue({ data: {} });
+	};
+	const grab = (serviceId = 40) =>
+		app.handle(
+			forceGrab({
+				service: "radarr",
+				serviceId,
+				title: "Audition 1999",
+				downloadUrl: "https://fake-indexer.com/download.torrent",
+			}),
+		);
+
+	it("Clones the 'Any' quality profile, not whichever profile is first", async () => {
+		radarr({
+			profiles: [
+				{ id: 2, name: "HD-1080p", language: { id: 1, name: "English" }, items: ["1080p"] },
+				{ id: 5, name: "Any", language: { id: 1, name: "English" }, items: ["every quality"] },
+			],
+		});
+		const body = await (await grab()).json();
+
+		expect(body.success).toBe(true);
+		const created = axios.post.mock.calls.find(([url]) => url === `${RADARR}/qualityprofile`);
+		expect(created[1]).toMatchObject({ name: "eziarr-any-language", items: ["every quality"] });
+	});
+
+	it("Reuses a temp profile left by an earlier run and removes it afterwards", async () => {
+		radarr({
+			profiles: [
+				{ id: 2, name: "HD-1080p", language: { id: 1, name: "English" } },
+				{ id: 77, name: "eziarr-any-language", language: { id: -1, name: "Any" } },
+			],
+		});
+		const body = await (await grab()).json();
+
+		expect(body.success).toBe(true);
+		expect(axios.post.mock.calls.some(([url]) => url === `${RADARR}/qualityprofile`)).toBe(false);
+		expect(axios.delete).toHaveBeenCalledWith(`${RADARR}/qualityprofile/77`, expect.anything());
+	});
+
+	it("Runs two force-grabs on one *Arr one after the other", async () => {
+		radarr({
+			profiles: [{ id: 5, name: "Any", language: { id: 1, name: "English" } }],
+			pushes: [languageRejection(), { data: [{ rejected: false }] }, languageRejection(), { data: [{ rejected: false }] }],
+		});
+		const events = [];
+		const realPut = axios.put.getMockImplementation();
+		axios.put.mockImplementation(async (url, body) => {
+			events.push(`put ${url.split("/").pop()} profile ${body.qualityProfileId}`);
+			return realPut ? realPut(url, body) : { data: {} };
+		});
+		axios.delete.mockImplementation(async (url) => {
+			events.push(`delete ${url.split("/").pop()}`);
+			return { data: {} };
+		});
+
+		const [a, b] = await Promise.all([grab(40), grab(41)]);
+		expect((await a.json()).success).toBe(true);
+		expect((await b.json()).success).toBe(true);
+
+		// Each grab swaps, restores and cleans up before the next one starts.
+		// Which request reaches the handler first isn't fixed (body parsing
+		// races), so either order is fine; interleaving is not.
+		const run = (id) => [`put ${id} profile 99`, `put ${id} profile 2`, "delete 99"];
+		expect([[...run(40), ...run(41)], [...run(41), ...run(40)]]).toContainEqual(events);
+	});
 });

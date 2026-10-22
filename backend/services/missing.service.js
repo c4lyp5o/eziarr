@@ -10,6 +10,23 @@ import {
 import { coerceNumericId, fetchAllQueues } from "../utils";
 import { generalLogger as logger } from "../logger";
 
+const TEMP_PROFILE_NAME = "eziarr-any-language";
+
+// Force-grab swaps a title's profile, grabs, then restores and removes the
+// temp profile. Two at once on one *Arr would share that temp profile and the
+// first to finish would delete it from under the second, so they run one at
+// a time per service (the server is a single process).
+const forceGrabQueues = new Map();
+const oneAtATime = (key, fn) => {
+	const previous = forceGrabQueues.get(key) ?? Promise.resolve();
+	const run = previous.then(fn, fn);
+	forceGrabQueues.set(
+		key,
+		run.catch(() => {}),
+	);
+	return run;
+};
+
 export const MissingService = {
 	getMissing: async () => {
 		const missingItems = getMissingMedia();
@@ -139,15 +156,26 @@ export const MissingService = {
 		try {
 			const res = await arr(config, "radarr").get("/qualityprofile");
 			const profiles = res.data;
+
+			// A temp profile left by an earlier run (a crash before cleanup) is
+			// ours: reuse it and remove it afterwards, rather than mistaking it
+			// for one of the user's and leaving it on Radarr forever.
+			const leftover = profiles.find((p) => p.name === TEMP_PROFILE_NAME);
+			if (leftover) return { id: leftover.id, created: true };
+
 			const existing = profiles.find((p) => p.language?.id === -1);
 			if (existing) return { id: existing.id, created: false };
 
-			// Clone the first profile but set language = Any. Radarr-only: Sonarr's
+			// Clone the "Any" quality profile (the one the non-language path
+			// relaxes to) with language = Any, so a release rejected for language
+			// AND quality isn't still rejected for quality. Radarr-only: Sonarr's
 			// quality profiles carry no `language` field at all.
+			const base =
+				profiles.find((p) => p.name?.toLowerCase() === "any") || profiles[0];
 			const clone = {
-				...profiles[0],
+				...base,
 				id: 0,
-				name: "eziarr-any-language",
+				name: TEMP_PROFILE_NAME,
 				language: { id: -1, name: "Any" },
 			};
 			const created = await arr(config, "radarr").post("/qualityprofile", clone);
@@ -209,7 +237,10 @@ export const MissingService = {
 		};
 	},
 
-	postMissingForceGrab: async ({
+	postMissingForceGrab: (ctx) =>
+		oneAtATime(ctx.body.service, () => MissingService._forceGrab(ctx)),
+
+	_forceGrab: async ({
 		body: { service, serviceId, title, downloadUrl, forceLanguage },
 	}) => {
 		const SERVICES = getAllServices();
