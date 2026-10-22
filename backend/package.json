@@ -5,8 +5,8 @@
 	"module": "index.js",
 	"version": "1.3.0",
 	"scripts": {
-		"test": "vitest run",
-		"test:watch": "vitest"
+		"test": "bun test",
+		"test:watch": "bun test --watch"
 	},
 	"dependencies": {
 		"@elysiajs/cookie": "^0.8.0",
@@ -19,8 +19,7 @@
 		"telegram": "^2.26.22"
 	},
 	"devDependencies": {
-		"@types/bun": "1.3.11",
-		"vitest": "^4.1.11"
+		"@types/bun": "1.3.11"
 	},
 	"peerDependencies": {
 		"typescript": "^5.9.3"

@@ -12,7 +12,7 @@ Eziarr runs as a microservice architecture using PM2 to manage two distinct Node
 * **Process Manager:** PM2 (runs `index.js` and `worker.js` concurrently).
 * **MTProto Client:** GramJS is used to handle native Telegram API interactions, bypassing the standard Telegram Bot API file-size limits.
 * **HTTP Client:** Axios for interacting with the *Arr stack APIs and streaming HTTP downloads.
-* **Testing:** Vitest for comprehensive API, Authentication, and Queue lifecycle testing.
+* **Testing:** `bun test` (Bun's runner; the suites use the Vitest-style `describe`/`it`/`vi` API, which Bun provides). Run `bun test` in `backend/`, or `bun run test` from the repo root. A preload (`tests/setup.js`, wired in `bunfig.toml`) points the database, logs and downloads at a throwaway temp directory, so tests never touch `db/`. CI runs the suite and the frontend build on every PR (`.github/workflows/test.yml`).
 
 ### Frontend
 * **Framework:** React 19.
@@ -30,7 +30,7 @@ Eziarr's backend is modularized to ensure clean separation of concerns:
 * **`/services`**: Contains the core business logic (e.g., `auth.service.js`, `missing.service.js`). Processes requests and interacts with the database or external APIs.
 * **`/models`**: TypeBox schemas used by routes to strictly validate incoming JSON bodies and outgoing responses.
 * **`/plugins`**: Elysia middleware. Contains `auth.plugin.js` (decodes JWTs) and `protector.plugin.js` (guards private routes with a 401 Unauthorized wall).
-* **`/tests`**: Comprehensive Vitest suites covering external service mocks, the SQLite state machine, and authentication flows.
+* **`/tests`**: `bun test` suites covering external service mocks, the SQLite state machine, and authentication flows.
 * **`db.js`**: SQLite interface. Handles the schema, settings, and the crucial `active_tasks` and `download_queue` tables for IPC.
 * **`telegram.js`**: Manages Telegram authentication and media downloading via GramJS.
 * **`utils.js`**: Security and utility helpers. Includes the `isSafeUrl` SSRF protection filter and `translatePath` cross-OS path mapper.
