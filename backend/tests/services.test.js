@@ -3,6 +3,10 @@ import axios from "axios";
 import { app } from "../index.js";
 import { setSetting } from "../db.js";
 import { getAuthCookie } from "./testUtils.js";
+import { resetQueueCache } from "../utils.js";
+import { DB_DIR } from "../config.js";
+import { Database } from "bun:sqlite";
+import path from "node:path";
 
 vi.mock("axios", () => {
 	return {
@@ -24,6 +28,12 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		resetQueueCache();
+		// The unified queue includes Eziarr's own download queue; start each
+		// case from an empty one so counts don't depend on other test files.
+		const db = new Database(path.join(DB_DIR, "eziarr.sqlite"));
+		db.run("DELETE FROM download_queue");
+		db.close();
 
 		setSetting("radarrUrl", "http://fake-radarr:7878");
 		setSetting("radarrApiKey", "fake_radarr_key");
@@ -193,7 +203,11 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 		);
 	});
 
-	it("POST /api/v1/system/test - Should reject internal URLs (SSRF guard)", async () => {
+	// *Arr URLs are the admin's own servers, almost always on the LAN. The SSRF
+	// guard used to refuse them here, so "Test" failed for every LAN install
+	// while saving (which nothing guards) still worked.
+	it("POST /api/v1/system/test - Should test a LAN *Arr URL", async () => {
+		axios.get.mockResolvedValueOnce({ data: {} });
 		const req = new Request("http://localhost/api/v1/system/test", {
 			method: "POST",
 			headers: {
@@ -202,15 +216,35 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 			},
 			body: JSON.stringify({
 				service: "radarr",
-				url: "http://127.0.0.1:7878",
+				url: "http://192.168.1.20:7878/",
 				apiKey: "x",
 			}),
 		});
 		const res = await app.handle(req);
-		const body = await res.json();
+
+		expect(res.status).toBe(200);
+		expect(axios.get).toHaveBeenCalledWith(
+			"http://192.168.1.20:7878/api/v3/system/status",
+			expect.objectContaining({ headers: { "X-Api-Key": "x" } }),
+		);
+	});
+
+	it("POST /api/v1/system/test - Should refuse anything but http(s)", async () => {
+		const req = new Request("http://localhost/api/v1/system/test", {
+			method: "POST",
+			headers: {
+				Cookie: authCookie,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				service: "radarr",
+				url: "file:///etc/passwd",
+				apiKey: "x",
+			}),
+		});
+		const res = await app.handle(req);
 
 		expect(res.status).toBe(400);
-		expect(body.success).toBe(false);
 		expect(axios.get).not.toHaveBeenCalled();
 	});
 

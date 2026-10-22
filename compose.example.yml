@@ -1,0 +1,54 @@
+# Eziarr with Docker Compose. Copy to compose.yml, adjust the paths, then:
+#   docker compose up -d && docker logs eziarr   # read the first-start setup code
+#
+# Volumes:
+#   /app/db         settings, queue and history (SQLite). Back this up.
+#   /app/logs       general.log (server), worker.log, hunter.log; rotated at 5 MB.
+#   /app/downloads  where downloads land. Your *Arrs must be able to read it too;
+#                   set Settings -> Path Translation to the path THEY see it at.
+# The container runs as uid 100 / gid 101; those paths must be writable by it.
+
+services:
+  eziarr:
+    image: calypso666/eziarr:1.4.0   # or :latest
+    container_name: eziarr
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - TZ=Asia/Kuala_Lumpur
+      # Skip the setup code by setting the password on first start (8+ chars):
+      # - EZIARR_PASSWORD_FILE=/run/secrets/eziarr_password
+    volumes:
+      - ./eziarr/db:/app/db
+      - ./eziarr/logs:/app/logs
+      - /path/your/arrs/can/read:/app/downloads
+
+# ---------------------------------------------------------------------------
+# Behind Traefik (or another reverse proxy) instead of a published port.
+# TRUST_PROXY is required here: without it every client shares the proxy's
+# login rate-limit bucket. Use 1 for one proxy; 2 if a CDN sits in front of
+# Traefik AND Traefik is configured to trust the CDN's forwarded headers.
+#
+# services:
+#   eziarr:
+#     image: calypso666/eziarr:1.4.0
+#     container_name: eziarr
+#     restart: unless-stopped
+#     networks: [traefik_default]
+#     environment:
+#       - TZ=Asia/Kuala_Lumpur
+#       - TRUST_PROXY=1
+#     volumes:
+#       - ./eziarr/db:/app/db
+#       - ./eziarr/logs:/app/logs
+#       - /path/your/arrs/can/read:/app/downloads
+#     labels:
+#       - "traefik.enable=true"
+#       - "traefik.http.routers.eziarr.rule=Host(`eziarr.example.com`)"
+#       - "traefik.http.routers.eziarr.entrypoints=websecure"
+#       - "traefik.http.services.eziarr.loadbalancer.server.port=5000"
+#
+# networks:
+#   traefik_default:
+#     external: true

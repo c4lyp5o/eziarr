@@ -82,8 +82,12 @@ export const MissingModel = {
 				quality: t.Optional(t.String()),
 				indexer: t.Optional(t.String()),
 				timeleft: t.Optional(t.String()),
+				// 0-100, or null before the client reports a size.
+				progress: t.Optional(t.Nullable(t.Number())),
 			}),
 		),
+		// *Arr services whose queue didn't answer this time.
+		unavailable: t.Optional(t.Array(t.String())),
 	}),
 	postMissingSearchResponse: t.Object({
 		success: t.Boolean(),

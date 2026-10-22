@@ -1,12 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import axios from "axios";
+import { arr } from "./arr";
 import {
-	upsertMissingMedia,
 	getNextItemToSearchMissingMedia,
 	markAsSearchedMissingMedia,
-	getMissingMedia,
-	unmonitorMissingMedia,
 	getAllSettings,
 	getAllServices,
 	upsertTask,
@@ -17,170 +14,26 @@ import {
 	scheduleRetryDownloadQueue,
 	markAsFailedDownloadQueue,
 	markDownloadedPayload,
+	getQueuedDownloadedPaths,
 	finalizeDownloadQueue,
 	pruneDownloadQueue,
-	// pruneDownloadHistory,
 } from "./db";
 import { downloadTelegramFile } from "./telegram";
+import { syncMissingItems } from "./sync";
 import { downloadHttpFile } from "./downloader";
-import { triggerArrImport, verifyArrImport, isImportableService } from "./import";
+import {
+	triggerArrImport,
+	verifyArrImport,
+	isImportableService,
+	getMovieFileId,
+} from "./import";
 import { generalLogger as logger, hunterLogger } from "./logger";
-import { getPosterUrl } from "./utils";
+import { sweepOldDownloads } from "./utils";
 import { DEFAULT_SETTINGS, DOWNLOAD_DIR } from "./config";
 
 const MAX_ATTEMPTS = 5;
 
 let isProcessingQueue = false;
-
-const syncMissingItems = async () => {
-	const SERVICES = getAllServices();
-
-	const activeIds = new Set();
-	const successfulServices = new Set();
-
-	try {
-		upsertTask("worker-sync", "Sync", "running", "Syncing missing items...");
-		logger.info("[WORKER/SYNC] 🔄 Syncing missing items.");
-
-		if (SERVICES.radarr.url && SERVICES.radarr.apiKey) {
-			// 1. RADARR
-			try {
-				const radarrRes = await axios.get(
-					`${SERVICES.radarr.url}/api/v3/wanted/missing`,
-					{
-						params: {
-							pageSize: 100,
-							sortKey: "releaseDate",
-							sortDir: "desc",
-						},
-						headers: { "X-Api-Key": SERVICES.radarr.apiKey },
-						timeout: 30000,
-					},
-				);
-				radarrRes.data.records.forEach((m) => {
-					const id = `radarr-${m.id}`;
-					activeIds.add(id);
-					upsertMissingMedia({
-						id: id,
-						serviceId: m.id,
-						title: m.title,
-						type: "movie",
-						service: "radarr",
-						releaseDate: m.inCinemas || m.digitalRelease,
-						status: m.status,
-						posterUrl: getPosterUrl(m.images, "poster"),
-					});
-				});
-				successfulServices.add("radarr");
-			} catch (err) {
-				logger.error("[WORKER] Radarr Sync Error :", err);
-			}
-		} else {
-			logger.warn("[WORKER/SYNC] Radarr not configured. Skipping.");
-		}
-
-		if (SERVICES.sonarr.url && SERVICES.sonarr.apiKey) {
-			// 2. SONARR
-			try {
-				const sonarrRes = await axios.get(
-					`${SERVICES.sonarr.url}/api/v3/wanted/missing`,
-					{
-						params: {
-							pageSize: 100,
-							sortKey: "airDateUtc",
-							sortDir: "desc",
-							includeSeries: true,
-						},
-						headers: { "X-Api-Key": SERVICES.sonarr.apiKey },
-						timeout: 30000,
-					},
-				);
-				sonarrRes.data.records.forEach((ep) => {
-					const id = `sonarr-${ep.id}`;
-					activeIds.add(id);
-					upsertMissingMedia({
-						id: id,
-						serviceId: ep.id,
-						title: `${ep.series?.title || ""} - S${ep.seasonNumber}E${ep.episodeNumber}`,
-						seriesTitle: ep.series?.title,
-						type: "episode",
-						service: "sonarr",
-						releaseDate: ep.airDateUtc,
-						status: "missing",
-						posterUrl: getPosterUrl(ep.series?.images, "poster"),
-					});
-				});
-				successfulServices.add("sonarr");
-			} catch (err) {
-				logger.error("[WORKER/SYNC] Sonarr Sync Error :", err);
-			}
-		} else {
-			logger.warn("[WORKER/SYNC] Sonarr not configured. Skipping.");
-		}
-
-		if (SERVICES.lidarr.url && SERVICES.lidarr.apiKey) {
-			// 3. LIDARR
-			try {
-				const lidarrRes = await axios.get(
-					`${SERVICES.lidarr.url}/api/v1/wanted/missing`,
-					{
-						params: {
-							page: 1,
-							pageSize: 100,
-							sortKey: "releaseDate",
-							sortDir: "desc",
-						},
-						headers: { "X-Api-Key": SERVICES.lidarr.apiKey },
-						timeout: 30000,
-					},
-				);
-				lidarrRes.data.records.forEach((album) => {
-					const id = `lidarr-${album.id}`;
-					activeIds.add(id);
-					upsertMissingMedia({
-						id: id,
-						serviceId: album.id,
-						title: `${album.artist.artistName} - ${album.title}`,
-						type: "album",
-						service: "lidarr",
-						releaseDate: album.releaseDate,
-						status: "missing",
-						posterUrl: getPosterUrl(album.images, "cover"),
-					});
-				});
-				successfulServices.add("lidarr");
-			} catch (err) {
-				logger.error("[WORKER/SYNC] Lidarr Sync Error :", err);
-			}
-		} else {
-			logger.warn("[WORKER/SYNC] Lidarr not configured. Skipping.");
-		}
-
-		// 4. CLEANUP (Soft Sync)
-		const missingMedia = getMissingMedia();
-		const idsToDelete = missingMedia
-			.filter(
-				(item) =>
-					successfulServices.has(item.service) && !activeIds.has(item.id),
-			)
-			.map((item) => item.id);
-
-		if (idsToDelete.length > 0) {
-			logger.info(
-				`[WORKER] 🧹 Cleaning up ${idsToDelete.length} downloaded/removed items...`,
-			);
-			idsToDelete.forEach((id) => {
-				unmonitorMissingMedia(id);
-			});
-		}
-
-		logger.info("[WORKER] ✅ Syncing Complete.");
-	} catch (err) {
-		logger.error("[WORKER] Syncing Failed: :", err);
-	} finally {
-		removeTask("worker-sync");
-	}
-};
 
 const runHunter = async () => {
 	const SERVICES = getAllServices();
@@ -198,7 +51,6 @@ const runHunter = async () => {
 			`[WORKER/HUNTER] Service is not configured. Aborting.`,
 		);
 
-	let endpoint = "/api/v3/command";
 	let payload = {};
 
 	if (item.service === "radarr") {
@@ -206,7 +58,6 @@ const runHunter = async () => {
 	} else if (item.service === "sonarr") {
 		payload = { name: "EpisodeSearch", episodeIds: [item.serviceId] };
 	} else if (item.service === "lidarr") {
-		endpoint = "/api/v1/command";
 		payload = { name: "AlbumSearch", albumIds: [item.serviceId] };
 	}
 
@@ -220,10 +71,7 @@ const runHunter = async () => {
 		hunterLogger.info(
 			`[WORKER/HUNTER] 🎯 Searching [${item.service}] ${item.title}`,
 		);
-		await axios.post(`${serviceConfig.url}${endpoint}`, payload, {
-			headers: { "X-Api-Key": serviceConfig.apiKey },
-			timeout: 30000,
-		});
+		await arr(serviceConfig, item.service).post("/command", payload);
 	} catch (err) {
 		hunterLogger.error(`[WORKER/HUNTER] Failed searching ${item.title}: `, err);
 	} finally {
@@ -421,6 +269,15 @@ const processDownloadQueue = async () => {
 				`${payload.service} is not configured. Cannot import file.`,
 			);
 
+		const verifiable = isImportableService(payload.service);
+		const previousFileId = verifiable
+			? await getMovieFileId({
+					config,
+					service: payload.service,
+					serviceId: payload.serviceId,
+				})
+			: null;
+
 		const commandPayload = await triggerArrImport({
 			config,
 			service: payload.service,
@@ -428,12 +285,13 @@ const processDownloadQueue = async () => {
 			filePath: result.filePath,
 		});
 
-		if (isImportableService(payload.service)) {
+		if (verifiable) {
 			const verdict = await verifyArrImport({
 				config,
 				service: payload.service,
 				serviceId: payload.serviceId,
 				filePath: result.filePath,
+				previousFileId,
 			});
 			if (!verdict.imported) {
 				// Nothing imported — fail loudly instead of a hollow ✅, so the
@@ -475,7 +333,6 @@ const cleanupOldDownloads = () => {
 	if (!fs.existsSync(DOWNLOAD_DIR)) return;
 
 	const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-	const now = Date.now();
 
 	try {
 		upsertTask(
@@ -485,38 +342,14 @@ const cleanupOldDownloads = () => {
 			"Cleaning up old downloads...",
 		);
 		logger.info("[WORKER/SWEEPER] 🧹 Cleaning up old downloads...");
-		const folders = fs.readdirSync(DOWNLOAD_DIR);
-		for (const folder of folders) {
-			const folderPath = path.join(DOWNLOAD_DIR, folder);
-
-			if (fs.statSync(folderPath).isDirectory()) {
-				const files = fs.readdirSync(folderPath);
-
-				// Check and delete old files
-				for (const file of files) {
-					const filePath = path.join(folderPath, file);
-					const stats = fs.statSync(filePath);
-
-					if (now - stats.mtimeMs > MAX_AGE_MS) {
-						try {
-							fs.unlinkSync(filePath);
-							logger.info(
-								`[WORKER/SWEEPER] 🧹 Sweeper: Deleted old zombie file: ${filePath}`,
-							);
-						} catch (err) {
-							// It's perfectly fine if this fails.
-						}
-					}
-				}
-
-				try {
-					if (fs.readdirSync(folderPath).length === 0) {
-						fs.rmdirSync(folderPath);
-					}
-				} catch (err) {
-					// It's perfectly fine if this fails.
-				}
-			}
+		const deleted = sweepOldDownloads(DOWNLOAD_DIR, {
+			maxAgeMs: MAX_AGE_MS,
+			keep: getQueuedDownloadedPaths(),
+		});
+		for (const filePath of deleted) {
+			logger.info(
+				`[WORKER/SWEEPER] 🧹 Sweeper: Deleted old zombie file: ${filePath}`,
+			);
 		}
 		logger.info("[WORKER/SWEEPER] ✅ Cleanup sweeper complete.");
 	} catch (err) {
@@ -536,13 +369,10 @@ const main = async () => {
 	pruneDownloadQueue();
 	markStaleTasks();
 	cleanupOldDownloads();
-	// pruneDownloadHistory();
 	await settingsWatcher();
 	// set recurring tasks
 	setInterval(settingsWatcher, 10000);
 	setInterval(cleanupOldDownloads, 60 * 60 * 1000);
-	// setInterval(pruneDownloadQueue, 60 * 60 * 1000);
-	// setInterval(pruneDownloadHistory, 60 * 60 * 1000);
 	setInterval(processDownloadQueue, 5000);
 	logger.info("[WORKER] ✅ Worker initialized.");
 };

@@ -160,6 +160,22 @@ export const unmonitorMissingMedia = (id) => {
 	db.run("DELETE FROM missing_items WHERE id = ?", [id]);
 };
 
+/**
+ * Apply one sync in a single transaction: upsert every row fetched, then
+ * remove rows of services that synced completely but no longer list them
+ * (downloaded or unmonitored). Services that failed keep their rows.
+ * Returns how many rows were removed.
+ */
+export const applyMissingSync = db.transaction((rows, syncedServices) => {
+	for (const row of rows) upsertMissingMedia(row);
+	const seen = new Set(rows.map((r) => r.id));
+	const stale = getMissingMedia().filter(
+		(item) => syncedServices.has(item.service) && !seen.has(item.id),
+	);
+	for (const item of stale) unmonitorMissingMedia(item.id);
+	return stale.length;
+});
+
 export const markAsSearchedMissingMedia = (id) => {
 	db.run("UPDATE missing_items SET last_searched_at = ? WHERE id = ?", [
 		Date.now(),
@@ -564,6 +580,20 @@ export const markDownloadedPayload = (id, filePath) => {
 	});
 };
 
+/** Files that queued jobs already downloaded and still need for an import retry. */
+export const getQueuedDownloadedPaths = () => {
+	const paths = new Set();
+	for (const row of db.query("SELECT payload FROM download_queue").all()) {
+		try {
+			const { downloadedPath } = JSON.parse(row.payload);
+			if (downloadedPath) paths.add(downloadedPath);
+		} catch {
+			// Unparseable payloads hold no downloaded file.
+		}
+	}
+	return paths;
+};
+
 export const scheduleRetryDownloadQueue = (id, errMessage) => {
 	const row = db
 		.query("SELECT attempts FROM download_queue WHERE id = $id")
@@ -706,16 +736,6 @@ export const recordForceGrabHistory = (
 		$filename: title,
 		$sourceUrl: downloadUrl,
 	});
-};
-
-export const pruneDownloadHistory = (maxAgeMs = 3 * 24 * 60 * 60 * 1000) => {
-	const cutoff = Date.now() - maxAgeMs;
-	db.query(
-		`
-    DELETE FROM download_history
-    WHERE finished_at IS NOT NULL AND finished_at < $cutoff
-  `,
-	).run({ $cutoff: cutoff });
 };
 
 export const getDownloadStats = () => {

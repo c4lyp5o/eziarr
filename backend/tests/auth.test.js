@@ -2,12 +2,38 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { app } from "../index.js";
 import { setSetting } from "../db.js";
 import { resetRateLimitBuckets } from "../plugins/rate-limit.plugin.js";
+import { issueSetupCode, prepareSetup } from "../setup.js";
+import { bumpTokenVersion } from "../session.js";
+
+const json = (url, body, headers = {}) =>
+	new Request(`http://localhost${url}`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...headers },
+		body: JSON.stringify(body),
+	});
+
+const cookieFrom = (res, name) =>
+	(res.headers.get("set-cookie") || "").match(
+		new RegExp(`${name}=([^;, \\n]+)`),
+	)?.[0] ?? "";
+
+const loginAs = async (password = "testpass") => {
+	setSetting("isFirstTime", "false");
+	setSetting("password", await Bun.password.hash(password));
+	const res = await app.handle(json("/api/v1/login", { password }));
+	return {
+		access: cookieFrom(res, "eziarr_access"),
+		refresh: cookieFrom(res, "eziarr_refresh"),
+	};
+};
+
+const me = (cookie) =>
+	app.handle(new Request("http://localhost/api/v1/me", { headers: { Cookie: cookie } }));
 
 describe("Authentication & Cookie Lifecycle Flow", () => {
 	beforeEach(() => {
 		resetRateLimitBuckets();
 		setSetting("isFirstTime", "true");
-		setSetting("username", "");
 		setSetting("password", "");
 	});
 
@@ -25,7 +51,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 		const req = new Request("http://localhost/api/v1/firsttime", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username: "admin", password: "securepassword" }),
+			body: JSON.stringify({ password: "securepassword", setupCode: issueSetupCode() }),
 		});
 		const res = await app.handle(req);
 		const body = await res.json();
@@ -42,13 +68,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/login - Should fail with wrong credentials", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("correctpassword"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username: "admin", password: "wrongpassword" }),
+			body: JSON.stringify({ password: "wrongpassword" }),
 		});
 
 		const res = await app.handle(req);
@@ -60,14 +85,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/login - Should succeed and set HttpOnly Cookies", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("correctpassword"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				username: "admin",
 				password: "correctpassword",
 				rememberMe: true,
 			}),
@@ -86,13 +109,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("GET /api/v1/me - Should decode cookie and return admin status", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		const loginReq = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username: "admin", password: "testpass" }),
+			body: JSON.stringify({ password: "testpass" }),
 		});
 		const loginRes = await app.handle(loginReq);
 		const rawSetCookie = loginRes.headers.get("set-cookie") || "";
@@ -113,13 +135,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/refresh - Should issue a new access token from refresh cookie", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		const loginReq = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username: "admin", password: "testpass" }),
+			body: JSON.stringify({ password: "testpass" }),
 		});
 		const loginRes = await app.handle(loginReq);
 		const rawSetCookie = loginRes.headers.get("set-cookie") || "";
@@ -168,13 +189,12 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/login - Should issue non-secure cookies over plain http", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		const req = new Request("http://localhost/api/v1/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username: "admin", password: "testpass" }),
+			body: JSON.stringify({ password: "testpass" }),
 		});
 		const res = await app.handle(req);
 		const cookies = res.headers.get("set-cookie") || "";
@@ -186,7 +206,6 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 	it("POST /api/v1/login - Should issue secure cookies when COOKIE_SECURE=true", async () => {
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		const oldOverride = process.env.COOKIE_SECURE;
@@ -196,7 +215,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 			const req = new Request("http://localhost/api/v1/login", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ username: "admin", password: "testpass" }),
+				body: JSON.stringify({ password: "testpass" }),
 			});
 			const res = await app.handle(req);
 			const cookies = res.headers.get("set-cookie") || "";
@@ -212,7 +231,6 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 	it("POST /api/v1/login - Should rate limit after 10 attempts per minute", async () => {
 		resetRateLimitBuckets();
 		setSetting("isFirstTime", "false");
-		setSetting("username", "admin");
 		setSetting("password", await Bun.password.hash("testpass"));
 
 		let lastStatus = 0;
@@ -220,7 +238,7 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 			const req = new Request("http://localhost/api/v1/login", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ username: "admin", password: "wrongpass" }),
+				body: JSON.stringify({ password: "wrongpass" }),
 			});
 			const res = await app.handle(req);
 			lastStatus = res.status;
@@ -244,5 +262,104 @@ describe("Authentication & Cookie Lifecycle Flow", () => {
 
 		expect(cookies).toContain("eziarr_access=");
 		expect(cookies).toContain("eziarr_refresh=");
+	});
+
+	// --- First-boot setup code (security sweep #3) ---
+	it("POST /api/v1/firsttime - Should refuse setup without the server's setup code", async () => {
+		issueSetupCode();
+		const res = await app.handle(
+			json("/api/v1/firsttime", { password: "securepassword", setupCode: "AAAA-AAAA" }),
+		);
+		expect(res.status).toBe(401);
+
+		const missing = await app.handle(
+			json("/api/v1/firsttime", { password: "securepassword" }),
+		);
+		expect(missing.status).toBe(400);
+
+		const check = await (await app.handle(new Request("http://localhost/api/v1/firsttime"))).json();
+		expect(check.isFirstTime).toBe(true);
+	});
+
+	it("POST /api/v1/firsttime - Should accept the code in any case, once", async () => {
+		const code = issueSetupCode();
+		const loose = code.replace("-", " ").toLowerCase();
+		const res = await app.handle(
+			json("/api/v1/firsttime", { password: "securepassword", setupCode: loose }),
+		);
+		expect(res.status).toBe(200);
+
+		// Setup is done and the code is spent: a replay is refused.
+		setSetting("isFirstTime", "true");
+		const replay = await app.handle(
+			json("/api/v1/firsttime", { password: "attackerpass", setupCode: code }),
+		);
+		expect(replay.status).toBe(401);
+	});
+
+	it("prepareSetup - Should complete setup from EZIARR_PASSWORD and refuse a short one", async () => {
+		process.env.EZIARR_PASSWORD = "short";
+		await expect(prepareSetup()).rejects.toThrow(/at least 8/);
+
+		process.env.EZIARR_PASSWORD = "from-the-environment";
+		expect(await prepareSetup()).toBe(null);
+		delete process.env.EZIARR_PASSWORD;
+
+		const check = await (await app.handle(new Request("http://localhost/api/v1/firsttime"))).json();
+		expect(check.isFirstTime).toBe(false);
+		const login = await app.handle(json("/api/v1/login", { password: "from-the-environment" }));
+		expect(login.status).toBe(200);
+	});
+
+	// --- Session revocation (security sweep #2, #4) ---
+	it("GET /api/v1/me - Should refuse a refresh token used as an access token", async () => {
+		const { refresh } = await loginAs();
+		const asAccess = refresh.replace("eziarr_refresh=", "eziarr_access=");
+		expect((await me(asAccess)).status).toBe(401);
+	});
+
+	it("Should revoke every existing session when the session version moves", async () => {
+		const { access, refresh } = await loginAs();
+		expect((await me(access)).status).toBe(200);
+
+		bumpTokenVersion();
+
+		expect((await me(access)).status).toBe(401);
+		const refreshed = await app.handle(
+			new Request("http://localhost/api/v1/refresh", {
+				method: "POST",
+				headers: { Cookie: refresh },
+			}),
+		);
+		expect(refreshed.status).toBe(401);
+	});
+
+	it("POST /api/v1/settings/batch - Should revoke other sessions on a password change but keep the caller signed in", async () => {
+		const other = await loginAs("testpass");
+		const mine = await loginAs("testpass");
+
+		const res = await app.handle(
+			json(
+				"/api/v1/settings/batch",
+				{ password: "brand-new-pass", syncEnabled: true, hunterEnabled: true, syncInterval: 10, hunterInterval: 15 },
+				{ Cookie: mine.access },
+			),
+		);
+		expect(res.status).toBe(200);
+
+		expect((await me(other.access)).status).toBe(401);
+		expect((await me(mine.access)).status).toBe(401);
+		const fresh = cookieFrom(res, "eziarr_access");
+		expect((await me(fresh)).status).toBe(200);
+	});
+
+	it("POST /api/v1/settings - Should refuse a password under 8 characters", async () => {
+		const { access } = await loginAs();
+		const res = await app.handle(
+			json("/api/v1/settings", { key: "password", value: "short" }, { Cookie: access }),
+		);
+		expect(res.status).toBe(400);
+		const login = await app.handle(json("/api/v1/login", { password: "testpass" }));
+		expect(login.status).toBe(200);
 	});
 });

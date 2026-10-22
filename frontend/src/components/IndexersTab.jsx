@@ -30,8 +30,7 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 			}
 			toast.success(`Got ${torrents.length} results from Indexers`);
 			setIndexerResults(torrents);
-		} catch (err) {
-			// console.error("Indexers Search Failed", err);
+		} catch {
 			toast.error("Indexers Search Failed");
 			setIndexerResults([]);
 		} finally {
@@ -59,8 +58,7 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 			} else {
 				toast.error("Grab From Indexers Failed");
 			}
-		} catch (err) {
-			// console.error("Grab From Indexers Failed", err);
+		} catch {
 			toast.error("Grab From Indexers Failed");
 		} finally {
 			setGrabbingId(null);
@@ -75,8 +73,8 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 	if (!status)
 		return (
 			<div className="p-6">
-				<div className="w-full mb-4 py-3 bg-red-600/10 border border-red-500/30 rounded-lg flex items-center justify-center gap-3 backdrop-blur-sm animate-pulse">
-					<span className="text-sm font-bold text-red-400 tracking-wide">
+				<div className="w-full mb-4 py-3 bg-neg-bg border border-negative/30 rounded-lg flex items-center justify-center gap-3">
+					<span className="text-sm font-semibold text-negative">
 						Prowlarr is not configured!
 					</span>
 				</div>
@@ -86,14 +84,14 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 	return (
 		<div className="p-6">
 			{isLoading ? (
-				<div className="w-full mb-4 py-3 bg-indigo-600/10 border border-indigo-500/30 rounded-lg flex items-center justify-center gap-3 backdrop-blur-sm animate-pulse">
-					<div className="w-4 h-4 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-					<span className="text-sm font-bold text-indigo-400 tracking-wide">
+				<div className="w-full mb-4 py-3 bg-raised border border-control rounded-lg flex items-center justify-center gap-3">
+					<div className="w-4 h-4 border-2 border-control border-t-ink rounded-full animate-spin" />
+					<span className="text-sm font-semibold text-ink">
 						Searching Indexers...
 					</span>
 				</div>
 			) : indexerResults.length === 0 ? (
-				<div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-800 rounded-xl">
+				<div className="text-center py-12 text-faint border-2 border-dashed border-line rounded-2xl">
 					<Database size={32} className="mx-auto mb-3 opacity-20" />
 					<p>No results found in Indexers.</p>
 				</div>
@@ -103,15 +101,15 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 					<div className="md:hidden space-y-2">
 						{indexerResults.map((t) => (
 							<div key={t.guid} className={ui.card}>
-								<div className="text-sm font-semibold text-gray-200 truncate">
+								<div className="text-sm font-semibold text-ink truncate">
 									{t.title}
 								</div>
-								<div className="mt-1 flex justify-between text-xs text-gray-500 font-mono">
+								<div className="mt-1 flex justify-between text-xs text-faint num">
 									<span>{formatSize(t.size)}</span>
 									<span>{t.seeders} seeds</span>
 								</div>
 								<div className="mt-2 flex items-center justify-between">
-									<span className="text-xs text-gray-500">{t.indexer}</span>
+									<span className="text-xs text-faint">{t.indexer}</span>
 									<Button
 										size="sm"
 										variant="success"
@@ -128,7 +126,7 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 					<div className="hidden md:block">
 						<table className="w-full text-left border-collapse">
 							<thead>
-								<tr className="text-xs font-bold text-gray-500 uppercase border-b border-gray-800">
+								<tr className="text-xs font-semibold text-faint border-b border-line">
 									<th className="pb-3 pl-2">Title</th>
 									<th className="pb-3 text-right">Size</th>
 									<th className="pb-3 text-right">Seeds</th>
@@ -136,11 +134,11 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 									<th className="pb-3 text-right">Action</th>
 								</tr>
 							</thead>
-							<tbody className="text-sm text-gray-300">
+							<tbody className="text-sm text-ink">
 								{indexerResults.map((t) => (
 									<tr
 										key={t.guid}
-										className="group border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors"
+										className="group border-b border-line hover:bg-raised transition-colors"
 									>
 										<td
 											className="py-3 pl-2 max-w-md truncate pr-4"
@@ -148,7 +146,7 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 										>
 											{t.title}
 										</td>
-										<td className="py-3 text-right font-mono text-xs">
+										<td className="py-3 text-right num text-xs">
 											{formatSize(t.size)}
 										</td>
 										<td className="py-3 text-right">
@@ -157,16 +155,16 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 												variant="chip"
 												className={
 													t.seeders === 0
-														? "text-red-300 border-red-500/20 bg-red-500/10"
+														? "text-negative border-negative/30 bg-neg-bg"
 														: t.seeders < 10
-															? "text-yellow-200 border-yellow-500/20 bg-yellow-500/10"
-															: "text-emerald-200 border-emerald-500/20 bg-emerald-500/10"
+															? "text-warning border-warning/30 bg-warn-bg"
+															: "text-positive border-positive/30 bg-pos-bg"
 												}
 											>
 												{t.seeders}
 											</Button>
 										</td>
-										<td className="py-3 text-right text-xs text-gray-500">
+										<td className="py-3 text-right text-xs text-faint">
 											{t.indexer}
 										</td>
 										<td className="py-3 text-right flex justify-end">

@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-22
+
+> **Upgrading:** behind a reverse proxy, set `TRUST_PROXY=1` (see Security).
+> A fresh install now asks for a one-time setup code from the server log.
+
+### Security
+- **CRITICAL: the API required no login.** The auth plugins' hooks were
+  local to the plugins (Elysia hooks are unscoped by default), so the
+  session check never ran for the routes it was meant to guard: anyone who
+  could reach Eziarr could read settings and logs, start downloads, and set
+  a new password through `POST /settings/batch`. Present since the plugin
+  refactor (354f9f9). Both hooks are now `scoped`, and a test walks every
+  API route and requires a 401 without a session.
+- **First-boot setup code:** setting the initial password now needs a
+  one-time code printed on the server console, so an exposed fresh install
+  can't be claimed by whoever reaches it first. `EZIARR_PASSWORD` /
+  `EZIARR_PASSWORD_FILE` skip it.
+- **Login rate limit could be bypassed** by sending a fresh `X-Forwarded-For`
+  per request: the leftmost (client-controlled) entry was trusted whenever the
+  peer had a private IP. The header is now ignored unless `TRUST_PROXY` is
+  set, and then the entry the trusted proxy appended is used.
+  **Behaviour change:** behind a reverse proxy, set `TRUST_PROXY=1`, or all
+  clients share the proxy's rate-limit bucket.
+- **Password change revokes sessions:** tokens carry a session version that a
+  password change bumps; the caller is re-issued a session.
+- Refresh tokens are no longer accepted as access tokens.
+- `POST /settings` enforces the 8-character password minimum.
+- The session is checked before the request body is validated, so a caller
+  without one always gets 401 rather than a validation error.
+- The download URL guard covers more internal ranges (benchmarking,
+  multicast, reserved, Teredo, local NAT64) and checks the IPv4 address
+  behind IPv4-mapped, NAT64 and 6to4 IPv6 addresses; IPv6 literals are now
+  actually evaluated.
+- A download never overwrites a file another queued job is still waiting to
+  import; it is numbered instead.
+
+### Fixed
+- **One offline *Arr no longer takes the UI down:** `GET /missing` and the
+  Queue tab return the queues that answered plus an `unavailable` list, and
+  the UI says which service isn't answering.
+- **Sync saw only the first 100 missing items per service** (and its cleanup
+  then deleted the rest). It now pages through the whole list, writes in one
+  transaction, and never cleans up from a partial list.
+- **Queue progress never reached the UI:** the `/missing` response schema
+  stripped the new `progress` field.
+- **Force-grab's temporary Radarr profile** now copies the "Any" quality
+  profile, reclaims a temp profile left by an earlier run, and force-grabs
+  run one at a time per service so they can't delete it from under each
+  other.
+- **"Test connection" refused LAN *Arr URLs** (the SSRF guard rejects private
+  addresses). The *Arr URLs are the admin's own, so Test now only requires
+  http(s).
+
+### Changed
+- *Arr queues are fetched once per 5 s and shared by every poll, instead of
+  per request (up to ~110 *Arr calls a minute from one open browser).
+- Logs rotate at 5 MB (3 files kept), the worker writes its own `worker.log`,
+  and the Logs tab reads only the tail of each file, merged by time.
+- Download size cap raised from 2 GiB to 5 GiB.
+- Docs: README rewritten for 1.4 (Docker Compose setup, configuration,
+  security, upgrade notes) with new screenshots; DEVELOPER.md brought up to
+  date; new CONTRIBUTING.md and AGENTS.md (CLAUDE.md imports it).
+- Tests run with `bun test` (Vitest removed) against a throwaway database;
+  the data directories can be moved with `EZIARR_DB_DIR`, `EZIARR_LOG_DIR`
+  and `EZIARR_DOWNLOAD_DIR`. CI runs the tests and the frontend build.
+- Frontend dependencies updated (Vite 8.3.4 clears the dev-server advisories).
+- Queue items from `GET /missing` carry a `progress` field (0-100 or null).
+- New UI with a light/dark theme toggle and motion.
+
 ## [1.3.0] - 2026-10-04
 
 ### Fixed

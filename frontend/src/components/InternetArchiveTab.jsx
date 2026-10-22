@@ -33,8 +33,7 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 			}
 			toast.success("Internet Archive Search Complete");
 			setArchiveSearchResults(files);
-		} catch (err) {
-			// console.error("Internet Archive Search Failed", err);
+		} catch {
 			toast.error("Internet Archive Search Failed");
 			setArchiveSearchResults([]);
 		} finally {
@@ -49,8 +48,7 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 			setExpandingId(identifier);
 			const { filesInside } = await apiCall(`/api/v1/ia/files/${identifier}`);
 			setArchiveFiles((prev) => ({ ...prev, [identifier]: filesInside }));
-		} catch (err) {
-			// console.error("Internet Archive File Fetch Failed", err);
+		} catch {
 			toast.error("Internet Archive File Fetch Failed");
 			setArchiveFiles((prev) => ({ ...prev, [identifier]: [] }));
 		} finally {
@@ -66,16 +64,16 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 	return (
 		<div className="p-6">
 			{isLoading && (
-				<div className="w-full mb-4 py-3 bg-yellow-600/10 border border-yellow-600/30 rounded-lg flex items-center justify-center gap-3 backdrop-blur-sm animate-pulse">
-					<div className="w-4 h-4 border-2 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
-					<span className="text-sm font-bold text-yellow-500 tracking-wide">
+				<div className="w-full mb-4 py-3 bg-warn-bg border border-warning/30 rounded-lg flex items-center justify-center gap-3">
+					<div className="w-4 h-4 border-2 border-warning/30 border-t-yellow-500 rounded-full animate-spin" />
+					<span className="text-sm font-semibold text-warning">
 						Searching Archive.org...
 					</span>
 				</div>
 			)}
 
 			{!isLoading && archiveSearchResults.length === 0 && (
-				<div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-800 rounded-xl">
+				<div className="text-center py-12 text-faint border-2 border-dashed border-line rounded-2xl">
 					<Landmark size={32} className="mx-auto mb-3 opacity-20" />
 					<p>No results found in the Archive.</p>
 				</div>
@@ -92,18 +90,18 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 							className="flex justify-between items-center cursor-pointer group"
 						>
 							<div>
-								<h4 className="font-bold text-gray-200 group-hover:text-indigo-400 transition-colors">
+								<h4 className="font-semibold text-ink group-hover:text-ink transition-colors">
 									{item.title}
 								</h4>
-								<p className="text-xs text-gray-500 mt-1">
+								<p className="text-xs text-faint mt-1">
 									{item.year || "Unknown Year"} • {item.downloads} downloads
 								</p>
 							</div>
 							{expandingId === item.id ? (
-								<div className="animate-spin w-4 h-4 border-2 border-yellow-500 rounded-full border-t-transparent" />
+								<div className="animate-spin w-4 h-4 border-2 border-warning/30 rounded-full border-t-transparent" />
 							) : (
 								<div
-									className={`text-gray-500 transition-transform ${archiveFiles[item.id] ? "rotate-180" : ""}`}
+									className={`text-faint transition-transform ${archiveFiles[item.id] ? "rotate-180" : ""}`}
 								>
 									▼
 								</div>
@@ -112,25 +110,25 @@ const InternetArchiveTab = ({ query, onGrab }) => {
 
 						{/* FILES LIST (Expanded) */}
 						{archiveFiles[item.id] && (
-							<div className="mt-4 pt-4 border-t border-gray-800 space-y-2 bg-black/10 rounded-lg">
+							<div className="mt-4 pt-4 border-t border-line space-y-2 bg-black/10 rounded-lg">
 								{archiveFiles[item.id].length === 0 ? (
-									<p className="text-xs text-center text-gray-600 py-2">
+									<p className="text-xs text-center text-faint py-2">
 										No video files found.
 									</p>
 								) : (
 									archiveFiles[item.id].map((file) => (
 										<ListItem key={file.downloadUrl}>
 											<div
-												className="truncate text-xs text-gray-300 max-w-[60%]"
+												className="truncate text-xs text-ink max-w-[60%]"
 												title={file.filename}
 											>
 												{file.filename}
 											</div>
 											<div className="flex gap-3 items-center shrink-0">
-												<span className="text-[10px] text-gray-500 font-mono uppercase bg-black px-2 py-1 rounded">
+												<span className="text-xs text-faint num bg-ground px-2 py-1 rounded">
 													{file.format}
 												</span>
-												<span className="text-[10px] text-gray-500 font-mono uppercase bg-black px-2 py-1 rounded">
+												<span className="text-xs text-faint num bg-ground px-2 py-1 rounded">
 													{formatSize(file.size)}
 												</span>
 												<Button

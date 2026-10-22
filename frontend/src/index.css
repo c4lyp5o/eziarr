@@ -1,6 +1,120 @@
+@import "@fontsource-variable/inter";
 @import "tailwindcss";
 
+/*
+ * True-black flat: elevation by lightness alone (ground → surface → raised),
+ * no borders or shadows on cards at rest, colour only on data (the download
+ * rail) and on status. The primary control is an inverted pill.
+ *
+ * Theme: follows the OS unless the user picked one; the choice is written to
+ * <html data-theme="light|dark"> by context/Theme.jsx.
+ */
+:root,
+:root[data-theme="dark"] {
+	color-scheme: dark;
+	--ground: #000000;
+	--surface: #111111;
+	--raised: #222222;
+	--active: #2a2a2a;
+	--line: #1f1f1f;
+	--rule: #191919;
+	--control: #444444;
+	--ink: #ffffff;
+	--muted: #b4b4b4;
+	--faint: #949494;
+	--accent: #c6f24e;
+	--accent-ink: #0b0f00;
+	--primary: #ffffff;
+	--on-primary: #000000;
+	--positive: #c6f24e;
+	--negative: #e5566f;
+	--warning: #e5a93b;
+	--pos-bg: #222a10;
+	--neg-bg: #2c1a20;
+	--warn-bg: #2b2414;
+	--scrim: rgb(0 0 0 / 0.72);
+}
+
+:root[data-theme="light"] {
+	color-scheme: light;
+	--ground: #f2f2f0;
+	--surface: #ffffff;
+	--raised: #ececea;
+	--active: #e2e2df;
+	--line: #e3e3e0;
+	--rule: #ededea;
+	--control: #c9c9c5;
+	--ink: #111111;
+	--muted: #4f4f4c;
+	--faint: #6b6b67;
+	--accent: #6e9800;
+	--accent-ink: #ffffff;
+	--primary: #111111;
+	--on-primary: #ffffff;
+	--positive: #4d6b00;
+	--negative: #b4232f;
+	--warning: #8a5a00;
+	--pos-bg: #eaf6c9;
+	--neg-bg: #fdeaec;
+	--warn-bg: #fbf0d9;
+	--scrim: rgb(20 20 18 / 0.45);
+}
+
+@theme inline {
+	--font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+	--color-ground: var(--ground);
+	--color-surface: var(--surface);
+	--color-raised: var(--raised);
+	--color-active: var(--active);
+	--color-line: var(--line);
+	--color-rule: var(--rule);
+	--color-control: var(--control);
+	--color-ink: var(--ink);
+	--color-muted: var(--muted);
+	--color-faint: var(--faint);
+	--color-accent: var(--accent);
+	--color-accent-ink: var(--accent-ink);
+	--color-primary: var(--primary);
+	--color-on-primary: var(--on-primary);
+	--color-positive: var(--positive);
+	--color-negative: var(--negative);
+	--color-warning: var(--warning);
+	--color-pos-bg: var(--pos-bg);
+	--color-neg-bg: var(--neg-bg);
+	--color-warn-bg: var(--warn-bg);
+	--color-scrim: var(--scrim);
+}
+
+@layer base {
+	html {
+		background: var(--ground);
+		color: var(--ink);
+		font-family: var(--font-sans);
+		-webkit-font-smoothing: antialiased;
+	}
+	body {
+		background: var(--ground);
+		font-size: 14px;
+		line-height: 20px;
+	}
+	::selection {
+		background: color-mix(in srgb, var(--accent) 35%, transparent);
+	}
+	:focus-visible {
+		outline: 2px solid var(--ink);
+		outline-offset: 2px;
+	}
+	input::placeholder,
+	textarea::placeholder {
+		color: var(--faint);
+	}
+}
+
 @layer utilities {
+	.num {
+		font-variant-numeric: tabular-nums;
+	}
+
 	/* Hide scrollbar for Chrome, Safari and Opera */
 	.no-scrollbar::-webkit-scrollbar {
 		display: none;

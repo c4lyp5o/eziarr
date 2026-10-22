@@ -1,16 +1,67 @@
 import { useState, useEffect } from "react";
-import {
-	Lock,
-	User,
-	LogIn,
-	Loader2,
-	LayoutGrid,
-	ShieldCheck,
-} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { Loader2 } from "lucide-react";
 
 import { apiCall } from "../utils/apiCall";
+import { ui } from "../ui/styles";
+import { spring } from "../ui/motion";
+
+import { Button } from "./Buttons";
+import { Mark } from "./Mark";
+
+const Field = ({ id, label, ...props }) => (
+	<div>
+		<label htmlFor={id} className="block text-sm font-medium text-ink mb-2">
+			{label}
+		</label>
+		<input id={id} className={`${ui.input} h-10`} {...props} />
+	</div>
+);
+
+const ErrorLine = ({ error }) => (
+	<AnimatePresence initial={false}>
+		{error && (
+			<motion.p
+				role="alert"
+				className="text-sm text-negative bg-neg-bg rounded-2xl px-4 py-2.5"
+				initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+				animate={{
+					opacity: 1,
+					height: "auto",
+					marginBottom: 16,
+					x: [0, -6, 6, -3, 0],
+				}}
+				exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+				transition={{ ...spring, x: { duration: 0.32 } }}
+			>
+				{error}
+			</motion.p>
+		)}
+	</AnimatePresence>
+);
+
+// The shared frame: the mark and name, one line on what this is, the form.
+const Frame = ({ title, subtitle, children }) => (
+	<div className="min-h-dvh bg-ground flex flex-col items-center justify-center px-4 py-10">
+		<motion.div
+			className="w-full max-w-sm"
+			initial={{ opacity: 0, y: 16 }}
+			animate={{ opacity: 1, y: 0 }}
+			transition={spring}
+		>
+			<div className="flex items-center gap-2 mb-8 text-ink">
+				<Mark size={28} />
+				<span className="text-lg font-semibold tracking-[-0.01em]">Eziarr</span>
+			</div>
+			<h1 className="text-xl font-semibold text-ink">{title}</h1>
+			<p className="text-sm text-muted mt-1 mb-6">{subtitle}</p>
+			<div className="bg-surface rounded-[20px] p-5 sm:p-6">{children}</div>
+		</motion.div>
+	</div>
+);
 
 const SetUpInitialUserAndPassword = ({ onClose }) => {
+	const [setupCode, setSetupCode] = useState("");
 	const [password, setPassword] = useState("");
 	const [repeatPassword, setRepeatPassword] = useState("");
 	const [error, setError] = useState("");
@@ -20,13 +71,18 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 		e.preventDefault();
 		setError("");
 
+		if (!setupCode.trim()) {
+			setError("Enter the setup code from the server log.");
+			return;
+		}
+
 		if (!password) {
-			setError("Please enter your desired password.");
+			setError("Choose a password first.");
 			return;
 		}
 
 		if (password !== repeatPassword) {
-			setError("Passwords do not match.");
+			setError("The two passwords don't match.");
 			return;
 		}
 
@@ -34,11 +90,10 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 			setIsLoading(true);
 			await apiCall("/api/v1/firsttime", {
 				method: "POST",
-				body: { password },
+				body: { password, setupCode },
 			});
 			onClose();
 		} catch (err) {
-			// console.error("Failed to login", err);
 			setError(err.message);
 		} finally {
 			setIsLoading(false);
@@ -46,113 +101,65 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 	};
 
 	return (
-		<div className="absolute inset-0 z-50 flex items-center justify-center bg-[#0a0a0a]/95 backdrop-blur-md p-4 animate-in fade-in duration-500">
-			<div className="bg-gray-900/50 backdrop-blur-xl border border-emerald-500/30 w-full max-w-md rounded-2xl flex flex-col shadow-[0_0_50px_-12px_rgba(16,185,129,0.2)] overflow-hidden">
-				<div className="p-8 text-center pb-6">
-					<div className="w-16 h-16 rounded-2xl bg-linear-to-tr from-emerald-400 to-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-500/20 mx-auto mb-5">
-						<ShieldCheck className="text-white" size={32} />
-					</div>
-					<h2 className="text-2xl font-bold text-white mb-2">
-						Welcome to Eziarr!
-					</h2>
-					<p className="text-sm text-gray-400 font-medium">
-						Lets set up your credentials!
-					</p>
-				</div>
-
-				<form
-					onSubmit={handleSaveUsernameAndPassword}
-					className="px-8 pb-8 space-y-4"
-				>
-					{error && (
-						<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400 text-center animate-in slide-in-from-top-2">
-							{error}
-						</div>
-					)}
-
-					{/* <div>
-						<label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-							Username
-						</label>
-						<div className="relative">
-							<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
-								<User size={18} />
-							</div>
-							<input
-								type="text"
-								name="username"
-								value={credentials.username}
-								onChange={handleChange}
-								className="block w-full pl-10 pr-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all disabled:opacity-50"
-								placeholder="Choose a username"
-								disabled={isLoading}
-								// biome-ignore lint/a11y/noAutofocus: false positive
-								autoFocus
-							/>
-						</div>
-					</div> */}
-
+		<Frame
+			title="Set a password"
+			subtitle="This server has no password yet. It protects every page and the API."
+		>
+			<form onSubmit={handleSaveUsernameAndPassword}>
+				<ErrorLine error={error} />
+				<div className="space-y-4">
 					<div>
-						{/** biome-ignore lint/a11y/noLabelWithoutControl: false positive */}
-						<label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-							Password
-						</label>
-						<div className="relative">
-							<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
-								<Lock size={18} />
-							</div>
-							<input
-								type="password"
-								name="password"
-								value={password}
-								onChange={(e) => setPassword(e.target.value)}
-								className="block w-full pl-10 pr-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all disabled:opacity-50"
-								placeholder="••••••••"
-								minLength={8}
-								disabled={isLoading}
-							/>
-						</div>
+						<Field
+							id="setup-code"
+							label="Setup code"
+							value={setupCode}
+							onChange={(e) => setSetupCode(e.target.value)}
+							placeholder="XXXX-XXXX"
+							autoComplete="one-time-code"
+							autoCapitalize="characters"
+							spellCheck={false}
+							disabled={isLoading}
+							autoFocus
+						/>
+						<p className="text-xs text-faint mt-2">
+							Printed in the server log when Eziarr starts:{" "}
+							<span className="text-muted">docker logs eziarr</span>. It changes
+							on every restart.
+						</p>
 					</div>
-
-					<div>
-						{/** biome-ignore lint/a11y/noLabelWithoutControl: false positive */}
-						<label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-							Repeat Password
-						</label>
-						<div className="relative">
-							<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
-								<Lock size={18} />
-							</div>
-							<input
-								type="password"
-								name="repeatPassword"
-								value={repeatPassword}
-								onChange={(e) => setRepeatPassword(e.target.value)}
-								className="block w-full pl-10 pr-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all disabled:opacity-50"
-								placeholder="••••••••"
-								minLength={8}
-								disabled={isLoading}
-							/>
-						</div>
-					</div>
-
-					<button
-						type="submit"
+					<Field
+						id="new-password"
+						label="Password"
+						type="password"
+						value={password}
+						onChange={(e) => setPassword(e.target.value)}
+						placeholder="At least 8 characters"
+						autoComplete="new-password"
+						minLength={8}
 						disabled={isLoading}
-						className="w-full mt-6 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white py-3 px-4 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-600/20"
-					>
-						{isLoading ? (
-							<>
-								<Loader2 size={18} className="animate-spin" /> Securing
-								Server...
-							</>
-						) : (
-							"Complete Setup"
-						)}
-					</button>
-				</form>
-			</div>
-		</div>
+					/>
+					<Field
+						id="repeat-password"
+						label="Repeat password"
+						type="password"
+						value={repeatPassword}
+						onChange={(e) => setRepeatPassword(e.target.value)}
+						autoComplete="new-password"
+						minLength={8}
+						disabled={isLoading}
+					/>
+				</div>
+				<Button
+					type="submit"
+					size="lg"
+					className="w-full mt-6"
+					disabled={isLoading}
+				>
+					{isLoading && <Loader2 size={16} className="animate-spin" />}
+					{isLoading ? "Saving…" : "Save and continue"}
+				</Button>
+			</form>
+		</Frame>
 	);
 };
 
@@ -171,7 +178,7 @@ const Login = ({ onLoginSuccess }) => {
 		setError("");
 
 		if (!password) {
-			setError("Please enter your password.");
+			setError("Enter your password.");
 			return;
 		}
 
@@ -183,8 +190,7 @@ const Login = ({ onLoginSuccess }) => {
 			});
 			onLoginSuccess();
 		} catch (err) {
-			// console.error("Failed to login", err);
-			setError(err.message || "Invalid username or password.");
+			setError(err.message || "That password didn't work.");
 		} finally {
 			setIsLoading(false);
 		}
@@ -206,113 +212,55 @@ const Login = ({ onLoginSuccess }) => {
 	}, []);
 
 	if (isCheckingFirstTime) {
-		return <div className="min-h-screen bg-[#0a0a0a]" />;
+		return <div className="min-h-dvh bg-ground" />;
+	}
+
+	if (isFirstTime) {
+		return (
+			<SetUpInitialUserAndPassword onClose={() => setIsFirstTime(false)} />
+		);
 	}
 
 	return (
-		<div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-4 selection:bg-indigo-500/30">
-			<div className="w-full max-w-md animate-in fade-in zoom-in-95 duration-500">
-				<div className="flex flex-col items-center mb-8">
-					<div className="w-16 h-16 rounded-2xl bg-linear-to-tr from-indigo-500 to-blue-600 flex items-center justify-center shadow-xl shadow-indigo-500/20 mb-4">
-						<LayoutGrid className="text-white" size={32} />
-					</div>
-					<h1 className="text-3xl font-bold tracking-tight text-white mb-1">
-						EZIARR
-					</h1>
-				</div>
+		<Frame
+			title="Sign in"
+			subtitle="Find and grab what Radarr, Sonarr and Lidarr are still missing."
+		>
+			<form onSubmit={handleLogin}>
+				<ErrorLine error={error} />
+				<Field
+					id="password"
+					label="Password"
+					type="password"
+					value={password}
+					onChange={(e) => setPassword(e.target.value)}
+					autoComplete="current-password"
+					minLength={8}
+					disabled={isLoading}
+					autoFocus
+				/>
 
-				<div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-2xl overflow-hidden p-6 sm:p-8">
-					<form onSubmit={handleLogin} className="space-y-5">
-						{error && (
-							<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400 text-center animate-in slide-in-from-top-2">
-								{error}
-							</div>
-						)}
+				<label className="flex items-center gap-2.5 mt-4 text-sm text-muted select-none cursor-pointer">
+					<input
+						type="checkbox"
+						checked={rememberMe}
+						onChange={(e) => setRememberMe(e.target.checked)}
+						className="size-4 accent-[var(--ink)]"
+					/>
+					Keep me signed in on this device
+				</label>
 
-						{/* <div>
-							<label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-								Username
-							</label>
-							<div className="relative">
-								<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
-									<User size={18} />
-								</div>
-								<input
-									type="text"
-									name="username"
-									value={credentials.username}
-									onChange={handleChange}
-									className="block w-full pl-10 pr-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
-									placeholder="admin"
-									autoComplete="username"
-									disabled={isLoading}
-								/>
-							</div>
-						</div> */}
-
-						<div>
-							{/** biome-ignore lint/a11y/noLabelWithoutControl: false positive */}
-							<label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-								Password
-							</label>
-							<div className="relative">
-								<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
-									<Lock size={18} />
-								</div>
-								<input
-									type="password"
-									name="password"
-									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									className="block w-full pl-10 pr-4 py-3 bg-[#0f0f10] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
-									placeholder="••••••••"
-									autoComplete="current-password"
-									minLength={8}
-									disabled={isLoading}
-								/>
-							</div>
-						</div>
-
-						<div className="flex items-center justify-between">
-							<label className="flex items-center gap-2 text-sm text-gray-300 select-none">
-								<input
-									type="checkbox"
-									checked={rememberMe}
-									onChange={(e) => setRememberMe(e.target.checked)}
-									className="h-4 w-4 accent-indigo-500"
-								/>
-								Remember me
-							</label>
-
-							<span className="text-xs text-gray-500">
-								Keeps you signed in longer
-							</span>
-						</div>
-
-						<button
-							type="submit"
-							disabled={isLoading}
-							className="w-full mt-2 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-3 px-4 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/20"
-						>
-							{isLoading ? (
-								<>
-									<Loader2 size={18} className="animate-spin" />{" "}
-									Authenticating...
-								</>
-							) : (
-								<>
-									<LogIn size={18} /> Sign In
-								</>
-							)}
-						</button>
-					</form>
-				</div>
-			</div>
-
-			{isFirstTime && (
-				<SetUpInitialUserAndPassword onClose={() => setIsFirstTime(false)} />
-			)}
-		</div>
+				<Button
+					type="submit"
+					size="lg"
+					className="w-full mt-6"
+					disabled={isLoading}
+				>
+					{isLoading && <Loader2 size={16} className="animate-spin" />}
+					{isLoading ? "Signing in…" : "Sign in"}
+				</Button>
+			</form>
+		</Frame>
 	);
 };
 

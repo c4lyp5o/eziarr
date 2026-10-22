@@ -15,6 +15,8 @@ import {
 	triggerArrImport,
 	verifyArrImport,
 	isImportableService,
+	getMovieFileId,
+	buildImportFilename,
 } from "../import.js";
 import { translatePath } from "../utils.js";
 import { setSetting } from "../db.js";
@@ -211,6 +213,55 @@ describe("Import: verifyArrImport does not trust an accepted command", () => {
 		expect(verdict.reason).toMatch(/imported nothing for movie 2099/);
 	});
 
+	// An upgrade/re-download targets a movie that ALREADY has a file: hasFile is
+	// true before the scan runs, so it must not count as proof of an import.
+	it("Should not count a file the movie already had as an import", async () => {
+		axios.get.mockResolvedValue({ data: { hasFile: true, movieFile: { id: 7 } } });
+
+		const verdict = await verifyArrImport({
+			config,
+			service: "radarr",
+			serviceId: 2099,
+			filePath: dropFile,
+			previousFileId: 7,
+			timeoutMs: 5,
+			intervalMs: 1,
+			sleep: async () => {},
+		});
+		expect(verdict.imported).toBe(false);
+	});
+
+	it("Should report success once the movie's file is replaced", async () => {
+		axios.get
+			.mockResolvedValueOnce({ data: { hasFile: true, movieFile: { id: 7 } } })
+			.mockResolvedValueOnce({ data: { hasFile: true, movieFile: { id: 8 } } });
+
+		const verdict = await verifyArrImport({
+			config,
+			service: "radarr",
+			serviceId: 2099,
+			filePath: dropFile,
+			previousFileId: 7,
+			timeoutMs: 10000,
+			intervalMs: 1,
+			sleep: async () => {},
+		});
+		expect(verdict.imported).toBe(true);
+		expect(axios.get).toHaveBeenCalledTimes(2);
+	});
+
+	it("Should snapshot the movie's current file id, or null without one", async () => {
+		axios.get
+			.mockResolvedValueOnce({ data: { hasFile: true, movieFile: { id: 7 } } })
+			.mockResolvedValueOnce({ data: { hasFile: false, movieFile: null } })
+			.mockRejectedValueOnce(new Error("ECONNRESET"));
+
+		const args = { config, service: "radarr", serviceId: 2099 };
+		expect(await getMovieFileId(args)).toBe(7);
+		expect(await getMovieFileId(args)).toBe(null);
+		expect(await getMovieFileId(args)).toBe(null);
+	});
+
 	it("Should treat a vanished drop-folder file as an import (Move consumed it)", async () => {
 		axios.get.mockResolvedValue({ data: { hasFile: false } });
 
@@ -273,3 +324,44 @@ describe("Import: scope guard", () => {
 		expect(isImportableService("lidarr")).toBe(false);
 	});
 });
+
+describe("Import: the name a download is saved under", () => {
+	const config = { url: "http://radarr.lan", apiKey: "k" };
+	beforeEach(() => vi.clearAllMocks());
+
+	it("Should name a movie 'Title (Year)' and keep the source extension", async () => {
+		axios.get.mockResolvedValueOnce({ data: { title: "Polong", year: 2026 } });
+		const name = await buildImportFilename({
+			config,
+			service: "radarr",
+			sid: 2099,
+			filename: "polong.2026.1080p.WEB.MKV",
+		});
+		expect(name).toBe("Polong (2026).mkv");
+	});
+
+	it("Should name an episode 'Series SxxEyy' and strip path characters", async () => {
+		axios.get
+			.mockResolvedValueOnce({ data: { seriesId: 7, seasonNumber: 2, episodeNumber: 7 } })
+			.mockResolvedValueOnce({ data: { title: "Severance: Outie" } });
+		const name = await buildImportFilename({
+			config,
+			service: "sonarr",
+			sid: 88411,
+			filename: "x.mp4",
+		});
+		expect(name).toBe("Severance Outie S02E07.mp4");
+	});
+
+	it("Should fall back to the source filename when the *Arr can't be asked", async () => {
+		axios.get.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+		const name = await buildImportFilename({
+			config,
+			service: "radarr",
+			sid: 1,
+			filename: "Original Name.mp4",
+		});
+		expect(name).toBe("Original Name.mp4");
+	});
+});
+

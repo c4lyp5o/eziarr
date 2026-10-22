@@ -1,9 +1,7 @@
 import fs from "node:fs";
-import axios from "axios";
+import { arr } from "./arr";
 import { translatePath } from "./utils";
 import { generalLogger as logger } from "./logger";
-
-const API_VER = (service) => (service === "lidarr" ? "v1" : "v3");
 
 const scanCommandName = (service) => {
 	if (service === "radarr") return "DownloadedMoviesScan";
@@ -58,11 +56,7 @@ export const triggerArrImport = async ({
 }) => {
 	const payload = buildScanCommand({ service, serviceId, filePath });
 
-	await axios.post(
-		`${config.url}/api/${API_VER(service)}/command`,
-		payload,
-		{ headers: { "X-Api-Key": config.apiKey }, timeout: 30000 },
-	);
+	await arr(config, service).post("/command", payload);
 
 	return payload;
 };
@@ -73,6 +67,33 @@ const hasFile = (item) =>
 	item?.episodeFile != null;
 
 export const isImportableService = (service) => service === "radarr";
+
+/**
+ * Snapshot the movie's current file id BEFORE the scan, so verification can
+ * tell a fresh import apart from a file the movie already had (an upgrade or
+ * re-download). Returns null when the movie has no file, or when it can't be
+ * read — verification then falls back to plain hasFile.
+ */
+export const getMovieFileId = async ({ config, service, serviceId }) => {
+	try {
+		const res = await arr(config, service).get(`/movie/${Number(serviceId)}`, {
+			timeout: 15000,
+		});
+		return res.data?.movieFile?.id ?? null;
+	} catch (err) {
+		logger.warn(
+			`[WORKER] ⚠️ Could not snapshot movie ${serviceId} before import: ${err?.message ?? err}`,
+		);
+		return null;
+	}
+};
+
+// With a prior file, only a NEW movieFile id proves this scan imported ours;
+// otherwise the pre-existing file would verify instantly.
+const landedNewFile = (item, previousFileId) =>
+	previousFileId == null
+		? hasFile(item)
+		: item?.movieFile?.id != null && item.movieFile.id !== previousFileId;
 
 /**
  * The *Arr scan is fire-and-forget, so "the command was accepted" proves
@@ -92,6 +113,7 @@ export const verifyArrImport = async ({
 	service,
 	serviceId,
 	filePath,
+	previousFileId = null,
 	timeoutMs = 120000,
 	intervalMs = 5000,
 	sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -101,11 +123,10 @@ export const verifyArrImport = async ({
 
 	do {
 		try {
-			const res = await axios.get(
-				`${config.url}/api/${API_VER(service)}/movie/${Number(serviceId)}`,
-				{ headers: { "X-Api-Key": config.apiKey }, timeout: 15000 },
-			);
-			if (hasFile(res.data)) {
+			const res = await arr(config, service).get(`/movie/${Number(serviceId)}`, {
+				timeout: 15000,
+			});
+			if (landedNewFile(res.data, previousFileId)) {
 				logger.info(
 					`[WORKER] ✅ Import verified: movie ${serviceId} now has a file.`,
 				);
@@ -138,4 +159,59 @@ export const verifyArrImport = async ({
 			? `Scan imported nothing (last ${service} API error: ${lastError})`
 			: `Scan imported nothing for movie ${serviceId} within ${Math.round(timeoutMs / 1000)}s`,
 	};
+};
+
+/**
+ * The name a download is saved under, so the *Arr can parse it: "Title (Year)"
+ * for a movie, "Series SxxEyy" for an episode, "Artist - Album" for an album,
+ * keeping the source file's extension. Falls back to the source filename when
+ * the *Arr can't be asked.
+ */
+export const buildImportFilename = async ({ config, service, sid, filename }) => {
+	let perfectName = filename;
+	let ext = "";
+
+	try {
+		const lastDotIndex = filename.lastIndexOf(".");
+
+		const defaultExt = service === "lidarr" ? ".mp3" : ".mp4";
+
+		if (lastDotIndex === -1) {
+			logger.warn(
+				`[SERVER] No extension found in filename. Using ${defaultExt} as default. Original: ${filename}`,
+			);
+			ext = defaultExt;
+		} else {
+			ext = filename.substring(lastDotIndex).toLowerCase();
+
+			if (ext.length > 10 || !ext.match(/^\.[a-z0-9]+$/)) {
+				logger.warn(
+					`[SERVER] Invalid extension extracted (${ext}). Falling back to ${defaultExt}.`,
+				);
+				ext = defaultExt;
+			}
+		}
+
+		if (service === "radarr") {
+			const res = await arr(config, service).get(`/movie/${sid}`, { timeout: 10000 });
+			perfectName = `${res.data.title} (${res.data.year})${ext}`;
+		} else if (service === "sonarr") {
+			const epRes = await arr(config, service).get(`/episode/${sid}`, { timeout: 10000 });
+			const sRes = await arr(config, service).get(`/series/${epRes.data.seriesId}`, { timeout: 10000 });
+			const sn = epRes.data.seasonNumber.toString().padStart(2, "0");
+			const en = epRes.data.episodeNumber.toString().padStart(2, "0");
+			perfectName = `${sRes.data.title} S${sn}E${en}${ext}`;
+		} else if (service === "lidarr") {
+			const alRes = await arr(config, service).get(`/album/${sid}`, { timeout: 10000 });
+			perfectName = `${alRes.data.artist.artistName} - ${alRes.data.title}${ext}`;
+		}
+
+		perfectName = perfectName.replace(/[/\\?%*:|"<>]/g, "");
+	} catch (err) {
+		logger.warn(
+			`[SERVER] Failed to fetch exact title for renaming, falling back to original: ${err.message}`,
+		);
+	}
+
+	return perfectName;
 };

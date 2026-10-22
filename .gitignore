@@ -36,3 +36,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 client
 db/eziarr*
 logs/*.log
+
+# design inspection output (taste-skill)
+.taste-skill

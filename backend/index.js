@@ -1,6 +1,6 @@
 import path from "node:path";
 import crypto from "node:crypto";
-import { Elysia, file } from "elysia";
+import { Elysia, ElysiaCustomStatusResponse, file } from "elysia";
 import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import { openapi } from "@elysiajs/openapi";
@@ -8,6 +8,7 @@ import staticPlugin from "@elysiajs/static";
 import { getSetting, setSetting } from "./db";
 import { generalLogger as logger } from "./logger";
 import { CLIENT_DIR } from "./config";
+import { prepareSetup } from "./setup";
 
 import { AuthPlugin } from "./plugins/auth.plugin";
 import { ProtectorPlugin } from "./plugins/protector.plugin";
@@ -35,6 +36,9 @@ if (!JWT_SECRET) {
 
 export const app = new Elysia()
 	.onError(({ code, error, set }) => {
+		// A status a hook threw on purpose (e.g. ProtectorPlugin's 401): let
+		// Elysia send it as-is instead of turning it into a 500.
+		if (error instanceof ElysiaCustomStatusResponse) return;
 		if (code === "VALIDATION") {
 			process.env.NODE_ENV === "development" && logger.error(error);
 			set.status = 400;
@@ -150,21 +154,15 @@ if (process.env.NODE_ENV === "development") {
 						description: "Database and worker configuration",
 					},
 				],
-				// components: {
-				// 	securitySchemes: {
-				// 		ApiKeyAuth: {
-				// 			type: "apiKey",
-				// 			in: "header",
-				// 			name: "X-Api-Key",
-				// 		},
-				// 	},
-				// },
 			},
 		}),
 	);
 }
 
 try {
+	// First boot: an env password completes setup, otherwise this prints the
+	// one-time setup code on stdout (see setup.js).
+	await prepareSetup();
 	app.listen(process.env.PORT || 5000);
 	process.env.NODE_ENV === "development" &&
 		logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
