@@ -163,6 +163,7 @@ export const searchChannel = async (channelIdentifier, queries) => {
 				return {
 					id: msg.id,
 					channel: channelIdentifier,
+					channelTitle: entity.title || String(channelIdentifier),
 					filename: filename,
 					size: Number(doc.size),
 					date: msg.date,
@@ -174,6 +175,19 @@ export const searchChannel = async (channelIdentifier, queries) => {
 		logger.error("[TELEGRAM] Search Error: ", err);
 		throw new Error("Search Error");
 	}
+};
+
+/**
+ * The ids of every channel the account has joined (the same ones the status
+ * route lists), so a search can cover all of them.
+ */
+export const listChannelIds = async () => {
+	const client = await getTelegramClient();
+	if (!client) throw new Error("Not connected.");
+	if (!(await client.checkAuthorization())) throw new Error("Not authorized");
+
+	const dialogs = await client.getDialogs({ limit: 150 });
+	return dialogs.filter((d) => d.isChannel).map((d) => d.id.toString());
 };
 
 export const downloadTelegramFile = async (

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Telegram search:** the channel picker is gone. A search covers every
+  channel you have joined, a few at a time, and lists the results together
+  with the channel each came from. A channel that fails is skipped.
+
+### Fixed
+- Backend tests no longer fail to start when something is already listening
+  on port 5000.
+
 ## [1.5.0] - 2026-10-22
 
 ### Added

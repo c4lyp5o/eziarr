@@ -36,9 +36,9 @@ export const TelegramRoutes = new Elysia({ prefix: "/api/v1/telegram" })
 		body: TelegramModel.postTelegramSearch,
 		response: TelegramModel.postTelegramSearchResponse,
 		detail: {
-			summary: "Search for Media in a Telegram Channel",
+			summary: "Search for Media in Telegram Channels",
 			description:
-				"Search a specific Telegram channel for messages containing media (documents) that match the query. Returns an array of matching messages with metadata about the media files, which can then be imported.",
+				"Search every Telegram channel the client has (or one, when `channel` is given) for messages containing media (documents) that match the query. Returns an array of matching messages with metadata about the media files, which can then be imported.",
 			tags: ["Telegram"],
 		},
 	})
