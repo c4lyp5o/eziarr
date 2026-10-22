@@ -165,8 +165,8 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 	if (!status)
 		return (
 			<div className="p-6">
-				<div className="w-full mb-4 py-3 bg-red-600/10 border border-red-500/30 rounded-lg flex items-center justify-center gap-3 backdrop-blur-sm animate-pulse">
-					<span className="text-sm font-bold text-red-400 tracking-wide">
+				<div className="w-full mb-4 py-3 bg-neg-bg border border-negative/30 rounded-lg flex items-center justify-center gap-3">
+					<span className="text-sm font-semibold text-negative">
 						Telegram is not configured!
 					</span>
 				</div>
@@ -176,19 +176,19 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 	return (
 		<div className="p-6">
 			{checkingTelegramAuth ? (
-				<div className="w-full mb-4 py-3 bg-blue-600/10 border border-blue-500/30 rounded-lg flex items-center justify-center gap-3 backdrop-blur-sm animate-pulse">
-					<div className="w-4 h-4 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-					<span className="text-sm font-bold text-blue-400 tracking-wide">
+				<div className="w-full mb-4 py-3 bg-raised border border-control rounded-lg flex items-center justify-center gap-3">
+					<div className="w-4 h-4 border-2 border-control border-t-ink rounded-full animate-spin" />
+					<span className="text-sm font-semibold text-ink">
 						Connecting to Telegram...
 					</span>
 				</div>
 			) : !telegramConnected ? (
 				// --- LOGIN FORM ---
 				<Panel className="max-w-sm mx-auto p-8 text-center">
-					<div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-400">
+					<div className="w-12 h-12 bg-raised rounded-full flex items-center justify-center mx-auto mb-4 text-ink">
 						<Send size={24} />
 					</div>
-					<h3 className="text-lg font-bold text-white mb-6">
+					<h3 className="text-lg font-semibold text-ink mb-6">
 						Connect Telegram
 					</h3>
 
@@ -242,7 +242,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 
 					{telegramAuthState === "PASSWORD" && (
 						<div className="space-y-4">
-							<p className="text-sm text-yellow-400">2FA Password Required</p>
+							<p className="text-sm text-warning">2FA Password Required</p>
 							<input
 								type="password"
 								value={telegramPassword}
@@ -260,7 +260,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 								{isWaitingLogin ? (
 									<SpinnerSmall className="animate-spin" />
 								) : (
-									"Unlock"
+									"Verify"
 								)}
 							</Button>
 						</div>
@@ -271,7 +271,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 				<>
 					<Panel className="p-4 mb-6">
 						{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
-						<label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+						<label className="block text-xs font-semibold text-faint mb-2">
 							Target Channel
 						</label>
 						<div className="flex gap-2 items-center">
@@ -279,7 +279,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 								<select
 									value={selectedChannel}
 									onChange={(e) => setSelectedChannel(e.target.value)}
-									className={`${ui.input} appearance-none pr-8 focus:border-blue-500`}
+									className={`${ui.input} appearance-none pr-8 focus:border-control`}
 								>
 									<option value="" disabled>
 										Select a channel...
@@ -293,7 +293,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 									))}
 								</select>
 								{/* Dropdown Arrow Icon */}
-								<div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+								<div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-faint">
 									<svg
 										className="w-4 h-4"
 										fill="none"
@@ -327,7 +327,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 
 					<div className="space-y-3">
 						{telegramSearchResults.length === 0 && !isLoading && (
-							<div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-800 rounded-xl">
+							<div className="text-center py-12 text-faint border-2 border-dashed border-line rounded-2xl">
 								<Send size={32} className="mx-auto mb-3 opacity-20" />
 								<p>Search a channel to find media.</p>
 							</div>
@@ -340,17 +340,17 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 										className="flex items-center gap-4 overflow-hidden"
 										title={msg.filename}
 									>
-										<div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 text-blue-400">
+										<div className="w-10 h-10 rounded-lg bg-raised flex items-center justify-center shrink-0 text-ink">
 											<FileVideo size={20} />
 										</div>
 										<div className="min-w-0">
-											<h4 className="text-sm font-medium text-white truncate pr-4">
+											<h4 className="text-sm font-medium text-ink truncate pr-4">
 												{msg.messageText}
 											</h4>
-											<h4 className="text-sm font-medium text-white truncate pr-4">
+											<h4 className="text-sm font-medium text-ink truncate pr-4">
 												{msg.filename}
 											</h4>
-											<div className="flex gap-3 text-xs text-gray-400 mt-1">
+											<div className="flex gap-3 text-xs text-muted mt-1">
 												<span>{formatSize(msg.size)}</span>
 												<span>•</span>
 												<span>

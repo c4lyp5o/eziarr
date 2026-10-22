@@ -1,34 +1,42 @@
 export const ui = {
-	// Layout
-	panel: "bg-gray-900/50 border border-gray-800 rounded-xl",
-	panelSolid: "bg-gray-900 border border-gray-800 rounded-xl",
-	sectionTitle:
-		"text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2",
-	muted: "text-gray-500",
-	divider: "border-b border-gray-800",
+	// Layout — elevation by lightness alone: ground → surface → raised.
+	panel: "bg-surface rounded-[20px]",
+	panelSolid: "bg-surface rounded-[20px]",
+	sectionTitle: "text-base font-semibold text-ink flex items-center gap-2",
+	muted: "text-faint",
+	divider: "border-b border-line",
 
 	// Inputs
 	input:
-		"w-full bg-black border border-gray-700 rounded-lg py-2 px-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/40 focus:border-indigo-500 transition-colors",
+		"w-full h-9 bg-ground border border-control rounded-full px-4 text-ink text-sm placeholder:text-faint focus:outline-none focus:border-ink transition-colors",
 
-	// Buttons
+	// Buttons — one height per row, full pills; primary is the inverted pill.
 	btnBase:
-		"inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed",
-	btnSm: "px-3 py-1.5 text-xs",
-	btnMd: "px-4 py-2 text-sm",
-	btnLg: "px-6 py-2.5 text-sm",
-	btnPrimary: "bg-indigo-600 hover:bg-indigo-500 text-white",
-	btnSuccess: "bg-emerald-600 hover:bg-emerald-500 text-white",
-	btnWarn: "bg-yellow-500 hover:bg-yellow-400 text-black",
-	btnDanger: "bg-red-600 hover:bg-red-500 text-white",
-	btnGhost:
-		"bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-800",
+		"inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer",
+	btnSm: "h-8 px-3.5 text-[13px]",
+	btnMd: "h-9 px-4 text-sm",
+	btnLg: "h-10 px-5 text-sm",
+	btnPrimary: "bg-primary text-on-primary hover:opacity-85",
+	btnSuccess: "bg-raised text-ink hover:bg-active",
+	btnWarn: "bg-raised text-ink hover:bg-active",
+	btnDanger: "bg-neg-bg text-negative hover:brightness-110",
+	btnGhost: "bg-raised text-ink hover:bg-active",
 	btnIcon:
-		"p-2 rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-800",
-	chip: "rounded-md text-xs font-mono border border-gray-800 bg-gray-900 text-gray-300",
+		"size-9 rounded-full bg-transparent text-muted hover:bg-raised hover:text-ink",
+	chip: "rounded-full text-xs px-2.5 h-6 bg-raised text-ink num",
 
 	// Lists/cards
 	listRow:
-		"flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-gray-800/40 border border-gray-700/50 p-3 rounded-lg hover:border-gray-600 transition-colors",
-	card: "bg-gray-900 border border-gray-800 rounded-xl p-3 sm:p-4",
+		"flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-surface p-3 pl-4 rounded-2xl hover:bg-raised transition-colors",
+	card: "bg-surface rounded-2xl p-4",
+
+	// Status pills: a pale tint with the same hue's ink.
+	pillPositive:
+		"inline-flex items-center gap-1 h-5 px-2 rounded-full text-xs font-medium bg-pos-bg text-positive",
+	pillNegative:
+		"inline-flex items-center gap-1 h-5 px-2 rounded-full text-xs font-medium bg-neg-bg text-negative",
+	pillWarning:
+		"inline-flex items-center gap-1 h-5 px-2 rounded-full text-xs font-medium bg-warn-bg text-warning",
+	pillNeutral:
+		"inline-flex items-center gap-1 h-5 px-2 rounded-full text-xs font-medium bg-raised text-ink",
 };

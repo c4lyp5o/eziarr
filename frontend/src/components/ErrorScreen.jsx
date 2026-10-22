@@ -1,27 +1,37 @@
-import { X, RefreshCw } from "lucide-react";
+import { motion } from "motion/react";
+import { RefreshCw, CircleAlert } from "lucide-react";
+
+import { spring } from "../ui/motion";
+import { Button } from "./Buttons";
+import { Mark } from "./Mark";
 
 const ErrorScreen = () => {
 	return (
-		<div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6">
-			<div className="max-w-md w-full bg-gray-900 border border-red-500/20 rounded-2xl p-8 text-center shadow-2xl shadow-red-500/5">
-				<div className="inline-flex p-4 rounded-full bg-red-500/10 text-red-500 mb-6">
-					<X size={40} />
+		<div className="min-h-dvh bg-ground flex items-center justify-center px-4">
+			<motion.div
+				className="w-full max-w-sm"
+				initial={{ opacity: 0, y: 16 }}
+				animate={{ opacity: 1, y: 0 }}
+				transition={spring}
+			>
+				<div className="flex items-center gap-2 mb-8 text-ink">
+					<Mark size={28} />
+					<span className="text-lg font-semibold tracking-[-0.01em]">Eziarr</span>
 				</div>
-				<h2 className="text-2xl font-bold text-white mb-2">
-					Connection Failed
-				</h2>
-				<p className="text-gray-400 mb-8">
-					Unable to reach the EZIARR backend. Please ensure the server is
-					running and accessible.
-				</p>
-				<button
-					type="button"
-					onClick={() => window.location.reload()}
-					className="w-full py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
-				>
-					<RefreshCw size={18} /> Retry Connection
-				</button>
-			</div>
+				<div className="bg-surface rounded-[20px] p-6">
+					<h1 className="flex items-center gap-2 text-base font-semibold text-ink">
+						<CircleAlert size={18} className="text-negative" />
+						Can't reach the Eziarr server
+					</h1>
+					<p className="text-sm text-muted mt-2">
+						The page loaded, but the API didn't answer. Check that the server
+						is running, then try again.
+					</p>
+					<Button className="mt-5" onClick={() => window.location.reload()}>
+						<RefreshCw size={15} /> Try again
+					</Button>
+				</div>
+			</motion.div>
 		</div>
 	);
 };
