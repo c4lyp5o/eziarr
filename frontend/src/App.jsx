@@ -1,9 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from "react";
-import {
-	AnimatePresence,
-	LayoutGroup,
-	motion,
-} from "motion/react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
 	RefreshCw,
 	Search,
@@ -163,7 +159,9 @@ function App() {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: nop
 	useEffect(() => {
 		if (authState === "authed" && sysStatus && !sysStatus.isSetup) {
-			toast.warning("No services configured yet. Add Radarr, Sonarr or Lidarr to start.");
+			toast.warning(
+				"No services configured yet. Add Radarr, Sonarr or Lidarr to start.",
+			);
 			setSettingsTab("settings");
 		}
 	}, [sysStatus]);
@@ -242,7 +240,14 @@ function App() {
 	}, [missing, queue]);
 
 	const counts = useMemo(() => {
-		const c = { all: missing.length, radarr: 0, sonarr: 0, lidarr: 0, onTheWay: 0, stalled: 0 };
+		const c = {
+			all: missing.length,
+			radarr: 0,
+			sonarr: 0,
+			lidarr: 0,
+			onTheWay: 0,
+			stalled: 0,
+		};
 		for (const item of missing) {
 			if (item.service in c) c[item.service] += 1;
 			const state = describeQueue(queueByItem.get(item.id));
@@ -252,7 +257,8 @@ function App() {
 		return c;
 	}, [missing, queueByItem]);
 
-	if (authState === "checking") return <div className="min-h-screen bg-ground" />;
+	if (authState === "checking")
+		return <div className="min-h-screen bg-ground" />;
 
 	if (authState !== "authed")
 		return <Login onLoginSuccess={() => setAuthState("authed")} />;
@@ -294,13 +300,22 @@ function App() {
 				}`}
 			>
 				<div className="mx-auto max-w-[1208px] h-14 px-4 sm:px-6 flex items-center gap-2">
-					<a href="/" className="flex items-center gap-2 mr-4 shrink-0 text-ink" aria-label="Eziarr home">
+					<a
+						href="/"
+						className="flex items-center gap-2 mr-4 shrink-0 text-ink"
+						aria-label="Eziarr home"
+					>
 						<Mark size={24} />
-						<span className="text-base font-semibold tracking-[-0.01em]">Eziarr</span>
+						<span className="text-base font-semibold tracking-[-0.01em]">
+							Eziarr
+						</span>
 					</a>
 
 					<nav className="hidden md:flex items-center gap-1" aria-label="Main">
-						<span className="h-9 px-3 inline-flex items-center text-sm font-semibold text-ink" aria-current="page">
+						<span
+							className="h-9 px-3 inline-flex items-center text-sm font-semibold text-ink"
+							aria-current="page"
+						>
 							Missing
 						</span>
 						{NAV.map((n) => (
@@ -330,8 +345,16 @@ function App() {
 						<Button
 							variant="icon"
 							onClick={toggleTheme}
-							title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-							aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+							title={
+								theme === "dark"
+									? "Switch to light mode"
+									: "Switch to dark mode"
+							}
+							aria-label={
+								theme === "dark"
+									? "Switch to light mode"
+									: "Switch to dark mode"
+							}
 						>
 							<AnimatePresence mode="wait" initial={false}>
 								<motion.span
@@ -354,7 +377,12 @@ function App() {
 						>
 							<SettingsIcon size={18} />
 						</Button>
-						<Button variant="icon" title="Log out" aria-label="Log out" onClick={handleLogout}>
+						<Button
+							variant="icon"
+							title="Log out"
+							aria-label="Log out"
+							onClick={handleLogout}
+						>
 							<LogOut size={18} />
 						</Button>
 					</div>
@@ -365,7 +393,9 @@ function App() {
 				{/* TITLE ROW — the screen's question and today's answer */}
 				<div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-5">
 					<div className="min-w-0">
-						<h1 className="text-xl font-semibold tracking-[-0.01em]">Missing</h1>
+						<h1 className="text-xl font-semibold tracking-[-0.01em]">
+							Missing
+						</h1>
 						<p className="text-sm text-muted mt-1 num">
 							{finding}
 							{counts.stalled > 0 && (
@@ -390,9 +420,10 @@ function App() {
 									exit={{ opacity: 0, height: 0 }}
 									transition={spring}
 								>
-									{listNames(unavailable)} {unavailable.length === 1 ? "isn't" : "aren't"}{" "}
-									answering, so {unavailable.length === 1 ? "its" : "their"} downloads
-									may be missing below.
+									{listNames(unavailable)}{" "}
+									{unavailable.length === 1 ? "isn't" : "aren't"} answering, so{" "}
+									{unavailable.length === 1 ? "its" : "their"} downloads may be
+									missing below.
 								</motion.p>
 							)}
 						</AnimatePresence>
@@ -435,7 +466,10 @@ function App() {
 							className="hidden sm:inline-flex items-center gap-2 h-9 px-3 rounded-full whitespace-nowrap text-xs text-faint hover:text-ink hover:bg-surface transition-colors cursor-pointer num"
 							title="Refresh now"
 						>
-							<RefreshCw size={13} className={isValidating ? "animate-spin" : ""} />
+							<RefreshCw
+								size={13}
+								className={isValidating ? "animate-spin" : ""}
+							/>
 							Synced {formatClock(syncedAt)}
 						</button>
 					</div>
@@ -469,7 +503,9 @@ function App() {
 												transition={spring}
 											/>
 										)}
-										<span className={`relative text-[13px] ${selected ? "text-ink" : "text-faint"}`}>
+										<span
+											className={`relative text-[13px] ${selected ? "text-ink" : "text-faint"}`}
+										>
 											{f.label}
 										</span>
 										<span className="relative text-base font-semibold">
@@ -498,7 +534,8 @@ function App() {
 				) : counts.all === 0 ? (
 					<EmptyFrame title="All caught up">
 						<p className="text-sm text-muted mt-1">
-							Every monitored title is on disk. Eziarr checks again every 10 seconds.
+							Every monitored title is on disk. Eziarr checks again every 10
+							seconds.
 						</p>
 					</EmptyFrame>
 				) : filteredItems.length === 0 ? (
@@ -506,12 +543,14 @@ function App() {
 						<p className="text-sm text-muted mt-1">
 							{q ? (
 								<>
-									Nothing called “<span className="text-ink">{searchQuery}</span>”
+									Nothing called “
+									<span className="text-ink">{searchQuery}</span>”
 								</>
 							) : (
 								"Nothing"
 							)}{" "}
-							in {FILTERS.find((f) => f.id === activeFilter)?.label.toLowerCase()}.
+							in{" "}
+							{FILTERS.find((f) => f.id === activeFilter)?.label.toLowerCase()}.
 						</p>
 						<Button
 							variant="ghost"
@@ -556,27 +595,27 @@ function App() {
 			</main>
 
 			<Suspense fallback={null}>
-			{modalData && (
-				<ResultsModal
-					sysStatus={sysStatus}
-					service={modalData.service}
-					serviceId={modalData.serviceId}
-					query={modalData.query}
-					type={modalData.type}
-					isOpen={modalData.isOpen}
-					onClose={() => setModalData((m) => ({ ...m, isOpen: false }))}
-					mutate={mutate}
-				/>
-			)}
+				{modalData && (
+					<ResultsModal
+						sysStatus={sysStatus}
+						service={modalData.service}
+						serviceId={modalData.serviceId}
+						query={modalData.query}
+						type={modalData.type}
+						isOpen={modalData.isOpen}
+						onClose={() => setModalData((m) => ({ ...m, isOpen: false }))}
+						mutate={mutate}
+					/>
+				)}
 
-			{settingsLoaded && (
-				<SettingsModal
-					isOpen={settingsTab !== null}
-					initialTab={settingsTab ?? "settings"}
-					onClose={() => setSettingsTab(null)}
-					onSaveSuccess={mutateSysStatus}
-				/>
-			)}
+				{settingsLoaded && (
+					<SettingsModal
+						isOpen={settingsTab !== null}
+						initialTab={settingsTab ?? "settings"}
+						onClose={() => setSettingsTab(null)}
+						onSaveSuccess={mutateSysStatus}
+					/>
+				)}
 			</Suspense>
 		</div>
 	);

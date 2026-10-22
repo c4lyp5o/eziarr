@@ -16,7 +16,9 @@ const ErrorScreen = () => {
 			>
 				<div className="flex items-center gap-2 mb-8 text-ink">
 					<Mark size={28} />
-					<span className="text-lg font-semibold tracking-[-0.01em]">Eziarr</span>
+					<span className="text-lg font-semibold tracking-[-0.01em]">
+						Eziarr
+					</span>
 				</div>
 				<div className="bg-surface rounded-[20px] p-6">
 					<h1 className="flex items-center gap-2 text-base font-semibold text-ink">
@@ -24,8 +26,8 @@ const ErrorScreen = () => {
 						Can't reach the Eziarr server
 					</h1>
 					<p className="text-sm text-muted mt-2">
-						The page loaded, but the API didn't answer. Check that the server
-						is running, then try again.
+						The page loaded, but the API didn't answer. Check that the server is
+						running, then try again.
 					</p>
 					<Button className="mt-5" onClick={() => window.location.reload()}>
 						<RefreshCw size={15} /> Try again

@@ -13,37 +13,31 @@ import { formatDuration } from "../../utils/formatDuration";
 
 export default function HistoryTab({ history, historyIsLoading }) {
 	return (
-			<div className="h-full flex flex-col">
-				{history.length === 0 && !historyIsLoading ? (
-					<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
-						<History
-							size={48}
-							className="mb-4 opacity-50 text-faint"
-						/>
-						<h3 className="text-lg font-semibold text-ink">
-							No Download History
-						</h3>
-						<p className="text-sm mt-2 max-w-sm">
-							Past downloads will be logged here.
-						</p>
-					</div>
-				) : historyIsLoading ? (
-					<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
-						<Loader2
-							size={48}
-							className="mb-4 opacity-50 text-ink animate-spin"
-						/>
-						<h3 className="text-lg font-semibold text-ink">
-							Loading history...
-						</h3>
-					</div>
-				) : (
-					<div className="space-y-3">
-						<AnimatePresence initial={false}>
+		<div className="h-full flex flex-col">
+			{history.length === 0 && !historyIsLoading ? (
+				<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
+					<History size={48} className="mb-4 opacity-50 text-faint" />
+					<h3 className="text-lg font-semibold text-ink">
+						No Download History
+					</h3>
+					<p className="text-sm mt-2 max-w-sm">
+						Past downloads will be logged here.
+					</p>
+				</div>
+			) : historyIsLoading ? (
+				<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
+					<Loader2
+						size={48}
+						className="mb-4 opacity-50 text-ink animate-spin"
+					/>
+					<h3 className="text-lg font-semibold text-ink">Loading history...</h3>
+				</div>
+			) : (
+				<div className="space-y-3">
+					<AnimatePresence initial={false}>
 						{history.map((h) => (
 							<motion.div
 								{...rowMotion}
-								
 								key={h.id}
 								className="bg-surface p-4 rounded-2xl flex items-center gap-4"
 							>
@@ -78,8 +72,7 @@ export default function HistoryTab({ history, historyIsLoading }) {
 										</span>
 										{h.download_bytes > 0 && (
 											<span className="flex items-center gap-1">
-												<HardDrive size={12} />{" "}
-												{formatSize(h.download_bytes)}
+												<HardDrive size={12} /> {formatSize(h.download_bytes)}
 											</span>
 										)}
 										<span className="capitalize">{h.type}</span>
@@ -93,9 +86,8 @@ export default function HistoryTab({ history, historyIsLoading }) {
 							</motion.div>
 						))}
 					</AnimatePresence>
-					</div>
-				)}
-			</div>
-		
+				</div>
+			)}
+		</div>
 	);
 }

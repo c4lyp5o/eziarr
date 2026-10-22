@@ -1,41 +1,31 @@
 import { rowMotion } from "../../ui/motion";
 import { AnimatePresence, motion } from "motion/react";
-import {
-	Loader2,
-	RefreshCw,
-	Clock,
-	ListOrdered,
-} from "lucide-react";
+import { Loader2, RefreshCw, Clock, ListOrdered } from "lucide-react";
 
 export default function QueueTab({ queue, queueIsLoading }) {
 	return (
-			<div className="h-full flex flex-col">
-				{queue.length === 0 && !queueIsLoading ? (
-					<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
-						<ListOrdered
-							size={48}
-							className="mb-4 opacity-50 text-faint"
-						/>
-						<h3 className="text-lg font-semibold text-ink">
-							No Downloads Queued
-						</h3>
-						<p className="text-sm mt-2 max-w-sm">
-							Download queue is clear.
-						</p>
-					</div>
-				) : queueIsLoading ? (
-					<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
-						<Loader2
-							size={48}
-							className="mb-4 opacity-50 text-ink animate-spin"
-						/>
-						<h3 className="text-lg font-semibold text-ink">
-							Loading download queue...
-						</h3>
-					</div>
-				) : (
-					<div className="space-y-3">
-						<AnimatePresence initial={false}>
+		<div className="h-full flex flex-col">
+			{queue.length === 0 && !queueIsLoading ? (
+				<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
+					<ListOrdered size={48} className="mb-4 opacity-50 text-faint" />
+					<h3 className="text-lg font-semibold text-ink">
+						No Downloads Queued
+					</h3>
+					<p className="text-sm mt-2 max-w-sm">Download queue is clear.</p>
+				</div>
+			) : queueIsLoading ? (
+				<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
+					<Loader2
+						size={48}
+						className="mb-4 opacity-50 text-ink animate-spin"
+					/>
+					<h3 className="text-lg font-semibold text-ink">
+						Loading download queue...
+					</h3>
+				</div>
+			) : (
+				<div className="space-y-3">
+					<AnimatePresence initial={false}>
 						{queue.map((q) => {
 							let payloadObj = {};
 							try {
@@ -43,8 +33,7 @@ export default function QueueTab({ queue, queueIsLoading }) {
 							} catch (_e) {}
 							return (
 								<motion.div
-								{...rowMotion}
-								
+									{...rowMotion}
 									key={q.id}
 									className="bg-surface p-4 rounded-2xl flex items-center gap-4"
 								>
@@ -83,8 +72,8 @@ export default function QueueTab({ queue, queueIsLoading }) {
 										{q.status === "retry" && q.last_error && (
 											<p className="text-xs text-warning mt-2">
 												Will retry at{" "}
-												{new Date(q.next_attempt).toLocaleTimeString()}.
-												Reason: {q.last_error}
+												{new Date(q.next_attempt).toLocaleTimeString()}. Reason:{" "}
+												{q.last_error}
 											</p>
 										)}
 									</div>
@@ -92,9 +81,8 @@ export default function QueueTab({ queue, queueIsLoading }) {
 							);
 						})}
 					</AnimatePresence>
-					</div>
-				)}
-			</div>
-		
+				</div>
+			)}
+		</div>
 	);
 }

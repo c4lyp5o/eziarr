@@ -1,27 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
 import {
-	Lock,
-	X,
 	Save,
 	Settings as SettingsIcon,
-	Server,
-	Send,
-	FolderSync,
-	Film,
-	Tv,
-	Search,
-	Link,
-	AlertTriangle,
-	Check,
 	Loader2,
 	ScrollText,
 	Activity,
-	RefreshCw,
-	CheckCircle2,
-	XCircle,
-	Clock,
-	HardDrive,
 	BarChart3,
 	ListOrdered,
 	History,
@@ -57,8 +41,8 @@ const NoServicesConfiguredModal = ({
 	>
 		<div className="px-5 sm:px-6 pb-5">
 			<p className="text-sm text-muted">
-				Radarr, Sonarr and Lidarr are all empty, so Eziarr will have nothing
-				to look for until you add one.
+				Radarr, Sonarr and Lidarr are all empty, so Eziarr will have nothing to
+				look for until you add one.
 			</p>
 			<div className="flex justify-end gap-2 mt-5">
 				<Button variant="ghost" onClick={onCancel} disabled={isSavingConfig}>
@@ -286,8 +270,18 @@ const SettingsModal = ({
 
 	const TABS = [
 		{ id: "settings", label: "Config", icon: SettingsIcon },
-		{ id: "tasks", label: "Tasks", icon: Activity, count: tasks.length || null },
-		{ id: "queues", label: "Queue", icon: ListOrdered, count: queue.length || null },
+		{
+			id: "tasks",
+			label: "Tasks",
+			icon: Activity,
+			count: tasks.length || null,
+		},
+		{
+			id: "queues",
+			label: "Queue",
+			icon: ListOrdered,
+			count: queue.length || null,
+		},
 		{ id: "history", label: "History", icon: History },
 		{ id: "stats", label: "Stats", icon: BarChart3 },
 		{ id: "logs", label: "Logs", icon: ScrollText },
@@ -303,7 +297,12 @@ const SettingsModal = ({
 				title="Settings"
 				subtitle="Libraries, sources, and what the worker is doing."
 			>
-				<Tabs id="settings" tabs={TABS} active={activeTab} onChange={setActiveTab} />
+				<Tabs
+					id="settings"
+					tabs={TABS}
+					active={activeTab}
+					onChange={setActiveTab}
+				/>
 
 				{/* CONTENT AREA */}
 				<div className="flex-auto min-h-0 h-[70dvh] overflow-y-auto p-4 sm:p-6 bg-ground relative">
@@ -320,45 +319,73 @@ const SettingsModal = ({
 							))}
 						</div>
 					) : (
-					<AnimatePresence mode="wait" initial={false}>
-					<motion.div
-						key={activeTab}
-						initial={{ opacity: 0, y: 8 }}
-						animate={{ opacity: 1, y: 0 }}
-						exit={{ opacity: 0, y: -6 }}
-						transition={{ duration: 0.18 }}
-					>
-					{/* ============================== */}
-					{/* TAB 1: SETTINGS                */}
-					{/* ============================== */}
-					{activeTab === "settings" && <ConfigTab settings={settings} setSettings={setSettings} initialSettings={initialSettings} handleChange={handleChange} testStatus={testStatus} handleTestConnection={handleTestConnection} />}
+						<AnimatePresence mode="wait" initial={false}>
+							<motion.div
+								key={activeTab}
+								initial={{ opacity: 0, y: 8 }}
+								animate={{ opacity: 1, y: 0 }}
+								exit={{ opacity: 0, y: -6 }}
+								transition={{ duration: 0.18 }}
+							>
+								{/* ============================== */}
+								{/* TAB 1: SETTINGS                */}
+								{/* ============================== */}
+								{activeTab === "settings" && (
+									<ConfigTab
+										settings={settings}
+										setSettings={setSettings}
+										initialSettings={initialSettings}
+										handleChange={handleChange}
+										testStatus={testStatus}
+										handleTestConnection={handleTestConnection}
+									/>
+								)}
 
-					{/* ============================== */}
-					{/* TAB 2: TASKS                   */}
-					{/* ============================== */}
-					{activeTab === "tasks" && <TasksTab tasks={tasks} taskIsLoading={taskIsLoading} />}
+								{/* ============================== */}
+								{/* TAB 2: TASKS                   */}
+								{/* ============================== */}
+								{activeTab === "tasks" && (
+									<TasksTab tasks={tasks} taskIsLoading={taskIsLoading} />
+								)}
 
-					{/* ============================== */}
-					{/* TAB 3: DOWNLOAD QUEUES         */}
-					{/* ============================== */}
-					{activeTab === "queues" && <QueueTab queue={queue} queueIsLoading={queueIsLoading} />}
+								{/* ============================== */}
+								{/* TAB 3: DOWNLOAD QUEUES         */}
+								{/* ============================== */}
+								{activeTab === "queues" && (
+									<QueueTab queue={queue} queueIsLoading={queueIsLoading} />
+								)}
 
-					{/* ============================== */}
-					{/* TAB 4: DOWNLOAD HISTORY        */}
-					{/* ============================== */}
-					{activeTab === "history" && <HistoryTab history={history} historyIsLoading={historyIsLoading} />}
+								{/* ============================== */}
+								{/* TAB 4: DOWNLOAD HISTORY        */}
+								{/* ============================== */}
+								{activeTab === "history" && (
+									<HistoryTab
+										history={history}
+										historyIsLoading={historyIsLoading}
+									/>
+								)}
 
-					{/* ============================== */}
-					{/* TAB 5: DOWNLOAD STATS          */}
-					{/* ============================== */}
-					{activeTab === "stats" && <StatsTab stats={stats} statsIsLoading={statsIsLoading} />}
+								{/* ============================== */}
+								{/* TAB 5: DOWNLOAD STATS          */}
+								{/* ============================== */}
+								{activeTab === "stats" && (
+									<StatsTab stats={stats} statsIsLoading={statsIsLoading} />
+								)}
 
-					{/* ============================== */}
-					{/* TAB 6: LOGS                    */}
-					{/* ============================== */}
-					{activeTab === "logs" && <LogsTab logs={logs} logsIsLoading={logsIsLoading} logType={logType} setLogType={setLogType} logsEndRef={logsEndRef} />}
-				</motion.div>
-					</AnimatePresence>
+								{/* ============================== */}
+								{/* TAB 6: LOGS                    */}
+								{/* ============================== */}
+								{activeTab === "logs" && (
+									<LogsTab
+										logs={logs}
+										logsIsLoading={logsIsLoading}
+										logType={logType}
+										setLogType={setLogType}
+										logsEndRef={logsEndRef}
+									/>
+								)}
+							</motion.div>
+						</AnimatePresence>
 					)}
 				</div>
 
@@ -372,7 +399,10 @@ const SettingsModal = ({
 							exit={{ opacity: 0, y: 12 }}
 							transition={{ duration: 0.18 }}
 						>
-							<Button onClick={handleSave} disabled={isSavingConfig || isLoadingConfig}>
+							<Button
+								onClick={handleSave}
+								disabled={isSavingConfig || isLoadingConfig}
+							>
 								{isSavingConfig ? (
 									<Loader2 size={15} className="animate-spin" />
 								) : (

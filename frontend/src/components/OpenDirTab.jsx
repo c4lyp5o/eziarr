@@ -46,8 +46,7 @@ const OpenDirTab = ({ query, onGrab }) => {
 				);
 				setOdFiles(filteredFiles);
 			}
-		} catch (err) {
-			// console.error("Open Directory Scan Failed", err);
+		} catch {
 			toast.error("Open Directory Scan Failed");
 			setOdFiles([]);
 		} finally {

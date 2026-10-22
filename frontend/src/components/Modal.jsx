@@ -28,7 +28,11 @@ export function Modal({
 	}, [isOpen, onClose, dismissable]);
 
 	const width =
-		size === "sm" ? "sm:max-w-sm" : size === "md" ? "sm:max-w-xl" : "sm:max-w-5xl";
+		size === "sm"
+			? "sm:max-w-sm"
+			: size === "md"
+				? "sm:max-w-xl"
+				: "sm:max-w-5xl";
 
 	// Portalled: a tile animating its transform would otherwise become the
 	// containing block for this fixed overlay.
@@ -54,7 +58,12 @@ export function Modal({
 						className={`relative w-full ${width} max-h-[92dvh] sm:max-h-[86dvh] flex flex-col bg-surface rounded-t-[20px] sm:rounded-[20px] shadow-[0_24px_64px_rgb(0_0_0/0.45)] overflow-hidden`}
 						initial={{ opacity: 0, y: 40, scale: 0.97 }}
 						animate={{ opacity: 1, y: 0, scale: 1 }}
-						exit={{ opacity: 0, y: 24, scale: 0.98, transition: { duration: 0.15 } }}
+						exit={{
+							opacity: 0,
+							y: 24,
+							scale: 0.98,
+							transition: { duration: 0.15 },
+						}}
 						transition={spring}
 					>
 						{title && (

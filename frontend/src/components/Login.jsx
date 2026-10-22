@@ -25,7 +25,12 @@ const ErrorLine = ({ error }) => (
 				role="alert"
 				className="text-sm text-negative bg-neg-bg rounded-2xl px-4 py-2.5"
 				initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-				animate={{ opacity: 1, height: "auto", marginBottom: 16, x: [0, -6, 6, -3, 0] }}
+				animate={{
+					opacity: 1,
+					height: "auto",
+					marginBottom: 16,
+					x: [0, -6, 6, -3, 0],
+				}}
 				exit={{ opacity: 0, height: 0, marginBottom: 0 }}
 				transition={{ ...spring, x: { duration: 0.32 } }}
 			>
@@ -114,13 +119,12 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 							autoCapitalize="characters"
 							spellCheck={false}
 							disabled={isLoading}
-							// biome-ignore lint/a11y/noAutofocus: the first field of the only form
 							autoFocus
 						/>
 						<p className="text-xs text-faint mt-2">
 							Printed in the server log when Eziarr starts:{" "}
-							<span className="text-muted">docker logs eziarr</span>. It changes on
-							every restart.
+							<span className="text-muted">docker logs eziarr</span>. It changes
+							on every restart.
 						</p>
 					</div>
 					<Field
@@ -145,7 +149,12 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 						disabled={isLoading}
 					/>
 				</div>
-				<Button type="submit" size="lg" className="w-full mt-6" disabled={isLoading}>
+				<Button
+					type="submit"
+					size="lg"
+					className="w-full mt-6"
+					disabled={isLoading}
+				>
 					{isLoading && <Loader2 size={16} className="animate-spin" />}
 					{isLoading ? "Saving…" : "Save and continue"}
 				</Button>
@@ -207,7 +216,9 @@ const Login = ({ onLoginSuccess }) => {
 	}
 
 	if (isFirstTime) {
-		return <SetUpInitialUserAndPassword onClose={() => setIsFirstTime(false)} />;
+		return (
+			<SetUpInitialUserAndPassword onClose={() => setIsFirstTime(false)} />
+		);
 	}
 
 	return (
@@ -226,7 +237,6 @@ const Login = ({ onLoginSuccess }) => {
 					autoComplete="current-password"
 					minLength={8}
 					disabled={isLoading}
-					// biome-ignore lint/a11y/noAutofocus: the only field on the page
 					autoFocus
 				/>
 
@@ -240,7 +250,12 @@ const Login = ({ onLoginSuccess }) => {
 					Keep me signed in on this device
 				</label>
 
-				<Button type="submit" size="lg" className="w-full mt-6" disabled={isLoading}>
+				<Button
+					type="submit"
+					size="lg"
+					className="w-full mt-6"
+					disabled={isLoading}
+				>
 					{isLoading && <Loader2 size={16} className="animate-spin" />}
 					{isLoading ? "Signing in…" : "Sign in"}
 				</Button>

@@ -8,7 +8,8 @@ const PLACEMENT = {
 	"top-right": "top-4 right-4 items-end",
 	"top-left": "top-4 left-4 items-start",
 	"top-center": "top-4 left-1/2 -translate-x-1/2 items-center",
-	"bottom-right": "bottom-4 inset-x-4 sm:left-auto sm:right-4 items-stretch sm:items-end",
+	"bottom-right":
+		"bottom-4 inset-x-4 sm:left-auto sm:right-4 items-stretch sm:items-end",
 	"bottom-left": "bottom-4 left-4 items-start",
 	"bottom-center": "bottom-4 left-1/2 -translate-x-1/2 items-center",
 };
@@ -78,7 +79,9 @@ const ToastItem = ({ message, type, onClose, fromTop }) => {
 			onDragEnd={(_e, info) => Math.abs(info.offset.x) > 80 && onClose()}
 			className="pointer-events-auto flex items-center gap-3 sm:min-w-80 sm:max-w-sm pl-3 pr-2 py-2.5 rounded-2xl bg-surface text-ink shadow-[0_12px_32px_rgb(0_0_0/0.35)] ring-1 ring-line"
 		>
-			<span className={`size-7 shrink-0 grid place-items-center rounded-full ${mark}`}>
+			<span
+				className={`size-7 shrink-0 grid place-items-center rounded-full ${mark}`}
+			>
 				<Icon size={15} strokeWidth={2.25} />
 			</span>
 			<p className="text-sm flex-1">{message}</p>

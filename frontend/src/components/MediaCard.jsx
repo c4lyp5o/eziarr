@@ -167,7 +167,10 @@ const MediaCard = ({
 						{heading}
 					</h3>
 					{subheading && (
-						<p className="text-[13px] text-muted line-clamp-2 wrap-break-word" title={subheading}>
+						<p
+							className="text-[13px] text-muted line-clamp-2 wrap-break-word"
+							title={subheading}
+						>
 							{subheading}
 						</p>
 					)}
@@ -180,8 +183,12 @@ const MediaCard = ({
 				<div className="mt-auto flex items-center gap-1 px-1 pt-2 min-h-10">
 					{state ? (
 						<p className="flex items-center gap-2 min-w-0 px-1.5 text-xs num">
-							<span className={`size-1.5 shrink-0 rounded-full ${DOT[state.tone]}`} />
-							<span className="text-ink font-medium whitespace-nowrap">{state.label}</span>
+							<span
+								className={`size-1.5 shrink-0 rounded-full ${DOT[state.tone]}`}
+							/>
+							<span className="text-ink font-medium whitespace-nowrap">
+								{state.label}
+							</span>
 							<span className="text-faint truncate">
 								{Number.isFinite(progress)
 									? `${progress}%`
@@ -219,18 +226,18 @@ const MediaCard = ({
 						</>
 					)}
 					{!state && (
-					<Button
-						variant="icon"
-						className="size-8! ml-auto"
-						onClick={(e) => {
-							e.stopPropagation();
-							setShowUnmonitorModal(true);
-						}}
-						title="Stop monitoring"
-						aria-label={`Stop monitoring ${heading}`}
-					>
-						<EyeOff size={15} />
-					</Button>
+						<Button
+							variant="icon"
+							className="size-8! ml-auto"
+							onClick={(e) => {
+								e.stopPropagation();
+								setShowUnmonitorModal(true);
+							}}
+							title="Stop monitoring"
+							aria-label={`Stop monitoring ${heading}`}
+						>
+							<EyeOff size={15} />
+						</Button>
 					)}
 				</div>
 			</motion.article>
@@ -245,7 +252,12 @@ const MediaCard = ({
 				<div className="px-5 sm:px-6 pb-5">
 					<p className="text-sm text-muted">
 						<span className="text-ink font-medium">{heading}</span> leaves this
-						list and {kind.label === "Movie" ? "Radarr" : kind.label === "Episode" ? "Sonarr" : "Lidarr"}{" "}
+						list and{" "}
+						{kind.label === "Movie"
+							? "Radarr"
+							: kind.label === "Episode"
+								? "Sonarr"
+								: "Lidarr"}{" "}
 						stops looking for it. You can monitor it again from the *Arr.
 					</p>
 					<div className="flex justify-end gap-2 mt-5">
@@ -261,7 +273,9 @@ const MediaCard = ({
 							onClick={confirmUnmonitor}
 							disabled={isUnmonitoring}
 						>
-							{isUnmonitoring && <RefreshCw size={14} className="animate-spin" />}
+							{isUnmonitoring && (
+								<RefreshCw size={14} className="animate-spin" />
+							)}
 							Stop monitoring
 						</Button>
 					</div>

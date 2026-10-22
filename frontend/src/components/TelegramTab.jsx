@@ -44,8 +44,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 					setSelectedChannel(userDetails.channels[0].id.toString());
 				}
 			}
-		} catch (err) {
-			// console.error("Telegram Status Check Failed", err);
+		} catch {
 			toast.error("Telegram Status Check Failed");
 			setAvailableChannels([]);
 			setSelectedChannel("");
@@ -66,8 +65,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 			});
 			toast.success("Telegram Code Sent");
 			setTelegramAuthState("CODE");
-		} catch (err) {
-			// console.error("Sending Telegram Code Failed", err);
+		} catch {
 			toast.error("Sending Telegram Code Failed");
 		} finally {
 			setIsWaitingCode(false);
@@ -95,8 +93,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 			} else {
 				toast.error("Telegram Login Failed");
 			}
-		} catch (err) {
-			// console.error("Telegram Login Failed", err);
+		} catch {
 			toast.error("Telegram Login Failed");
 		} finally {
 			setIsWaitingLogin(false);
@@ -119,8 +116,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 			}
 			toast.success(`Got ${files.length} results from Telegram`);
 			setTelegramSearchResults(files);
-		} catch (err) {
-			// console.error("Telegram Search Failed", err);
+		} catch {
 			toast.error("Telegram Search Failed");
 			setTelegramSearchResults([]);
 		} finally {
@@ -149,8 +145,7 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 			} else {
 				toast.error(res.message);
 			}
-		} catch (err) {
-			// console.error("Grab From Telegram Failed", err);
+		} catch {
 			toast.error("Grab From Telegram Failed");
 		} finally {
 			setGrabbingId(null);

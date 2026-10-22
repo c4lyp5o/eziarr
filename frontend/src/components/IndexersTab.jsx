@@ -30,8 +30,7 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 			}
 			toast.success(`Got ${torrents.length} results from Indexers`);
 			setIndexerResults(torrents);
-		} catch (err) {
-			// console.error("Indexers Search Failed", err);
+		} catch {
 			toast.error("Indexers Search Failed");
 			setIndexerResults([]);
 		} finally {
@@ -59,8 +58,7 @@ const IndexersTab = ({ status, service, serviceId, query, type, mutate }) => {
 			} else {
 				toast.error("Grab From Indexers Failed");
 			}
-		} catch (err) {
-			// console.error("Grab From Indexers Failed", err);
+		} catch {
 			toast.error("Grab From Indexers Failed");
 		} finally {
 			setGrabbingId(null);

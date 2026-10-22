@@ -3,7 +3,12 @@
 // <MotionConfig reducedMotion="user"> in main.jsx drops the travel for
 // people who ask for less motion.
 
-export const spring = { type: "spring", stiffness: 520, damping: 38, mass: 0.8 };
+export const spring = {
+	type: "spring",
+	stiffness: 520,
+	damping: 38,
+	mass: 0.8,
+};
 export const softSpring = { type: "spring", stiffness: 280, damping: 32 };
 export const ease = [0.22, 1, 0.36, 1];
 

@@ -56,12 +56,18 @@ const ResultsModal = ({
 			labelledBy="deep-search-title"
 			title={
 				<>
-					Deep search <span className="text-muted font-normal">for</span> {query}
+					Deep search <span className="text-muted font-normal">for</span>{" "}
+					{query}
 				</>
 			}
 			subtitle="Releases outside your *Arr's own indexers."
 		>
-			<Tabs id="sources" tabs={SOURCES} active={activeTab} onChange={setActiveTab} />
+			<Tabs
+				id="sources"
+				tabs={SOURCES}
+				active={activeTab}
+				onChange={setActiveTab}
+			/>
 
 			<div className="flex-auto min-h-0 h-[62dvh] overflow-y-auto bg-ground">
 				<AnimatePresence mode="wait" initial={false}>
