@@ -561,13 +561,18 @@ Bun.serve({
 						{
 							id: 640,
 							messageId: 640,
-							channel: "-100123",
+							channel: "-100456",
 							filename: "Tajuk Lain (2015).mkv",
 							size: 981116006,
 							date: 1711600000,
 							messageText: "",
 						},
-					].map((f, i) => ({ ...f, score: [1.15, 0.95, 0.2][i] })),
+					].map((f, i) => ({
+						...f,
+						channelTitle:
+							f.channel === "-100123" ? "Filem Melayu HD" : "Drama Bersiri",
+						score: [1.15, 0.95, 0.2][i],
+					})),
 				});
 			}
 			case "/api/v1/ia/search":

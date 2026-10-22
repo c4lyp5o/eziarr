@@ -29,8 +29,6 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 	const [telegramPassword, setTelegramPassword] = useState("");
 
 	// Search Flow
-	const [availableChannels, setAvailableChannels] = useState([]);
-	const [selectedChannel, setSelectedChannel] = useState("");
 	const [telegramSearchResults, setTelegramSearchResults] = useState([]);
 	// Filled in with the title; editable, because channels name files their
 	// own way and only a person knows to try "5cm" for "5 cm".
@@ -46,16 +44,8 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 			setCheckingTelegramAuth(true);
 			const userDetails = await apiCall("/api/v1/telegram/status");
 			setTelegramConnected(userDetails.connected);
-			if (userDetails.channels) {
-				setAvailableChannels(userDetails.channels);
-				if (!selectedChannel && userDetails.channels.length > 0) {
-					setSelectedChannel(userDetails.channels[0].id.toString());
-				}
-			}
 		} catch {
 			toast.error("Telegram Status Check Failed");
-			setAvailableChannels([]);
-			setSelectedChannel("");
 			setTelegramSearchResults([]);
 			setGrabbingId(null);
 			setTelegramConnected(false);
@@ -109,15 +99,12 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 	};
 
 	const handleSearchFromTelegram = async () => {
-		if (!selectedChannel) return toast.error("Please select a channel");
-
 		try {
 			setIsLoading(true);
 			setTelegramSearchResults([]);
 			const { files } = await apiCall("/api/v1/telegram/search", {
 				method: "POST",
 				body: {
-					channel: selectedChannel,
 					query: searchText.trim() || query,
 					service,
 					serviceId,
@@ -139,13 +126,13 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 
 	const handleGrabFromTelegram = async (msg) => {
 		try {
-			setGrabbingId(msg.id);
+			setGrabbingId(`${msg.channel}:${msg.id}`);
 			const res = await apiCall("/api/v1/telegram/import", {
 				method: "POST",
 				body: {
 					service,
 					serviceId,
-					channel: selectedChannel,
+					channel: msg.channel,
 					messageId: msg.id,
 					filename: msg.filename,
 				},
@@ -296,76 +283,35 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 							maxLength={200}
 						/>
 						<p className="text-xs text-faint mb-4">
-							Also tries other spellings (“5 cm” and “5cm”) and the title's
-							alternate names from your *Arr.
+							Searches all your channels. Also tries other spellings (“5 cm” and
+							“5cm”) and the title's alternate names from your *Arr.
 						</p>
-						{/** biome-ignore lint/a11y/noLabelWithoutControl: nop */}
-						<label className="block text-xs font-semibold text-faint mb-2">
-							Channel
-						</label>
-						<div className="flex gap-2 items-center">
-							<div className="relative flex-1">
-								<select
-									value={selectedChannel}
-									onChange={(e) => setSelectedChannel(e.target.value)}
-									className={`${ui.input} appearance-none pr-8 focus:border-control`}
-								>
-									<option value="" disabled>
-										Select a channel...
-									</option>
-									{availableChannels.map((c) => (
-										// CHANGE: Use c.id as the value.
-										// The backend sends 'id' as a string to avoid BigInt issues in JSON.
-										<option key={c.id} value={c.id}>
-											{c.title} {c.username ? `- (@${c.username})` : ""}
-										</option>
-									))}
-								</select>
-								{/* Dropdown Arrow Icon */}
-								<div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-faint">
-									<svg
-										className="w-4 h-4"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<title>Arrow Down</title>
-										<path
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											strokeWidth="2"
-											d="M19 9l-7 7-7-7"
-										></path>
-									</svg>
-								</div>
-							</div>
-							<Button
-								variant="primary"
-								onClick={handleSearchFromTelegram}
-								disabled={isLoading}
-							>
-								{isLoading ? (
-									<SpinnerSmall className="animate-spin" />
-								) : (
-									<Send size={16} />
-								)}
-								Search
-							</Button>
-						</div>
+						<Button
+							variant="primary"
+							onClick={handleSearchFromTelegram}
+							disabled={isLoading}
+						>
+							{isLoading ? (
+								<SpinnerSmall className="animate-spin" />
+							) : (
+								<Send size={16} />
+							)}
+							Search
+						</Button>
 					</Panel>
 
 					<div className="space-y-3">
 						{telegramSearchResults.length === 0 && !isLoading && (
 							<div className="text-center py-12 text-faint border-2 border-dashed border-line rounded-2xl">
 								<Send size={32} className="mx-auto mb-3 opacity-20" />
-								<p>Search a channel to find media.</p>
+								<p>Search your channels to find media.</p>
 							</div>
 						)}
 
 						<div className="space-y-2">
 							{telegramSearchResults.map((msg, i) => (
 								<ListItem
-									key={msg.id}
+									key={`${msg.channel}:${msg.id}`}
 									className={
 										msg.score != null && msg.score < WEAK ? "opacity-60" : ""
 									}
@@ -391,6 +337,14 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 												{msg.score != null && msg.score < WEAK && (
 													<span className={ui.pillNeutral}>Weak match</span>
 												)}
+												{msg.channelTitle && (
+													<>
+														<span className="truncate max-w-48">
+															{msg.channelTitle}
+														</span>
+														<span>•</span>
+													</>
+												)}
 												<span>{formatSize(msg.size)}</span>
 												<span>•</span>
 												<span>
@@ -403,9 +357,11 @@ const TelegramTab = ({ status, service, serviceId, query, mutate }) => {
 										variant="success"
 										size="sm"
 										onClick={() => handleGrabFromTelegram(msg)}
-										disabled={grabbingId === msg.id}
+										disabled={grabbingId === `${msg.channel}:${msg.id}`}
 									>
-										{grabbingId === msg.id ? "Grabbing..." : "Grab"}
+										{grabbingId === `${msg.channel}:${msg.id}`
+											? "Grabbing..."
+											: "Grab"}
 									</Button>
 								</ListItem>
 							))}

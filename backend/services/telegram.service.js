@@ -3,6 +3,7 @@ import {
 	sendLoginCode,
 	completeLogin,
 	searchChannel,
+	listChannelIds,
 } from "../telegram";
 import { getAllServices, addToDownloadQueue } from "../db";
 import { coerceNumericId } from "../utils";
@@ -18,6 +19,7 @@ import {
 import { generalLogger as logger } from "../logger";
 import { buildImportFilename } from "../import";
 
+const CHANNEL_CONCURRENCY = 4; // channels searched at once
 const MAX_QUERIES = 10; // Telegram searches per click; each is a round trip
 const MAX_TITLES = 5;
 
@@ -117,7 +119,7 @@ export const TelegramService = {
 	},
 
 	/**
-	 * Searches the channel for the query as typed, the ways people tend to
+	 * Searches every channel (or just `channel`, when given) for the query as typed, the ways people tend to
 	 * write it differently ("5 cm" / "5cm"), and the title's alternate names
 	 * from the *Arr; then ranks every file by how well it fits.
 	 */
@@ -151,10 +153,31 @@ export const TelegramService = {
 				queries.add(q);
 		});
 
-		const files = await searchChannel(
-			channel,
-			[...queries].slice(0, MAX_QUERIES),
-		);
+		// No channel means every channel the account has. One that fails (left,
+		// banned, rate limited) is skipped so it can't sink the whole search.
+		const channels = channel ? [channel] : await listChannelIds();
+		const toSend = [...queries].slice(0, MAX_QUERIES);
+		const files = [];
+		let failed = 0;
+		// A few channels at a time: one after another is slow with dozens of
+		// channels, all at once trips Telegram's flood limits.
+		const pending = [...channels];
+		const searchNext = async () => {
+			while (pending.length > 0) {
+				const id = pending.shift();
+				try {
+					files.push(...(await searchChannel(id, toSend)));
+				} catch (err) {
+					failed++;
+					if (channel) throw err;
+					logger.warn(`[TELEGRAM] Skipping channel ${id}: ${err.message}`);
+				}
+			}
+		};
+		const workers = Math.min(CHANNEL_CONCURRENCY, channels.length);
+		await Promise.all(Array.from({ length: workers }, searchNext));
+		if (channels.length > 0 && failed === channels.length)
+			throw new Error("Search Error");
 		const ranked = files
 			.map((f) => ({
 				...f,
