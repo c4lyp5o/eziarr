@@ -160,6 +160,10 @@ export const unmonitorMissingMedia = (id) => {
 	db.run("DELETE FROM missing_items WHERE id = ?", [id]);
 };
 
+export const unmonitorManyMissingMedia = db.transaction((ids) => {
+	for (const id of ids) unmonitorMissingMedia(id);
+});
+
 /**
  * Apply one sync in a single transaction: upsert every row fetched, then
  * remove rows of services that synced completely but no longer list them

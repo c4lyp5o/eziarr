@@ -103,7 +103,12 @@ export const completeLogin = async (code, password) => {
 	}
 };
 
-export const searchChannel = async (channelIdentifier, query) => {
+/**
+ * Every file message matching any of `queries` (each one a Telegram search,
+ * which matches whole words), deduplicated. Which queries to send and how
+ * well each result fits is decided by the caller (see match.js).
+ */
+export const searchChannel = async (channelIdentifier, queries) => {
 	const client = await getTelegramClient();
 	if (!client) throw new Error("Not connected.");
 
@@ -111,26 +116,7 @@ export const searchChannel = async (channelIdentifier, query) => {
 
 	try {
 		const entity = await resolveEntity(client, channelIdentifier);
-
-		const queriesToTry = new Set([query]);
-
-		let swappedQuery = query;
-		if (query.includes("&")) {
-			swappedQuery = query.replace(/&/g, "and");
-			queriesToTry.add(swappedQuery);
-		} else if (query.toLowerCase().includes(" and ")) {
-			swappedQuery = query.replace(/ and /gi, " & ");
-			queriesToTry.add(swappedQuery);
-		}
-
-		const cleanPunctuation = (str) =>
-			str
-				.replace(/[!?.:,'"-]/g, " ")
-				.replace(/\s+/g, " ")
-				.trim();
-
-		queriesToTry.add(cleanPunctuation(query));
-		queriesToTry.add(cleanPunctuation(swappedQuery));
+		const queriesToTry = new Set(queries);
 
 		let allMsgs = [];
 
@@ -180,7 +166,7 @@ export const searchChannel = async (channelIdentifier, query) => {
 					filename: filename,
 					size: Number(doc.size),
 					date: msg.date,
-					messageText: msg.message,
+					messageText: msg.message ?? "",
 				};
 			})
 			.filter(Boolean);

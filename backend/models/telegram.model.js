@@ -9,7 +9,13 @@ export const TelegramModel = {
 	}),
 	postTelegramSearch: t.Object({
 		channel: t.String(),
-		query: t.String(),
+		query: t.String({ minLength: 1, maxLength: 200 }),
+		// The title being searched for, so its alternate names and year can
+		// be used too. Optional: a search works from the query alone.
+		service: t.Optional(
+			t.Union([t.Literal("radarr"), t.Literal("sonarr"), t.Literal("lidarr")]),
+		),
+		serviceId: t.Optional(t.Union([t.String(), t.Number()])),
 	}),
 	postTelegramImport: t.Object({
 		service: t.Union([
@@ -53,6 +59,8 @@ export const TelegramModel = {
 				size: t.Number(),
 				date: t.Number(),
 				messageText: t.String(),
+				// How well the file fits the title, about 0 to 1.2 (match.js).
+				score: t.Number(),
 			}),
 		),
 	}),

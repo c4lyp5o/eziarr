@@ -1,91 +1,22 @@
 import { useState } from "react";
-import { motion } from "motion/react";
-import {
-	Search,
-	RefreshCw,
-	Film,
-	Tv,
-	Music,
-	EyeOff,
-	Globe,
-} from "lucide-react";
+import { Search, RefreshCw, Film, EyeOff, Globe } from "lucide-react";
 
 import { apiCall } from "../utils/apiCall";
 import { useToast } from "../context/Toast";
-import { softSpring } from "../ui/motion";
 import { describeQueue } from "../utils/queueState";
+import { episodeCode, episodeName, isUpcoming } from "../utils/wall";
 
 import { Button } from "./Buttons";
 import { Modal } from "./Modal";
-
-const KIND = {
-	radarr: { label: "Movie", icon: Film },
-	sonarr: { label: "Episode", icon: Tv },
-	lidarr: { label: "Album", icon: Music },
-};
-
-const formatDate = (dateString) => {
-	if (!dateString) return null;
-	const d = new Date(dateString);
-	if (Number.isNaN(d.getTime())) return null;
-	return d.toLocaleDateString(undefined, {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-	});
-};
-
-const DOT = {
-	positive: "bg-positive",
-	warning: "bg-warning",
-	neutral: "bg-faint",
-};
-
-// "00:34:10" → "34 min left"; anything shorter than a minute → "<1 min left".
-const formatTimeLeft = (timeleft) => {
-	if (!timeleft) return null;
-	const parts = String(timeleft).split(":").map(Number);
-	if (parts.length !== 3 || parts.some(Number.isNaN)) return timeleft;
-	const [h, m] = parts;
-	if (h >= 24) return `${Math.floor(h / 24)} d left`;
-	if (h > 0) return `${h} h ${m} min left`;
-	return m > 0 ? `${m} min left` : "<1 min left";
-};
-
-const PosterFallback = ({ item }) => {
-	const Icon = KIND[item.service]?.icon ?? Film;
-	return (
-		<div className="absolute inset-0 flex flex-col justify-between p-3 bg-raised">
-			<Icon size={18} className="text-faint" />
-			<span className="text-[15px] font-semibold leading-snug text-muted line-clamp-4">
-				{item.seriesTitle || item.title}
-			</span>
-		</div>
-	);
-};
-
-const DownloadRail = ({ progress, tone }) => {
-	const known = Number.isFinite(progress);
-	return (
-		<div className="absolute inset-x-2 bottom-2 h-1.5 rounded-full bg-black/55 overflow-hidden">
-			{known ? (
-				<motion.div
-					className={`h-full origin-left rounded-full ${tone === "warning" ? "bg-warning" : "bg-accent"}`}
-					initial={{ scaleX: 0 }}
-					animate={{ scaleX: progress / 100 }}
-					transition={softSpring}
-				/>
-			) : (
-				// No size reported yet: a short bar that sweeps, never a fake percent.
-				<motion.div
-					className={`h-full w-1/3 rounded-full ${tone === "warning" ? "bg-warning" : "bg-accent"}`}
-					animate={{ x: ["-100%", "300%"] }}
-					transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-				/>
-			)}
-		</div>
-	);
-};
+import {
+	CardShell,
+	DOT,
+	DownloadRail,
+	formatDate,
+	formatTimeLeft,
+	KIND,
+	Poster,
+} from "./Poster";
 
 const MediaCard = ({
 	item,
@@ -94,11 +25,11 @@ const MediaCard = ({
 	onDeepSearch,
 	isSearching,
 	mutate,
+	onUnmonitored,
+	selection,
 }) => {
 	const { toast } = useToast();
 
-	const [imgFailed, setImgFailed] = useState(!item.posterUrl);
-	const [imgLoaded, setImgLoaded] = useState(false);
 	const [showUnmonitorModal, setShowUnmonitorModal] = useState(false);
 	const [isUnmonitoring, setIsUnmonitoring] = useState(false);
 
@@ -111,6 +42,7 @@ const MediaCard = ({
 	const confirmUnmonitor = async () => {
 		try {
 			setIsUnmonitoring(true);
+			onUnmonitored?.(item.id);
 			await apiCall("/api/v1/missing/unmonitor", {
 				method: "POST",
 				body: {
@@ -129,35 +61,19 @@ const MediaCard = ({
 	};
 
 	const heading = item.seriesTitle || item.title;
-	const subheading = item.seriesTitle ? item.title : null;
+	const subheading = !item.seriesTitle
+		? null
+		: item.service === "sonarr"
+			? [episodeCode(item.title), episodeName(item)].filter(Boolean).join(" · ")
+			: item.title;
+	const upcoming = isUpcoming(item);
 
 	return (
 		<>
-			<motion.article
-				className="group flex flex-col h-full bg-surface rounded-[20px] p-2"
-				whileHover="hover"
-				initial="rest"
-				animate="rest"
-			>
-				<div className="relative aspect-2/3 overflow-hidden rounded-[14px] bg-raised">
-					{imgFailed ? (
-						<PosterFallback item={item} />
-					) : (
-						<motion.img
-							src={item.posterUrl}
-							alt=""
-							loading="lazy"
-							onLoad={() => setImgLoaded(true)}
-							onError={() => setImgFailed(true)}
-							className="absolute inset-0 w-full h-full object-cover"
-							initial={false}
-							animate={{ opacity: imgLoaded ? 1 : 0 }}
-							variants={{ hover: { scale: 1.04 }, rest: { scale: 1 } }}
-							transition={{ opacity: { duration: 0.35 }, scale: softSpring }}
-						/>
-					)}
+			<CardShell selection={selection} label={heading}>
+				<Poster src={item.posterUrl} title={heading} service={item.service}>
 					{state && <DownloadRail progress={progress} tone={state.tone} />}
-				</div>
+				</Poster>
 
 				<div className="flex flex-col gap-0.5 px-1.5 pt-3 pb-1">
 					<h3
@@ -176,7 +92,13 @@ const MediaCard = ({
 					)}
 					<p className="text-xs text-faint num">
 						{kind.label}
-						{released ? ` · ${released}` : ""}
+						{upcoming
+							? released
+								? ` · Out ${released}`
+								: " · No date yet"
+							: released
+								? ` · ${released}`
+								: ""}
 					</p>
 				</div>
 
@@ -240,7 +162,7 @@ const MediaCard = ({
 						</Button>
 					)}
 				</div>
-			</motion.article>
+			</CardShell>
 
 			<Modal
 				isOpen={showUnmonitorModal}

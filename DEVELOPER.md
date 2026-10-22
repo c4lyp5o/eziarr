@@ -99,10 +99,14 @@ Everything is under `/api/v1`. Public: `GET /` (health), `GET`/`POST /firsttime`
 
 | Area | Routes |
 | --- | --- |
-| Missing | `GET /missing` (missing items + all queues + `unavailable` services) · `POST /missing/search` · `POST /missing/deepsearch` (Prowlarr) · `POST /missing/forcegrab` · `POST /missing/unmonitor` |
+| Missing | `GET /missing` (missing items + all queues + `unavailable` services) · `GET /missing/stream` (server-sent events, below) · `POST /missing/search` · `POST /missing/bulk` (`search` or `unmonitor` a selection; one *Arr call per service) · `POST /missing/deepsearch` (Prowlarr) · `POST /missing/forcegrab` · `POST /missing/unmonitor` |
 | Downloads | `POST /telegram/import` · `POST /http/import` · `GET /downloads/queue` · `GET /downloads/history` · `GET /downloads/stats` |
 | Sources | `GET /telegram/status` · `POST /telegram/auth/send-code` · `POST /telegram/auth/login` · `POST /telegram/search` · `POST /ia/search` · `GET /ia/files/:identifier` · `POST /opendir/scan` |
 | Settings & system | `GET`/`POST /settings` · `POST /settings/batch` · `GET /system/status` · `POST /system/test` · `GET /system/tasks` · `GET /system/logs?type=general\|hunter` |
+
+**Telegram search** (`POST /telegram/search`, `backend/match.js`). Telegram matches whole words, so "5 cm" never finds "5cm". The service builds up to 10 searches: the query as typed, spelling variants (number+word joined and split, punctuation and a leading "The" dropped, `&`/"and", part numbers as Roman numerals and back, the episode code as `S01E04`), and the title's original and alternate names read from the *Arr when `service`/`serviceId` are sent. Every file is then scored against all those titles with spacing, punctuation, case and accents ignored, plus or minus for the year and the episode, and the list comes back best first with its `score`.
+
+**The live stream.** `GET /missing/stream` sends `event: missing` (the list) and `event: queue` (`{ queue, unavailable }`), each only when it changed, and a `: ping` comment otherwise. One 4 s loop in the server feeds every open stream and stops when the last one closes; the 5 s queue cache in `fetchAllQueues` keeps the *Arrs from being asked more often than that, however many tabs are open. Every tick re-checks the access token the stream opened with, so the stream ends when it expires (15 min) or the password changes; the page then refreshes its session and reconnects (`hooks/useLiveMissing.js`).
 
 Response schemas are enforced: Elysia **drops fields a response model doesn't declare**, so a new field needs adding to its model in `models/` or it never reaches the UI. With `NODE_ENV=development`, the OpenAPI UI is served at `/openapi`.
 
@@ -110,8 +114,17 @@ Response schemas are enforced: Elysia **drops fields a response model doesn't de
 
 | Path | Role |
 | --- | --- |
-| `App.jsx` | Shell (top bar, theme toggle), title row, count-card filters, poster wall; lazy-loads the two sheets. |
-| `components/MediaCard.jsx` | A poster tile: download rail and state, search / deep search / unmonitor. |
+| `App.jsx` | Shell (top bar, theme and notification toggles), title row, count-card filters, sort and select, the wall; lazy-loads the two sheets and the backdrop. |
+| `components/MediaWall.jsx` | The wall, virtualized by row with `@tanstack/react-virtual` against the window scroll: only rows near the screen exist. |
+| `components/MediaCard.jsx`, `SeriesCard.jsx` | A title's card (download rail and state, search / deep search / unmonitor) and a series card (several episodes, with the episode list). |
+| `components/Poster.jsx` | Shared by both cards: the poster with tilt and fallback, the download rail, the card frame and its selection overlay. |
+| `components/BulkBar.jsx` | The action bar of select mode. |
+| `components/PosterDrift.jsx` | The three.js backdrop behind sign-in and "All caught up"; lazy, so the wall never loads three.js. |
+| `utils/wall.js` | Pure helpers: `isUpcoming`, episode codes, folding episodes into series, sorting. |
+| `utils/release.js` | Reads a release name (resolution, source, codec, HDR, audio, camera rips), warns about dead or undersized releases, merges duplicates and orders deep-search results. Tested in `tests/unit/`. |
+| `hooks/useLiveMissing.js` | SWR plus the event stream; polls only while the stream is down. |
+| `hooks/useArrivals.js` | "Downloaded" toasts and opt-in notifications (remembers titles seen downloading until they leave the list). |
+| `hooks/useShortcuts.js` | `/` and Esc. |
 | `components/ResultsModal.jsx` + `*Tab.jsx` | Deep search: Indexers, Telegram, Internet Archive, Open directory. |
 | `components/SettingsModal.jsx` + `settings/*Tab.jsx` | Settings sheet shell (state and data) and one presentational file per tab. |
 | `components/Modal.jsx`, `Tabs.jsx`, `Buttons.jsx`, `Mark.jsx` | Shared primitives: portalled animated dialog, underline tabs, buttons, the logo. |
@@ -122,14 +135,20 @@ Response schemas are enforced: Elysia **drops fields a response model doesn't de
 
 **Design rules:** use the tokens, never raw Tailwind palette colours, so both themes work. Surfaces separate by lightness, not borders or shadows (only floating things like dialogs and toasts get a shadow). The one accent colour goes on data (download progress, the selected filter), not on chrome. The main action is an inverted pill.
 
-**Motion** (`motion/react`, wrapped in `MotionConfig reducedMotion="user"`) is feedback: presses, sheets, rows arriving and leaving, the wall reflowing on filter, progress. Animate transform and opacity only.
+**Motion** (`motion/react`, wrapped in `MotionConfig reducedMotion="user"`) is feedback: presses, sheets, rows arriving and leaving, progress, the poster tilt. Animate transform and opacity only. The wall's cards don't animate in and out: with thousands of titles that cost seconds per filter change.
+
+**The wall must stay virtualized.** Don't render every title (a library can miss thousands), and keep what's derived from the list (filtering, grouping, sorting) in a `useMemo` that doesn't depend on the queue, which changes every few seconds while anything downloads.
+
+`public/` holds the PWA manifest, icons and `sw.js`. The service worker only shows notifications; it has no fetch handler and caches nothing, so a deploy is never hidden behind a stale cache.
 
 ## 🧪 Tests and CI
 
 - `bun test` in `backend/` (or `bun run test` from the root). The suites use the Vitest-style API (`describe`, `it`, `vi.mock`), which Bun provides; there is no Vitest dependency.
 - `tests/setup.js` is preloaded (`bunfig.toml`) and points `EZIARR_DB_DIR`, `EZIARR_LOG_DIR` and `EZIARR_DOWNLOAD_DIR` at a temp directory, removed after the run. Tests never touch `db/`.
 - Test files share one process and one database: clean up rows you create, and don't depend on another file or test having run first. `bun test --randomize` should pass.
-- CI (`.github/workflows/test.yml`) runs on pushes to `main`/`staging`/`dev` and on PRs: backend tests, then `biome ci` and the frontend build, on Bun 1.4.3 with `--frozen-lockfile`.
+- **Frontend unit tests** (`bun run test:unit` in `frontend/`): pure helpers such as the release-name parser.
+- **Browser smoke test** (`frontend/tests/smoke.test.js`, `bun run smoke` after `bun run build`): starts `tests/mock-api.js` (a mock of the API with 600 titles) and `vite preview`, then drives Chrome over the DevTools protocol (`tests/cdp.js`; set `CHROME_BIN` if Chrome isn't on the path). It covers sign-in, the virtualized wall, series cards, filters, sorting, shortcuts, select mode and a download finishing over the stream. The mock is also handy for UI work: `bun tests/mock-api.js` and `bun run dev` (see the header of the file for its switches).
+- CI (`.github/workflows/test.yml`) runs on pushes to `main`/`staging`/`dev` and on PRs: backend tests, then `biome ci`, the frontend build and the smoke test, on Bun 1.4.3 with `--frozen-lockfile`.
 
 ## 🐳 Docker
 

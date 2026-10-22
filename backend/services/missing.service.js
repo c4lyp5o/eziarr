@@ -2,6 +2,7 @@ import { arr } from "../arr";
 import {
 	getMissingMedia,
 	unmonitorMissingMedia,
+	unmonitorManyMissingMedia,
 	getAllServices,
 	getDownloadQueue,
 	recordForceGrabHistory,
@@ -9,6 +10,7 @@ import {
 } from "../db";
 import { coerceNumericId, fetchAllQueues } from "../utils";
 import { generalLogger as logger } from "../logger";
+import { verifyAccessToken } from "../session";
 
 const TEMP_PROFILE_NAME = "eziarr-any-language";
 
@@ -25,6 +27,56 @@ const oneAtATime = (key, fn) => {
 		run.catch(() => {}),
 	);
 	return run;
+};
+
+// One *Arr call per service for a whole selection: search commands take id
+// lists, and each *Arr has a bulk monitor endpoint.
+const BULK = {
+	search: {
+		radarr: (ids) => ["post", "/command", { name: "MoviesSearch", movieIds: ids }],
+		sonarr: (ids) => ["post", "/command", { name: "EpisodeSearch", episodeIds: ids }],
+		lidarr: (ids) => ["post", "/command", { name: "AlbumSearch", albumIds: ids }],
+	},
+	unmonitor: {
+		radarr: (ids) => ["put", "/movie/editor", { movieIds: ids, monitored: false }],
+		sonarr: (ids) => ["put", "/episode/monitor", { episodeIds: ids, monitored: false }],
+		lidarr: (ids) => ["put", "/album/monitor", { albumIds: ids, monitored: false }],
+	},
+};
+
+// Live updates for open tabs. One loop serves every subscriber and runs only
+// while someone is listening; the queue cache in fetchAllQueues keeps the
+// *Arrs from being asked more than once per cache window. The (large)
+// missing list goes out only when it changed; the queue, which moves while
+// anything downloads, goes separately.
+const LIVE_TICK_MS = 4000;
+const live = { subscribers: new Set(), timer: null, missing: null, queue: null };
+
+const liveTick = async () => {
+	try {
+		const snap = await MissingService.getMissing();
+		live.missing = JSON.stringify(snap.missing);
+		live.queue = JSON.stringify({
+			queue: snap.queue,
+			unavailable: snap.unavailable,
+		});
+	} catch (err) {
+		logger.warn(`[SERVER] Live update failed: ${err.message}`);
+		return;
+	}
+	for (const sub of live.subscribers) sub.push();
+};
+
+const startLive = () => {
+	if (live.timer) return;
+	live.timer = setInterval(liveTick, LIVE_TICK_MS);
+};
+
+const stopLiveIfIdle = () => {
+	if (live.subscribers.size || !live.timer) return;
+	clearInterval(live.timer);
+	live.timer = null;
+	live.missing = live.queue = null;
 };
 
 export const MissingService = {
@@ -123,18 +175,26 @@ export const MissingService = {
 				},
 			});
 
+			// Prowlarr doesn't parse quality; the UI reads it from the title.
 			const torrents = res.data
 				.map((r) => ({
 					title: r.title,
 					size: r.size,
 					indexer: r.indexer,
-					seeders: r.seeders,
-					leechers: r.leechers,
+					seeders: r.seeders ?? null, // null for usenet
+					leechers: r.leechers ?? null,
+					grabs: r.grabs ?? null,
 					age: r.age,
+					publishDate: r.publishDate ?? null,
+					protocol: r.protocol ?? "torrent",
+					freeleech: (r.indexerFlags ?? []).some((f) =>
+						/freeleech/i.test(String(f)),
+					),
+					infoUrl: r.infoUrl ?? null,
 					downloadUrl: r.downloadUrl || r.magnetUrl,
 					guid: r.guid,
 				}))
-				.sort((a, b) => b.seeders - a.seeders);
+				.sort((a, b) => (b.seeders ?? 0) - (a.seeders ?? 0));
 
 			return { success: true, torrents };
 		}
@@ -241,7 +301,7 @@ export const MissingService = {
 		oneAtATime(ctx.body.service, () => MissingService._forceGrab(ctx)),
 
 	_forceGrab: async ({
-		body: { service, serviceId, title, downloadUrl, forceLanguage },
+		body: { service, serviceId, title, downloadUrl, forceLanguage, protocol },
 	}) => {
 		const SERVICES = getAllServices();
 		const config = SERVICES[service];
@@ -264,7 +324,9 @@ export const MissingService = {
 			return arr(config, service).post("/release/push", {
 					title: title,
 					downloadUrl: downloadUrl,
-					protocol: "Torrent",
+					// Usenet results must say so, or the *Arr hands the NZB to
+					// the torrent client.
+					protocol: protocol === "usenet" ? "Usenet" : "Torrent",
 					publishDate: new Date().toISOString(),
 				});
 		};
@@ -533,5 +595,112 @@ export const MissingService = {
 		unmonitorMissingMedia(`${service}-${sid}`);
 
 		return { success: true, message: `Unmonitored ${service}-${sid}` };
+	},
+
+	postMissingBulk: async ({ body: { action, items } }) => {
+		const SERVICES = getAllServices();
+		const byService = new Map();
+		for (const { service, serviceId } of items) {
+			const ids = byService.get(service) ?? [];
+			ids.push(coerceNumericId(serviceId, "serviceId"));
+			byService.set(service, ids);
+		}
+
+		let done = 0;
+		const failed = [];
+		for (const [service, ids] of byService) {
+			const config = SERVICES[service];
+			if (!config?.url || !config?.apiKey) {
+				failed.push(service);
+				continue;
+			}
+			const [method, path, body] = BULK[action][service](ids);
+			try {
+				await arr(config, service)[method](path, body);
+			} catch (err) {
+				logger.warn(`[SERVER] Bulk ${action} on ${service} failed: ${err.message}`);
+				failed.push(service);
+				continue;
+			}
+			if (action === "unmonitor")
+				unmonitorManyMissingMedia(ids.map((id) => `${service}-${id}`));
+			done += ids.length;
+		}
+
+		const verb = action === "search" ? "Search started for" : "Stopped monitoring";
+		return {
+			success: failed.length === 0,
+			done,
+			failed,
+			message: failed.length
+				? `${verb} ${done} of ${items.length}; ${failed.join(", ")} didn't answer`
+				: `${verb} ${done} ${done === 1 ? "title" : "titles"}`,
+		};
+	},
+
+	/**
+	 * Server-sent events: `missing` (the list) and `queue` (queue and
+	 * unavailable services), each sent when it changes, plus a ping comment
+	 * otherwise so proxies and Bun's idle timeout keep the stream open.
+	 * The access token it opened with is re-checked every tick, so the
+	 * stream ends when that token expires (15 min) or the password changes;
+	 * the client then refreshes its session and reopens. Logging out only
+	 * clears cookies, like for every other route; the page closes its own
+	 * stream when it signs out.
+	 */
+	streamMissing: ({ jwt, cookie: c, request }) => {
+		const token = c.eziarr_access?.value;
+		const encoder = new TextEncoder();
+		let sub;
+
+		const stream = new ReadableStream({
+			start(controller) {
+				const sent = { missing: null, queue: null };
+				const write = (text) => controller.enqueue(encoder.encode(text));
+				const close = () => {
+					if (!live.subscribers.delete(sub)) return;
+					stopLiveIfIdle();
+					try {
+						controller.close();
+					} catch {
+						// already closed by the client
+					}
+				};
+				sub = {
+					close,
+					push: async () => {
+						if (!(await verifyAccessToken(jwt, token))) return close();
+						let wrote = false;
+						for (const event of ["missing", "queue"]) {
+							if (live[event] && live[event] !== sent[event]) {
+								write(`event: ${event}\ndata: ${live[event]}\n\n`);
+								sent[event] = live[event];
+								wrote = true;
+							}
+						}
+						if (!wrote) write(": ping\n\n");
+					},
+				};
+				live.subscribers.add(sub);
+				request.signal?.addEventListener("abort", close);
+				startLive();
+				write("retry: 5000\n\n");
+				// A newcomer gets the current state now, not at the next tick.
+				if (live.missing) sub.push();
+				else liveTick();
+			},
+			cancel() {
+				sub?.close();
+			},
+		});
+
+		return new Response(stream, {
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache, no-transform",
+				// Tell nginx-style proxies not to buffer the stream.
+				"X-Accel-Buffering": "no",
+			},
+		});
 	},
 };

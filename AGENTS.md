@@ -12,6 +12,9 @@ Guidance for AI coding agents (and humans in a hurry) working on Eziarr. Archite
 | One test file | `cd backend && bun test tests/import.test.js` |
 | Frontend lint + format check | `cd frontend && bun run check` (`bunx biome check --write` to fix) |
 | Frontend build | `cd frontend && bun run build` (writes `../client`) |
+| Frontend unit tests | `cd frontend && bun run test:unit` |
+| Browser smoke test | `cd frontend && bun run smoke` (after a build; needs Chrome, `CHROME_BIN` to pick one) |
+| UI against fake data | `cd frontend && bun tests/mock-api.js` then `bun run dev` (`COUNT=3000` for a large library) |
 
 Use Bun, not npm/node, for everything. There is no Vitest package: `bun test` provides the `vitest` imports.
 
@@ -29,6 +32,7 @@ Use Bun, not npm/node, for everything. There is no Vitest package: `bun test` pr
 10. **Docker installs use `--frozen-lockfile`; the backend also uses `--ignore-scripts`.** Bun 1.4 otherwise deletes `bufferutil` on Alpine and the server crashes on boot. Smoke-test a built image after changing the Dockerfile or the Bun version.
 11. **No top-level `await` in `backend/index.js` or `worker.js`.** PM2 loads them with `require()`, which Bun refuses when a top-level await really suspends; the server crash-looped in 1.4.0. `tests/pm2-load.test.js` loads `index.js` the PM2 way. Likewise, don't detect the process from `Bun.main` (under PM2 it's PM2's wrapper); use `EZIARR_ROLE` from `ecosystem.config.js`.
 12. **Frontend colours come from tokens** (`bg-surface`, `text-ink`, `text-muted`, `bg-accent`, … in `src/index.css`), never raw Tailwind palette classes, so light and dark both work. Motion animates transform and opacity only.
+13. **The wall stays virtualized.** 1.4.1 rendered every title: 3000 cards took 5 s to appear and 12 s per filter change. Keep `MediaWall`, and keep derived lists in a `useMemo` that doesn't depend on the queue.
 
 ## Conventions
 

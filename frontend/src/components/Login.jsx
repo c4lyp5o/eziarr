@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Loader2 } from "lucide-react";
 
@@ -8,6 +8,8 @@ import { spring } from "../ui/motion";
 
 import { Button } from "./Buttons";
 import { Mark } from "./Mark";
+
+const PosterDrift = lazy(() => import("./PosterDrift"));
 
 const Field = ({ id, label, ...props }) => (
 	<div>
@@ -43,8 +45,11 @@ const ErrorLine = ({ error }) => (
 // The shared frame: the mark and name, one line on what this is, the form.
 const Frame = ({ title, subtitle, children }) => (
 	<div className="min-h-dvh bg-ground flex flex-col items-center justify-center px-4 py-10">
+		<Suspense fallback={null}>
+			<PosterDrift />
+		</Suspense>
 		<motion.div
-			className="w-full max-w-sm"
+			className="relative w-full max-w-sm"
 			initial={{ opacity: 0, y: 16 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={spring}

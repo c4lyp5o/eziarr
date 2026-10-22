@@ -1,4 +1,13 @@
-import { vi, describe, it, expect, beforeAll, beforeEach } from "vitest";
+import {
+	vi,
+	describe,
+	it,
+	expect,
+	beforeAll,
+	beforeEach,
+	afterAll,
+} from "vitest";
+import axios from "axios";
 import { app } from "../index.js";
 import { setSetting } from "../db.js";
 import { getAuthCookie } from "./testUtils.js";
@@ -8,6 +17,8 @@ const mockTelegramClientInstance = {
 	sendCode: vi.fn().mockResolvedValue({ phoneCodeHash: "fake_hash_123" }),
 	invoke: vi.fn().mockResolvedValue(true),
 	signInWithPassword: vi.fn().mockResolvedValue(true),
+	checkAuthorization: vi.fn().mockResolvedValue(true),
+	getEntity: vi.fn().mockResolvedValue({ title: "Test channel" }),
 	session: { save: vi.fn().mockReturnValue("fake_session_string") },
 };
 
@@ -16,9 +27,23 @@ vi.mock("telegram", () => {
 		TelegramClient: vi.fn(() => mockTelegramClientInstance),
 		Api: {
 			auth: { SignIn: vi.fn() },
+			// Constructors that keep their arguments, so the search test can
+			// see which queries were sent.
+			messages: {
+				Search: class {
+					constructor(args) {
+						Object.assign(this, args);
+					}
+				},
+			},
+			InputMessagesFilterEmpty: class {},
 		},
 	};
 });
+
+vi.mock("axios", () => ({
+	default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+}));
 
 vi.mock("telegram/sessions", () => ({
 	StringSession: vi.fn(),
@@ -103,5 +128,121 @@ describe("Telegram Authentication Flow", () => {
 		expect(res.status).toBe(200);
 		expect(body.success).toBe(false);
 		expect(body.message).toBe("2FA_NEEDED"); // Your frontend checks for this!
+	});
+});
+
+describe("Telegram search", () => {
+	// Files in the channel, and a stand-in for Telegram's search: like the
+	// real one it matches whole words, so "5 cm" does not find "5cm".
+	const CHANNEL_FILES = [
+		"5cm.2007.1080p.mkv",
+		"15cm.Something.2019.mkv",
+		"Other Movie 2007.mkv",
+		"Byousoku.5.Centimeter.2007.720p.mkv",
+	];
+	const wordsOf = (s) => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+	const telegramSearch = (req) => {
+		if (typeof req?.q !== "string") return true;
+		const wanted = wordsOf(req.q);
+		return {
+			messages: CHANNEL_FILES.map((fileName, i) => ({ fileName, id: i + 1 }))
+				.filter(({ fileName }) =>
+					wanted.every((w) => wordsOf(fileName).includes(w)),
+				)
+				.map(({ fileName, id }) => ({
+					id,
+					date: 1700000000 + id,
+					message: "",
+					media: {
+						document: {
+							size: 1000,
+							attributes: [{ className: "DocumentAttributeFilename", fileName }],
+						},
+					},
+				})),
+		};
+	};
+
+	let cookie = "";
+	const search = (body) =>
+		app.handle(
+			new Request("http://localhost/api/v1/telegram/search", {
+				method: "POST",
+				headers: { Cookie: cookie, "Content-Type": "application/json" },
+				body: JSON.stringify({ channel: "@testchannel", ...body }),
+			}),
+		);
+	const sentQueries = () =>
+		mockTelegramClientInstance.invoke.mock.calls
+			.map(([req]) => req.q)
+			.filter(Boolean);
+
+	beforeAll(async () => {
+		cookie = await getAuthCookie();
+	});
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		setSetting("telegramApiId", "12345");
+		setSetting("telegramApiHash", "fake_telegram_hash");
+		mockTelegramClientInstance.invoke.mockImplementation(async (req) =>
+			telegramSearch(req),
+		);
+	});
+
+	afterAll(() => {
+		mockTelegramClientInstance.invoke.mockReset();
+		mockTelegramClientInstance.invoke.mockResolvedValue(true);
+	});
+
+	it('finds "5cm" when searching for "5 cm", and ranks it first', async () => {
+		const res = await search({ query: "5 cm (2007)" });
+		const body = await res.json();
+
+		expect(res.status).toBe(200);
+		expect(sentQueries()).toContain("5cm");
+		expect(body.files[0].filename).toBe("5cm.2007.1080p.mkv");
+		expect(body.files[0].score).toBeGreaterThanOrEqual(1);
+		const other = body.files.find((f) => f.filename.startsWith("15cm"));
+		if (other) expect(other.score).toBeLessThan(0.5);
+	});
+
+	it("also searches the alternate titles Radarr knows", async () => {
+		setSetting("radarrUrl", "http://fake-radarr:7878");
+		setSetting("radarrApiKey", "k");
+		axios.get.mockResolvedValueOnce({
+			data: {
+				title: "5 Centimeters per Second",
+				originalTitle: "Byousoku 5 Centimeter",
+				alternateTitles: [],
+				year: 2007,
+			},
+		});
+
+		const res = await search({
+			query: "5 Centimeters per Second",
+			service: "radarr",
+			serviceId: 7,
+		});
+		const body = await res.json();
+
+		expect(axios.get).toHaveBeenCalledWith(
+			"http://fake-radarr:7878/api/v3/movie/7",
+			expect.anything(),
+		);
+		expect(sentQueries()).toContain("Byousoku 5 Centimeter");
+		expect(body.files[0].filename).toBe("Byousoku.5.Centimeter.2007.720p.mkv");
+	});
+
+	it("still searches when the *Arr can't be asked", async () => {
+		setSetting("radarrUrl", "http://fake-radarr:7878");
+		setSetting("radarrApiKey", "k");
+		axios.get.mockRejectedValueOnce(new Error("radarr down"));
+
+		const res = await search({ query: "5cm", service: "radarr", serviceId: 7 });
+		const body = await res.json();
+
+		expect(res.status).toBe(200);
+		expect(body.files[0].filename).toBe("5cm.2007.1080p.mkv");
 	});
 });

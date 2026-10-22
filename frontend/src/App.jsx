@@ -1,4 +1,12 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import {
+	useState,
+	useEffect,
+	useMemo,
+	useRef,
+	useCallback,
+	lazy,
+	Suspense,
+} from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
 	RefreshCw,
@@ -8,6 +16,9 @@ import {
 	LogOut,
 	Sun,
 	Moon,
+	Bell,
+	BellOff,
+	CheckSquare,
 } from "lucide-react";
 import useSWR from "swr";
 
@@ -15,9 +26,22 @@ import { useToast } from "./context/Toast.jsx";
 import { useTheme } from "./context/Theme.jsx";
 import { apiCall } from "./utils/apiCall.js";
 import { ui } from "./ui/styles.js";
-import { spring, stagger, tile } from "./ui/motion.js";
+import { spring } from "./ui/motion.js";
 
 import MediaCard from "./components/MediaCard.jsx";
+import { MediaWall } from "./components/MediaWall.jsx";
+import { SeriesCard } from "./components/SeriesCard.jsx";
+import { BulkBar } from "./components/BulkBar.jsx";
+import { useLiveMissing } from "./hooks/useLiveMissing.js";
+import { useArrivals } from "./hooks/useArrivals.js";
+import { useShortcuts } from "./hooks/useShortcuts.js";
+import {
+	entryItems,
+	groupEpisodes,
+	isUpcoming,
+	SORTS,
+	sortEntries,
+} from "./utils/wall.js";
 import { describeQueue } from "./utils/queueState.js";
 import ErrorScreen from "./components/ErrorScreen.jsx";
 import Login from "./components/Login.jsx";
@@ -27,6 +51,17 @@ import { Mark } from "./components/Mark.jsx";
 // The two sheets load on first open: most visits only look at the wall.
 const ResultsModal = lazy(() => import("./components/ResultsModal.jsx"));
 const SettingsModal = lazy(() => import("./components/SettingsModal.jsx"));
+const PosterDrift = lazy(() => import("./components/PosterDrift.jsx"));
+
+const SORT_KEY = "eziarr-sort";
+const readSort = () => {
+	try {
+		const v = localStorage.getItem(SORT_KEY);
+		return SORTS.some((s) => s.id === v) ? v : "newest";
+	} catch {
+		return "newest";
+	}
+};
 
 // Destinations that live in the settings sheet, reachable from the top bar.
 const NAV = [
@@ -41,6 +76,7 @@ const FILTERS = [
 	{ id: "sonarr", label: "Episodes" },
 	{ id: "lidarr", label: "Albums" },
 	{ id: "onTheWay", label: "On the way" },
+	{ id: "upcoming", label: "Not out yet" },
 ];
 
 const SERVICE_NAMES = { radarr: "Radarr", sonarr: "Sonarr", lidarr: "Lidarr" };
@@ -88,9 +124,9 @@ const SkeletonWall = () => (
 	</div>
 );
 
-const EmptyFrame = ({ title, children }) => (
+const EmptyFrame = ({ title, bare = false, children }) => (
 	<motion.div
-		className="bg-surface rounded-[20px] px-6 py-14 sm:py-20 flex flex-col items-center text-center"
+		className={`${bare ? "" : "bg-surface"} rounded-[20px] px-6 py-14 sm:py-20 flex flex-col items-center text-center`}
 		initial={{ opacity: 0, y: 12 }}
 		animate={{ opacity: 1, y: 0 }}
 		transition={spring}
@@ -114,6 +150,10 @@ function App() {
 	const [settingsLoaded, setSettingsLoaded] = useState(false);
 	if (settingsTab !== null && !settingsLoaded) setSettingsLoaded(true);
 	const [scrolled, setScrolled] = useState(false);
+	const [sort, setSort] = useState(readSort);
+	const [selecting, setSelecting] = useState(false);
+	const [selected, setSelected] = useState(() => new Set());
+	const searchRef = useRef(null);
 
 	// auth
 	const [authState, setAuthState] = useState("checking"); // checking | authed | anon
@@ -167,22 +207,16 @@ function App() {
 	}, [sysStatus]);
 
 	const [syncedAt, setSyncedAt] = useState(null);
+	const markSynced = useCallback(() => setSyncedAt(Date.now()), []);
 	const {
 		data: missingMedia,
 		error,
 		isLoading,
 		isValidating,
 		mutate,
-	} = useSWR(
-		authState === "authed" && sysStatus?.isSetup ? "/api/v1/missing" : null,
-		apiCall,
-		{
-			refreshInterval: 10000,
-			dedupingInterval: 5000,
-			revalidateOnFocus: false,
-			onSuccess: () => setSyncedAt(Date.now()),
-		},
-	);
+	} = useLiveMissing(authState === "authed" && sysStatus?.isSetup, {
+		onUpdate: markSynced,
+	});
 
 	const handleTriggerSearch = async (service, id, itemId) => {
 		setSearchingId(itemId);
@@ -247,15 +281,94 @@ function App() {
 			lidarr: 0,
 			onTheWay: 0,
 			stalled: 0,
+			upcoming: 0,
 		};
 		for (const item of missing) {
-			if (item.service in c) c[item.service] += 1;
+			if (isUpcoming(item)) c.upcoming += 1;
+			else if (item.service in c) c[item.service] += 1;
 			const state = describeQueue(queueByItem.get(item.id));
 			if (state) c.onTheWay += 1;
 			if (state?.tone === "warning") c.stalled += 1;
 		}
+		c.all = missing.length - c.upcoming;
 		return c;
 	}, [missing, queueByItem]);
+
+	const onArrive = useCallback(
+		(name) => toast.success(`${name} downloaded`),
+		[toast],
+	);
+	const {
+		notifications,
+		toggleNotifications,
+		forget: forgetArrivals,
+	} = useArrivals({
+		missing,
+		queueByItem,
+		ready: Boolean(missingMedia),
+		onArrive,
+	});
+
+	const leaveSelection = useCallback(() => {
+		setSelecting(false);
+		setSelected(new Set());
+	}, []);
+	const clearSearch = useCallback(() => setSearchQuery(""), []);
+	useShortcuts({
+		searchRef,
+		onClearSearch: clearSearch,
+		onEscape: selecting ? leaveSelection : undefined,
+	});
+
+	const handleBulk = async (action, items) => {
+		if (action === "unmonitor") forgetArrivals(items.map((m) => m.id));
+		try {
+			const res = await apiCall("/api/v1/missing/bulk", {
+				method: "POST",
+				body: {
+					action,
+					items: items.map(({ service, serviceId }) => ({
+						service,
+						serviceId,
+					})),
+				},
+			});
+			(res.success ? toast.success : toast.warning)(res.message);
+			mutate();
+			return res;
+		} catch {
+			toast.error(
+				action === "search"
+					? "Couldn't start the search. Try again."
+					: "Couldn't stop monitoring. Try again.",
+			);
+		}
+	};
+
+	// Recomputed only when the list, a filter or the order changes, not on
+	// every render: while anything downloads the queue updates every few
+	// seconds, and only the "On the way" filter depends on it.
+	const queueForFilter = activeFilter === "onTheWay" ? queueByItem : null;
+	const { filteredItems, entries } = useMemo(() => {
+		const query = searchQuery.trim().toLowerCase();
+		const filteredItems = missing.filter((item) => {
+			const matchesSearch =
+				!query ||
+				item.title.toLowerCase().includes(query) ||
+				item.seriesTitle?.toLowerCase().includes(query);
+			const matchesType = queueForFilter
+				? queueForFilter.has(item.id)
+				: activeFilter === "upcoming"
+					? isUpcoming(item)
+					: !isUpcoming(item) &&
+						(activeFilter === "all" || item.service === activeFilter);
+			return matchesSearch && matchesType;
+		});
+		return {
+			filteredItems,
+			entries: sortEntries(groupEpisodes(filteredItems), sort),
+		};
+	}, [missing, queueForFilter, searchQuery, activeFilter, sort]);
 
 	if (authState === "checking")
 		return <div className="min-h-screen bg-ground" />;
@@ -266,29 +379,42 @@ function App() {
 	if (error) return <ErrorScreen />;
 
 	const q = searchQuery.trim().toLowerCase();
-	const filteredItems = missing.filter((item) => {
-		const matchesSearch =
-			!q ||
-			item.title.toLowerCase().includes(q) ||
-			item.seriesTitle?.toLowerCase().includes(q);
-		const matchesType =
-			activeFilter === "all" ||
-			(activeFilter === "onTheWay"
-				? queueByItem.has(item.id)
-				: item.service === activeFilter);
-		return matchesSearch && matchesType;
-	});
+	const selectedItems = selecting
+		? missing.filter((m) => selected.has(m.id))
+		: [];
+	const selectionFor = (items) => {
+		if (!selecting) return undefined;
+		const all = items.every((m) => selected.has(m.id));
+		return {
+			selected: all,
+			toggle: () =>
+				setSelected((prev) => {
+					const next = new Set(prev);
+					for (const m of items) all ? next.delete(m.id) : next.add(m.id);
+					return next;
+				}),
+		};
+	};
+	const changeSort = (value) => {
+		setSort(value);
+		try {
+			localStorage.setItem(SORT_KEY, value);
+		} catch {
+			// Private mode: the order lasts for this visit.
+		}
+	};
 
 	const loading = isLoading || sysStatusIsLoading;
 	const notSetUp = !loading && sysStatus && !sysStatus.isSetup;
 
 	const finding = loading
 		? "Syncing your libraries…"
-		: counts.all === 0
+		: missing.length === 0
 			? "Nothing missing. Every monitored title is on disk."
 			: [
 					`${counts.all} ${counts.all === 1 ? "title" : "titles"} missing`,
 					`${counts.onTheWay} on the way`,
+					...(counts.upcoming ? [`${counts.upcoming} not out yet`] : []),
 				].join(" · ");
 
 	return (
@@ -342,6 +468,28 @@ function App() {
 								v{sysStatus.latestVersion} available
 							</a>
 						)}
+						{notifications !== "unsupported" && (
+							<Button
+								variant="icon"
+								onClick={toggleNotifications}
+								disabled={notifications === "blocked"}
+								aria-pressed={notifications === "on"}
+								title={
+									notifications === "on"
+										? "Notifications on: you'll hear when a download finishes"
+										: notifications === "blocked"
+											? "Notifications are blocked in this browser's site settings"
+											: "Notify me when a download finishes"
+								}
+								aria-label="Download notifications"
+							>
+								{notifications === "on" ? (
+									<Bell size={18} />
+								) : (
+									<BellOff size={18} />
+								)}
+							</Button>
+						)}
 						<Button
 							variant="icon"
 							onClick={toggleTheme}
@@ -389,7 +537,13 @@ function App() {
 				</div>
 			</header>
 
-			<main className="mx-auto max-w-[1208px] px-4 sm:px-6 pt-6 pb-24">
+			{!loading && !notSetUp && missing.length === 0 && (
+				<Suspense fallback={null}>
+					<PosterDrift mood="calm" />
+				</Suspense>
+			)}
+
+			<main className="relative mx-auto max-w-[1208px] px-4 sm:px-6 pt-6 pb-24">
 				{/* TITLE ROW — the screen's question and today's answer */}
 				<div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-5">
 					<div className="min-w-0">
@@ -436,13 +590,20 @@ function App() {
 								className="absolute left-3.5 top-1/2 -translate-y-1/2 text-faint pointer-events-none"
 							/>
 							<input
+								ref={searchRef}
 								type="search"
 								aria-label="Search missing titles"
+								aria-keyshortcuts="/"
 								placeholder="Search titles"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 								className={`${ui.input} pl-9 pr-9 bg-surface border-transparent focus:border-control`}
 							/>
+							{!searchQuery && (
+								<kbd className="hidden sm:grid absolute right-3 top-1/2 -translate-y-1/2 size-5 place-items-center rounded-md border border-control text-[11px] text-faint pointer-events-none">
+									/
+								</kbd>
+							)}
 							<AnimatePresence>
 								{searchQuery && (
 									<motion.button
@@ -481,7 +642,7 @@ function App() {
 						<div
 							role="tablist"
 							aria-label="Filter missing titles"
-							className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-5 mb-6"
+							className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 lg:grid-cols-6 mb-4"
 						>
 							{FILTERS.map((f) => {
 								const selected = activeFilter === f.id;
@@ -518,6 +679,45 @@ function App() {
 					</LayoutGroup>
 				)}
 
+				{/* WALL TOOLS — order and selection */}
+				{!loading && !notSetUp && missing.length > 0 && (
+					<div className="flex items-center justify-between gap-2 mb-4">
+						<p className="text-xs text-faint num">
+							{filteredItems.length === entries.length
+								? `${entries.length} shown`
+								: `${filteredItems.length} titles in ${entries.length} cards`}
+						</p>
+						<div className="flex items-center gap-2">
+							<label className="sr-only" htmlFor="wall-sort">
+								Order
+							</label>
+							<select
+								id="wall-sort"
+								value={sort}
+								onChange={(e) => changeSort(e.target.value)}
+								className="h-8 pl-3 pr-8 rounded-full bg-surface text-[13px] text-ink border border-transparent focus:outline-none focus:border-control cursor-pointer"
+							>
+								{SORTS.map((o) => (
+									<option key={o.id} value={o.id}>
+										{o.label}
+									</option>
+								))}
+							</select>
+							<Button
+								size="sm"
+								variant={selecting ? "primary" : "ghost"}
+								aria-pressed={selecting}
+								onClick={() =>
+									selecting ? leaveSelection() : setSelecting(true)
+								}
+							>
+								<CheckSquare size={14} />
+								Select
+							</Button>
+						</div>
+					</div>
+				)}
+
 				{/* THE WALL */}
 				{loading ? (
 					<SkeletonWall />
@@ -531,8 +731,8 @@ function App() {
 							Connect a library
 						</Button>
 					</EmptyFrame>
-				) : counts.all === 0 ? (
-					<EmptyFrame title="All caught up">
+				) : missing.length === 0 ? (
+					<EmptyFrame bare title="All caught up">
 						<p className="text-sm text-muted mt-1">
 							Every monitored title is on disk. Eziarr checks again every 10
 							seconds.
@@ -564,35 +764,50 @@ function App() {
 						</Button>
 					</EmptyFrame>
 				) : (
-					<motion.ul
-						layout
-						className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5"
-					>
-						<AnimatePresence mode="popLayout">
-							{filteredItems.map((item, i) => (
-								<motion.li
-									key={item.id}
-									layout
-									variants={tile}
-									initial="initial"
-									animate="animate"
-									exit="exit"
-									transition={stagger(i)}
-								>
-									<MediaCard
-										item={item}
-										queueItem={queueByItem.get(item.id)}
-										onSearch={handleTriggerSearch}
-										onDeepSearch={() => handleOpenDeepSearch(item)}
-										isSearching={searchingId === item.id}
-										mutate={mutate}
-									/>
-								</motion.li>
-							))}
-						</AnimatePresence>
-					</motion.ul>
+					<MediaWall
+						items={entries}
+						renderItem={(entry) =>
+							entry.group ? (
+								<SeriesCard
+									group={entry.group}
+									queueByItem={queueByItem}
+									onBulk={handleBulk}
+									onSearch={handleTriggerSearch}
+									onDeepSearch={handleOpenDeepSearch}
+									searchingId={searchingId}
+									selection={selectionFor(entry.group.episodes)}
+								/>
+							) : (
+								<MediaCard
+									item={entry.item}
+									queueItem={queueByItem.get(entry.item.id)}
+									onSearch={handleTriggerSearch}
+									onDeepSearch={() => handleOpenDeepSearch(entry.item)}
+									isSearching={searchingId === entry.item.id}
+									mutate={mutate}
+									onUnmonitored={(id) => forgetArrivals([id])}
+									selection={selectionFor(entryItems(entry))}
+								/>
+							)
+						}
+					/>
 				)}
 			</main>
+
+			<BulkBar
+				open={selecting}
+				count={selectedItems.length}
+				shown={filteredItems.length}
+				onSelectShown={() =>
+					setSelected(new Set(filteredItems.map((m) => m.id)))
+				}
+				onClear={() => setSelected(new Set())}
+				onRun={async (action) => {
+					const res = await handleBulk(action, selectedItems);
+					if (res) leaveSelection();
+				}}
+				onClose={leaveSelection}
+			/>
 
 			<Suspense fallback={null}>
 				{modalData && (

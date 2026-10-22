@@ -9,7 +9,8 @@ export default defineConfig({
 		port: 3000,
 		proxy: {
 			"/api": {
-				target: "http://localhost:5000",
+				// EZIARR_API: the smoke test points this at its mock.
+				target: process.env.EZIARR_API || "http://localhost:5000",
 				changeOrigin: true,
 				secure: false,
 			},
