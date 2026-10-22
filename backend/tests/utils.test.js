@@ -4,6 +4,7 @@ import {
 	translatePath,
 	prepareFileDownload,
 	sweepOldDownloads,
+	queueProgress,
 	getClientIp,
 } from "../utils.js";
 import { setSetting } from "../db.js";
@@ -183,5 +184,14 @@ describe("Downloads: sweeper", () => {
 
 		expect(sweepOldDownloads(dir, { maxAgeMs: DAY, now })).toEqual([legacy]);
 		expect(fs.existsSync(path.join(dir, "Old Movie"))).toBe(false);
+	});
+});
+
+describe("Queue: download progress", () => {
+	it("Should derive percent from the *Arr size and sizeleft", () => {
+		expect(queueProgress(1000, 250)).toBe(75);
+		expect(queueProgress(1000, 0)).toBe(100);
+		expect(queueProgress(0, 0)).toBe(null);
+		expect(queueProgress(undefined, undefined)).toBe(null);
 	});
 });

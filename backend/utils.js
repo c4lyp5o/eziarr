@@ -27,6 +27,16 @@ export const getPosterUrl = (images = [], coverType) => {
 	return null;
 };
 
+// Percent downloaded (0-100) from an *Arr queue record, or null when the
+// client hasn't reported a size yet.
+export const queueProgress = (size, sizeleft) => {
+	const total = Number(size);
+	const left = Number(sizeleft);
+	if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(left))
+		return null;
+	return Math.min(100, Math.max(0, Math.round((1 - left / total) * 100)));
+};
+
 export const fetchQueue = async (serviceName, idKey) => {
 	const SERVICES = getAllServices();
 	const conf = SERVICES[serviceName];
@@ -51,6 +61,7 @@ export const fetchQueue = async (serviceName, idKey) => {
 			quality: item.quality?.quality?.name,
 			indexer: item.indexer,
 			timeleft: item.timeleft, // '00:05:30'
+			progress: queueProgress(item.size, item.sizeleft),
 		}));
 };
 

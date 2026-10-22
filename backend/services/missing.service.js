@@ -5,6 +5,7 @@ import {
 	getAllServices,
 	getDownloadQueue,
 	recordForceGrabHistory,
+	getTasks,
 } from "../db";
 import { coerceNumericId, fetchQueue } from "../utils";
 import { generalLogger as logger } from "../logger";
@@ -20,6 +21,8 @@ export const MissingService = {
 		]);
 
 		const eziarrQueue = getDownloadQueue();
+		// The worker reports live percent on its task row, keyed by job id.
+		const taskProgress = new Map(getTasks().map((t) => [t.id, t.progress]));
 
 		const normalizedEziarrQueue = eziarrQueue.map((item) => {
 			let payload;
@@ -41,6 +44,7 @@ export const MissingService = {
 				quality: payload.quality ?? undefined,
 				indexer: payload.indexer ?? undefined,
 				timeleft: "",
+				progress: taskProgress.get(item.id) ?? null,
 			};
 		});
 
