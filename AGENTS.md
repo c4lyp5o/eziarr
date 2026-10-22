@@ -12,6 +12,7 @@ Guidance for AI coding agents (and humans in a hurry) working on Eziarr. Archite
 | One test file | `cd backend && bun test tests/import.test.js` |
 | Frontend lint + format check | `cd frontend && bun run check` (`bunx biome check --write` to fix) |
 | Frontend build | `cd frontend && bun run build` (writes `../client`) |
+| Frontend unit tests | `cd frontend && bun run test:unit` |
 | Browser smoke test | `cd frontend && bun run smoke` (after a build; needs Chrome, `CHROME_BIN` to pick one) |
 | UI against fake data | `cd frontend && bun tests/mock-api.js` then `bun run dev` (`COUNT=3000` for a large library) |
 

@@ -33,7 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   motion and is skipped without WebGL.
 - **Poster tilt:** with a mouse, a poster leans towards the pointer and
   catches a soft light.
-- **Browser smoke test in CI**, against a mock API.
+- **Deep search results say what each release is:** badges read from the
+  name (resolution, source, codec, HDR, audio, multi-audio, subs), peers,
+  grabs, age, freeleech and a link to the indexer's page. Camera rips,
+  dead torrents and files too small for their resolution are flagged and
+  sorted last; the same release on several indexers is one row. Order by
+  best, seeders, newest or size.
+- **Smarter Telegram search:** the search box is editable, and Eziarr also
+  searches the other ways a name gets written ("5 cm" / "5cm", "Part 2" /
+  "Part II", S1E4 / S01E04) and the original and alternate titles from
+  Radarr, Sonarr or Lidarr. Files come back ranked by how well they match,
+  with the best match marked and weak ones dimmed.
+- **Browser smoke test in CI**, against a mock API, and frontend unit tests.
 
 ### Changed
 - **The wall renders only the rows on screen.** With 3000 missing titles
@@ -42,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the filter changes.
 - Episode cards show the episode code ("S02E07") under the series name
   instead of repeating the series name.
+
+### Fixed
+- **Force-grabbing a Usenet result** told the *Arr it was a torrent, so
+  the NZB went to the torrent client. The release's protocol is now passed
+  through.
 
 ## [1.4.1] - 2026-10-22
 

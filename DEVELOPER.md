@@ -104,6 +104,8 @@ Everything is under `/api/v1`. Public: `GET /` (health), `GET`/`POST /firsttime`
 | Sources | `GET /telegram/status` · `POST /telegram/auth/send-code` · `POST /telegram/auth/login` · `POST /telegram/search` · `POST /ia/search` · `GET /ia/files/:identifier` · `POST /opendir/scan` |
 | Settings & system | `GET`/`POST /settings` · `POST /settings/batch` · `GET /system/status` · `POST /system/test` · `GET /system/tasks` · `GET /system/logs?type=general\|hunter` |
 
+**Telegram search** (`POST /telegram/search`, `backend/match.js`). Telegram matches whole words, so "5 cm" never finds "5cm". The service builds up to 10 searches: the query as typed, spelling variants (number+word joined and split, punctuation and a leading "The" dropped, `&`/"and", part numbers as Roman numerals and back, the episode code as `S01E04`), and the title's original and alternate names read from the *Arr when `service`/`serviceId` are sent. Every file is then scored against all those titles with spacing, punctuation, case and accents ignored, plus or minus for the year and the episode, and the list comes back best first with its `score`.
+
 **The live stream.** `GET /missing/stream` sends `event: missing` (the list) and `event: queue` (`{ queue, unavailable }`), each only when it changed, and a `: ping` comment otherwise. One 4 s loop in the server feeds every open stream and stops when the last one closes; the 5 s queue cache in `fetchAllQueues` keeps the *Arrs from being asked more often than that, however many tabs are open. Every tick re-checks the access token the stream opened with, so the stream ends when it expires (15 min) or the password changes; the page then refreshes its session and reconnects (`hooks/useLiveMissing.js`).
 
 Response schemas are enforced: Elysia **drops fields a response model doesn't declare**, so a new field needs adding to its model in `models/` or it never reaches the UI. With `NODE_ENV=development`, the OpenAPI UI is served at `/openapi`.
@@ -119,6 +121,7 @@ Response schemas are enforced: Elysia **drops fields a response model doesn't de
 | `components/BulkBar.jsx` | The action bar of select mode. |
 | `components/PosterDrift.jsx` | The three.js backdrop behind sign-in and "All caught up"; lazy, so the wall never loads three.js. |
 | `utils/wall.js` | Pure helpers: `isUpcoming`, episode codes, folding episodes into series, sorting. |
+| `utils/release.js` | Reads a release name (resolution, source, codec, HDR, audio, camera rips), warns about dead or undersized releases, merges duplicates and orders deep-search results. Tested in `tests/unit/`. |
 | `hooks/useLiveMissing.js` | SWR plus the event stream; polls only while the stream is down. |
 | `hooks/useArrivals.js` | "Downloaded" toasts and opt-in notifications (remembers titles seen downloading until they leave the list). |
 | `hooks/useShortcuts.js` | `/` and Esc. |
@@ -143,6 +146,7 @@ Response schemas are enforced: Elysia **drops fields a response model doesn't de
 - `bun test` in `backend/` (or `bun run test` from the root). The suites use the Vitest-style API (`describe`, `it`, `vi.mock`), which Bun provides; there is no Vitest dependency.
 - `tests/setup.js` is preloaded (`bunfig.toml`) and points `EZIARR_DB_DIR`, `EZIARR_LOG_DIR` and `EZIARR_DOWNLOAD_DIR` at a temp directory, removed after the run. Tests never touch `db/`.
 - Test files share one process and one database: clean up rows you create, and don't depend on another file or test having run first. `bun test --randomize` should pass.
+- **Frontend unit tests** (`bun run test:unit` in `frontend/`): pure helpers such as the release-name parser.
 - **Browser smoke test** (`frontend/tests/smoke.test.js`, `bun run smoke` after `bun run build`): starts `tests/mock-api.js` (a mock of the API with 600 titles) and `vite preview`, then drives Chrome over the DevTools protocol (`tests/cdp.js`; set `CHROME_BIN` if Chrome isn't on the path). It covers sign-in, the virtualized wall, series cards, filters, sorting, shortcuts, select mode and a download finishing over the stream. The mock is also handy for UI work: `bun tests/mock-api.js` and `bun run dev` (see the header of the file for its switches).
 - CI (`.github/workflows/test.yml`) runs on pushes to `main`/`staging`/`dev` and on PRs: backend tests, then `biome ci`, the frontend build and the smoke test, on Bun 1.4.3 with `--frozen-lockfile`.
 
