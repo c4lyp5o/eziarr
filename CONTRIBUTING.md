@@ -21,6 +21,7 @@ bun run dev            # server, worker and Vite together
 cd backend  && bun test              # all backend tests
 cd frontend && bun run check         # Biome: lint + formatting
 cd frontend && bun run build         # the UI still builds
+cd frontend && bun run smoke         # the built UI in headless Chrome
 ```
 
 CI runs the same checks on every pull request.

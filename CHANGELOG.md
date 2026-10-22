@@ -5,20 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-- **The Missing wall renders only the rows on screen.** Large libraries
-  (thousands of missing titles) now open in under a second instead of
-  several, and switching filters no longer freezes the page. Cards no
-  longer animate in and out when the filter changes.
+## [1.5.0] - 2026-10-22
 
 ### Added
+- **Series cards:** when two or more episodes of a show are missing, they
+  fold into one card. "Search all" searches every episode at once; the
+  card opens the episode list, with search, deep search and stop
+  monitoring per episode, or for all of them.
+- **"Not out yet" filter:** titles not released yet (or with no date) are
+  counted and listed apart. "All missing" and the movie, episode and album
+  counts now cover only what a search can find.
+- **Sorting:** newest first, oldest first or title A–Z, remembered per
+  browser.
+- **Select mode:** pick titles (or whole series) and search for, or stop
+  monitoring, all of them at once. New API: `POST /api/v1/missing/bulk`,
+  one *Arr call per service.
+- **Live updates:** the wall follows a server-sent event stream
+  (`GET /api/v1/missing/stream`) instead of downloading the whole list
+  every 10 seconds; it falls back to polling when the stream is down.
+- **"Downloaded" toasts**, and opt-in system notifications (the bell in
+  the top bar) while Eziarr is open in the background. Needs HTTPS.
+- **Install as an app:** a web app manifest and icons.
+- **Shortcuts:** `/` jumps to search; Esc clears it or leaves select mode.
 - **Sign-in backdrop:** blank poster cards drift slowly towards you behind
-  the sign-in and setup forms (three.js, loaded only on those screens). It
-  holds still for reduced motion and is skipped without WebGL.
+  the sign-in and setup forms, and more calmly behind "All caught up"
+  (three.js, loaded only on those screens). It holds still for reduced
+  motion and is skipped without WebGL.
 - **Poster tilt:** with a mouse, a poster leans towards the pointer and
   catches a soft light.
+- **Browser smoke test in CI**, against a mock API.
+
+### Changed
+- **The wall renders only the rows on screen.** With 3000 missing titles
+  it now shows in about 0.7 s instead of 5 s, and a filter change takes
+  about 0.15 s instead of 12 s. Cards no longer animate in and out when
+  the filter changes.
+- Episode cards show the episode code ("S02E07") under the series name
+  instead of repeating the series name.
 
 ## [1.4.1] - 2026-10-22
 

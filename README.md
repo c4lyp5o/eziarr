@@ -8,8 +8,12 @@ Eziarr sits beside your *Arr stack. It lists every missing movie, episode and al
 
 ## ✨ Features
 
-- **One wall for everything missing.** Radarr, Sonarr and Lidarr in a single poster wall, filtered by movies, episodes, albums or what's on its way, with a search box and a light/dark theme.
-- **Live download state on every title.** Each poster shows whether it's downloading (with real progress), queued or stalled, and the title row says how many are missing, on the way and stalled.
+- **One wall for everything missing.** Radarr, Sonarr and Lidarr in a single poster wall, filtered by movies, episodes, albums or what's on its way, sorted by release date or title, with a search box (`/`) and a light/dark theme. It stays fast with thousands of titles.
+- **A series is one card.** When several episodes of a show are missing, they fold into one card: search them all at once, or open the episode list.
+- **"Not out yet" kept apart.** Titles that haven't been released (or have no date) get their own filter, so "missing" means something a search can find.
+- **Act on many at once.** Select titles and search for, or stop monitoring, all of them in one go.
+- **Live download state on every title.** Each poster shows whether it's downloading (with real progress), queued or stalled, updated as it happens. When a download finishes you get a toast, and, if you turn them on, a system notification while Eziarr is in the background.
+- **Install it as an app** on your phone or desktop (over HTTPS).
 - **Hunter.** A background worker re-searches old missing items on your indexers on a schedule.
 - **Deep search** when the indexers fail:
   - **Indexers** via Prowlarr, with a **force grab** that temporarily lifts quality-profile, language and queue restrictions to push a release through.
@@ -132,6 +136,10 @@ Other settings (*Arr connections, Prowlarr, Telegram, sync and hunter intervals,
 - Eziarr works over plain `http://` on a LAN. If you expose it to the internet, put it behind an HTTPS reverse proxy.
 
 Found a security problem? Please report it privately; see [CONTRIBUTING.md](CONTRIBUTING.md#reporting-security-issues).
+
+## ⬆️ Upgrading to 1.5
+
+Nothing to change. The wall now follows a live event stream (`/api/v1/missing/stream`) instead of polling every 10 seconds. Traefik and Caddy pass it through as is; nginx honours the `X-Accel-Buffering: no` header Eziarr sends. If a proxy holds the stream back anyway, the page notices and goes back to polling.
 
 ## ⬆️ Upgrading to 1.4
 
