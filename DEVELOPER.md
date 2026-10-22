@@ -133,7 +133,7 @@ Response schemas are enforced: Elysia **drops fields a response model doesn't de
 
 ## 🐳 Docker
 
-Two stages on `oven/bun:1.4.3-alpine`: build the UI, then install the backend (`--production --frozen-lockfile --ignore-scripts`) and run as the non-root `eziarr` user under `pm2-runtime`.
+Two stages on `oven/bun:1.4.3-alpine`: build the UI, then install the backend (`--production --frozen-lockfile --ignore-scripts`) and run as the non-root `eziarr` user (uid 100, gid 101) under `pm2-runtime`. A `HEALTHCHECK` curls `/api/v1`. `compose.example.yml` is the reference deployment; `backend/.env.example` lists every environment variable.
 
 `--ignore-scripts` matters. Bun 1.4 runs `bufferutil`/`utf-8-validate`'s native build by default; on Alpine it fails (no musl prebuilds, no compiler) and Bun then deletes both packages, so the Telegram client can't load and the server crashes on boot. Without the script they fall back to pure JS. Pushing to `main` publishes `calypso666/eziarr:<version>` and `:latest`.
 

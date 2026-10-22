@@ -41,6 +41,8 @@ Eziarr sits beside your *Arr stack. It lists every missing movie, episode and al
 
 ### Docker (recommended)
 
+[`compose.example.yml`](compose.example.yml) has this setup plus a variant for running behind Traefik. In short:
+
 ```yaml
 # docker-compose.yml
 services:
@@ -58,6 +60,8 @@ services:
       - /path/your/arrs/can/read:/app/downloads
     restart: unless-stopped
 ```
+
+The container runs as uid 100 / gid 101, so the three mounted folders must be writable by it. It has a built-in health check on `/api/v1`.
 
 Then:
 

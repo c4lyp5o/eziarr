@@ -41,7 +41,8 @@ RUN cd backend && bun install --production --frozen-lockfile --ignore-scripts
 # Copy backend source code
 COPY backend ./backend
 
-# Copy main package.json, pm2 config and .env (if present)
+# Copy main package.json and the pm2 config (.env is never copied: it's in
+# .dockerignore; configure the container with environment variables)
 COPY package.json ./
 COPY ecosystem.config.js ./
 
@@ -60,6 +61,10 @@ USER eziarr
 RUN BUN_INSTALL_BIN=/home/eziarr/.bun/bin bun add -g pm2
 
 EXPOSE 5000
+
+# /api/v1 is the public health route. Shell form so PORT can move it.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+	CMD curl -fsS -m 5 "http://localhost:${PORT:-5000}/api/v1" || exit 1
 
 # If you use PM2 ecosystem
 CMD ["bun", "start"]
