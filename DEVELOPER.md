@@ -17,6 +17,7 @@ Eziarr runs as a microservice architecture using PM2 to manage two distinct Node
 ### Frontend
 * **Framework:** React 19.
 * **Build Tool:** Vite.
+* **Lint & format:** Biome (`biome.json`). `bun run check` in `frontend/` lints and checks formatting; `bunx biome check --write` applies fixes. CI runs `biome ci`.
 * **Styling:** Tailwind CSS v4 & Lucide-React icons.
 * **Data Fetching:** SWR for aggressive, stale-while-revalidate data syncing and live UI polling (e.g., Active Tasks and Logs). Custom wrapper (`apiCall.js`) handles silent HTTP-Only JWT token refreshes automatically.
 
