@@ -6,7 +6,7 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { arr } from "./arr";
-import { getSetting, getAllServices } from "./db";
+import { getSetting, getAllServices, getQueuedDownloadedPaths } from "./db";
 import { generalLogger as logger } from "./logger";
 import { DOWNLOAD_DIR } from "./config";
 
@@ -138,58 +138,75 @@ export const translatePath = (localPath) => {
 	return finalPath;
 };
 
-const isPrivateIpv4 = (ip) => {
-	// ip is validated IPv4 string
-	const [a, b] = ip.split(".").map((x) => Number.parseInt(x, 10));
+// Address ranges a download, directory scan or proxy check treats as
+// internal. Parsed by Node's BlockList, not string prefixes.
+const BLOCKED = new net.BlockList();
+for (const [addr, prefix] of [
+	["0.0.0.0", 8], // "this network"
+	["10.0.0.0", 8],
+	["100.64.0.0", 10], // carrier-grade NAT
+	["127.0.0.0", 8], // loopback
+	["169.254.0.0", 16], // link-local, cloud metadata
+	["172.16.0.0", 12],
+	["192.0.0.0", 24], // IETF protocol assignments
+	["192.168.0.0", 16],
+	["198.18.0.0", 15], // benchmarking, often internal
+	["224.0.0.0", 4], // multicast
+	["240.0.0.0", 4], // reserved, incl. broadcast
+])
+	BLOCKED.addSubnet(addr, prefix, "ipv4");
+for (const [addr, prefix] of [
+	["::", 128], // unspecified
+	["::1", 128], // loopback
+	["100::", 64], // discard
+	["2001::", 32], // Teredo: tunnels to an IPv4 we can't see
+	["64:ff9b:1::", 48], // local-use NAT64
+	["fc00::", 7], // unique local
+	["fe80::", 10], // link-local
+	["fec0::", 10], // site-local (deprecated)
+	["ff00::", 8], // multicast
+])
+	BLOCKED.addSubnet(addr, prefix, "ipv6");
 
-	// 0.0.0.0/8 (includes 0.0.0.0)
-	if (a === 0) return true;
-
-	// 10.0.0.0/8
-	if (a === 10) return true;
-
-	// 127.0.0.0/8 (loopback)
-	if (a === 127) return true;
-
-	// 169.254.0.0/16 (link-local, includes cloud metadata hops sometimes)
-	if (a === 169 && b === 254) return true;
-
-	// 172.16.0.0/12
-	if (a === 172 && b >= 16 && b <= 31) return true;
-
-	// 192.168.0.0/16
-	if (a === 192 && b === 168) return true;
-
-	// 100.64.0.0/10 (carrier-grade NAT)
-	if (a === 100 && b >= 64 && b <= 127) return true;
-
-	return false;
+// The 8 hextets of an IPv6 address (accepts "::" and a dotted-quad tail).
+const ipv6Hextets = (ip) => {
+	let addr = ip.toLowerCase();
+	const quad = addr.match(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+	if (quad) {
+		const [a, b, c, d] = quad.slice(1).map(Number);
+		addr = `${addr.slice(0, quad.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+	}
+	const [head, tail] = addr.split("::");
+	const parse = (part) => (part ? part.split(":").map((h) => Number.parseInt(h, 16)) : []);
+	const left = parse(head);
+	const right = tail === undefined ? [] : parse(tail);
+	return [...left, ...Array(8 - left.length - right.length).fill(0), ...right];
 };
 
-const isPrivateIpv6 = (ip) => {
-	const normalized = ip.toLowerCase();
+const v4From = (hi, lo) => [hi >> 8, hi & 255, lo >> 8, lo & 255].join(".");
 
-	// :: / ::1
-	if (normalized === "::" || normalized === "::1") return true;
-
-	// fc00::/7 (unique local addresses)
-	if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-
-	// fe80::/10 (link-local unicast)
-	if (normalized.startsWith("fe8") || normalized.startsWith("fe9")) return true;
-	if (normalized.startsWith("fea") || normalized.startsWith("feb")) return true;
-
-	// ::ffff:127.0.0.1 etc (IPv4-mapped IPv6) — treat as suspicious
-	if (normalized.startsWith("::ffff:")) return true;
-
-	return false;
+// The IPv4 address an IPv6 address stands for, when it carries one:
+// IPv4-mapped/compatible (::ffff:a.b.c.d, ::a.b.c.d), NAT64 (64:ff9b::/96)
+// and 6to4 (2002::/16). Connecting to these reaches that IPv4 host.
+const embeddedIpv4 = (ip) => {
+	const h = ipv6Hextets(ip);
+	if (h.slice(0, 5).every((x) => x === 0) && (h[5] === 0xffff || h[5] === 0))
+		return v4From(h[6], h[7]);
+	if (h[0] === 0x64 && h[1] === 0xff9b && h.slice(2, 6).every((x) => x === 0))
+		return v4From(h[6], h[7]);
+	if (h[0] === 0x2002) return v4From(h[1], h[2]);
+	return null;
 };
 
 const isIpDisallowed = (ip) => {
 	const family = net.isIP(ip);
 
-	if (family === 4) return isPrivateIpv4(ip);
-	if (family === 6) return isPrivateIpv6(ip);
+	if (family === 4) return BLOCKED.check(ip, "ipv4");
+	if (family === 6) {
+		if (BLOCKED.check(ip, "ipv6")) return true;
+		const v4 = embeddedIpv4(ip);
+		return v4 !== null && BLOCKED.check(v4, "ipv4");
+	}
 
 	// not an IP string
 	return true;
@@ -255,9 +272,11 @@ export const isSafeUrl = async (urlString) => {
 	// const port = url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80;
 	// if (![80, 443].includes(port)) return false;
 
-	// If the hostname is already an IP literal, validate directly
-	if (net.isIP(hostname)) {
-		return !isIpDisallowed(hostname);
+	// If the hostname is already an IP literal, validate directly. URL keeps
+	// the brackets on an IPv6 literal ("[::1]"), which net.isIP rejects.
+	const literal = hostname.replace(/^\[(.*)\]$/, "$1");
+	if (net.isIP(literal)) {
+		return !isIpDisallowed(literal);
 	}
 
 	// Resolve DNS and ensure none of the results point to disallowed ranges
@@ -330,7 +349,19 @@ export const prepareFileDownload = async (filename) => {
 	// Write the file flat into DOWNLOAD_DIR — no per-file subfolder.
 	// The *Arr import path chokes on files nested in a folder.
 	const outputDir = DOWNLOAD_DIR;
-	const outputPath = path.join(DOWNLOAD_DIR, safeFilename);
+	let outputPath = path.join(DOWNLOAD_DIR, safeFilename);
+
+	// Flat downloads mean two jobs for one title share a name. Never write
+	// over a file another queued job is still waiting to import: number this
+	// one instead ("Title (2026) (2).mp4"; the *Arrs parse title and year and
+	// ignore the rest). The worker downloads one job at a time, so a queued
+	// file is the only one that can be in use.
+	const taken = getQueuedDownloadedPaths();
+	if (taken.has(outputPath)) {
+		const { name, ext } = path.parse(safeFilename);
+		for (let n = 2; taken.has(outputPath); n++)
+			outputPath = path.join(DOWNLOAD_DIR, `${name} (${n})${ext}`);
+	}
 	if (!fs.existsSync(outputDir)) {
 		fs.mkdirSync(outputDir, { recursive: true });
 	}

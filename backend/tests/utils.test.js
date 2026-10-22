@@ -7,7 +7,11 @@ import {
 	queueProgress,
 	getClientIp,
 } from "../utils.js";
-import { setSetting } from "../db.js";
+import {
+	setSetting,
+	addToDownloadQueue,
+	markDownloadedPayload,
+} from "../db.js";
 import path from "node:path";
 import fs from "node:fs";
 import { DOWNLOAD_DIR } from "../config.js";
@@ -219,3 +223,49 @@ describe("Queue: download progress", () => {
 		expect(queueProgress(undefined, undefined)).toBe(null);
 	});
 });
+
+describe("Downloads: names never collide with a queued file", () => {
+	it("Should number a download whose name another queued job still needs", async () => {
+		const first = await prepareFileDownload("Polong (2026).mp4");
+		expect(path.basename(first.outputPath)).toBe("Polong (2026).mp4");
+
+		const job = addToDownloadQueue("telegram", { filename: "Polong (2026).mp4" });
+		markDownloadedPayload(job, first.outputPath);
+
+		const second = await prepareFileDownload("Polong (2026).mp4");
+		expect(path.basename(second.outputPath)).toBe("Polong (2026) (2).mp4");
+	});
+});
+
+describe("Security: SSRF guard address ranges", () => {
+	const cases = {
+		blocked: [
+			"http://[64:ff9b::7f00:1]/", // NAT64 of 127.0.0.1
+			"http://[2002:c0a8:0101::1]/", // 6to4 of 192.168.1.1
+			"http://[::ffff:10.0.0.1]/", // IPv4-mapped private
+			"http://[2001:0:4136:e378::1]/", // Teredo
+			"http://[ff02::1]/", // multicast
+			"http://[fd00::1]/", // unique local
+			"http://[::1]/",
+			"http://224.0.0.1/",
+			"http://198.18.0.5/",
+			"http://255.255.255.255/",
+		],
+		allowed: [
+			"http://[64:ff9b::808:808]/", // NAT64 of 8.8.8.8
+			"http://[2002:0808:0808::1]/", // 6to4 of 8.8.8.8
+			"http://[::ffff:8.8.8.8]/",
+			"http://[2606:4700:4700::1111]/",
+			"http://8.8.8.8/",
+		],
+	};
+
+	it("Should block internal addresses in every form, including inside IPv6", async () => {
+		for (const url of cases.blocked) expect([url, await isSafeUrl(url)]).toEqual([url, false]);
+	});
+
+	it("Should allow public addresses in the same forms", async () => {
+		for (const url of cases.allowed) expect([url, await isSafeUrl(url)]).toEqual([url, true]);
+	});
+});
+
