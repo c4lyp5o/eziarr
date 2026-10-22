@@ -21,31 +21,40 @@ export const launch = async ({ width = 1440, height = 900 } = {}) => {
 	const bin = findChrome();
 	if (!bin) throw new Error("No Chrome found; set CHROME_BIN");
 	const profile = mkdtempSync(path.join(tmpdir(), "eziarr-smoke-"));
-	const port = 9400 + Math.floor(Math.random() * 400);
+	// Port 0: Chrome picks a free port and prints the browser's WebSocket
+	// address ("DevTools listening on ws://…") on stderr. No guessing a port
+	// that may be taken, and no polling HTTP before it listens.
 	const proc = spawn(
 		bin,
 		[
 			"--headless=new",
 			"--no-sandbox",
 			"--disable-gpu",
+			"--disable-dev-shm-usage",
 			"--hide-scrollbars",
-			`--remote-debugging-port=${port}`,
+			"--remote-debugging-port=0",
 			`--user-data-dir=${profile}`,
 			"about:blank",
 		],
-		{ stdio: "ignore" },
+		{ stdio: ["ignore", "ignore", "pipe"] },
 	);
+	let stderr = "";
+	let devtools = null;
+	proc.stderr.on("data", (d) => {
+		stderr = (stderr + d).slice(-8000);
+		devtools ??= stderr.match(/DevTools listening on (ws:\/\/\S+)/)?.[1];
+	});
 
 	let ws;
-	for (let i = 0; i < 100 && !ws; i++) {
-		try {
-			const res = await fetch(`http://127.0.0.1:${port}/json/version`);
-			ws = new WebSocket((await res.json()).webSocketDebuggerUrl);
-		} catch {
-			await Bun.sleep(100);
-		}
+	const deadline = Date.now() + 30000;
+	while (!ws && Date.now() < deadline && proc.exitCode === null) {
+		if (devtools) ws = new WebSocket(devtools);
+		else await Bun.sleep(100);
 	}
-	if (!ws) throw new Error("Chrome did not start");
+	if (!ws)
+		throw new Error(
+			`Chrome (${bin}) did not start${proc.exitCode !== null ? `, exit ${proc.exitCode}` : ""}:\n${stderr}`,
+		);
 	await new Promise((r) => ws.addEventListener("open", r));
 
 	let id = 0;
