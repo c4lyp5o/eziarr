@@ -14,7 +14,8 @@ import {
 } from "../db.js";
 import path from "node:path";
 import fs from "node:fs";
-import { DOWNLOAD_DIR } from "../config.js";
+import { DOWNLOAD_DIR, DB_DIR } from "../config.js";
+import { Database } from "bun:sqlite";
 
 describe("Security: SSRF Protection", () => {
 	it("Should allow safe, external HTTP/HTTPS URLs", async () => {
@@ -232,8 +233,15 @@ describe("Downloads: names never collide with a queued file", () => {
 		const job = addToDownloadQueue("telegram", { filename: "Polong (2026).mp4" });
 		markDownloadedPayload(job, first.outputPath);
 
-		const second = await prepareFileDownload("Polong (2026).mp4");
-		expect(path.basename(second.outputPath)).toBe("Polong (2026) (2).mp4");
+		try {
+			const second = await prepareFileDownload("Polong (2026).mp4");
+			expect(path.basename(second.outputPath)).toBe("Polong (2026) (2).mp4");
+		} finally {
+			// Don't leave a queued job behind: /missing reports the queue.
+			const db = new Database(path.join(DB_DIR, "eziarr.sqlite"));
+			db.run("DELETE FROM download_queue WHERE id = ?", [job]);
+			db.close();
+		}
 	});
 });
 

@@ -4,6 +4,9 @@ import { app } from "../index.js";
 import { setSetting } from "../db.js";
 import { getAuthCookie } from "./testUtils.js";
 import { resetQueueCache } from "../utils.js";
+import { DB_DIR } from "../config.js";
+import { Database } from "bun:sqlite";
+import path from "node:path";
 
 vi.mock("axios", () => {
 	return {
@@ -26,6 +29,11 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		resetQueueCache();
+		// The unified queue includes Eziarr's own download queue; start each
+		// case from an empty one so counts don't depend on other test files.
+		const db = new Database(path.join(DB_DIR, "eziarr.sqlite"));
+		db.run("DELETE FROM download_queue");
+		db.close();
 
 		setSetting("radarrUrl", "http://fake-radarr:7878");
 		setSetting("radarrApiKey", "fake_radarr_key");

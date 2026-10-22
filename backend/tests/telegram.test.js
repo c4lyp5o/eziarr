@@ -35,6 +35,10 @@ describe("Telegram Authentication Flow", () => {
 		vi.clearAllMocks();
 		setSetting("telegramApiId", "12345");
 		setSetting("telegramApiHash", "fake_telegram_hash");
+		// What send-code leaves behind, so each login test stands on its own
+		// (it used to rely on the send-code test running first).
+		setSetting("telegramTempHash", "fake_hash_123");
+		setSetting("telegramTempPhoneNumber", "+1234567890");
 	});
 
 	it("POST /api/v1/telegram/auth/send-code - Should request SMS code", async () => {
@@ -60,8 +64,6 @@ describe("Telegram Authentication Flow", () => {
 	});
 
 	it("POST /api/v1/telegram/auth/login - Should complete login successfully", async () => {
-		setSetting("telegram_temp_hash", "fake_hash_123");
-		setSetting("telegram_temp_phone", "+1234567890");
 
 		const req = new Request("http://localhost/api/v1/telegram/auth/login", {
 			method: "POST",
