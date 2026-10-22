@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **CRITICAL: the API required no login.** The auth plugins' hooks were
+  local to the plugins (Elysia hooks are unscoped by default), so the
+  session check never ran for the routes it was meant to guard: anyone who
+  could reach Eziarr could read settings and logs, start downloads, and set
+  a new password through `POST /settings/batch`. Present since the plugin
+  refactor (354f9f9). Both hooks are now `scoped`, and a test walks every
+  API route and requires a 401 without a session.
 - **First-boot setup code:** setting the initial password now needs a
   one-time code printed on the server console, so an exposed fresh install
   can't be claimed by whoever reaches it first. `EZIARR_PASSWORD` /
