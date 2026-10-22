@@ -261,3 +261,44 @@ export const prepareFileDownload = async (filename) => {
 	}
 	return { outputDir, outputPath };
 };
+
+/**
+ * Delete downloads older than `maxAgeMs`. Downloads land flat in `dir`, so
+ * loose top-level files are swept; subfolders are legacy (pre-flat layout) and
+ * are swept file by file, then removed once empty. Paths in `keep` belong to
+ * queued jobs waiting to retry their import and are never deleted.
+ */
+export const sweepOldDownloads = (
+	dir,
+	{ maxAgeMs, keep = new Set(), now = Date.now() },
+) => {
+	const deleted = [];
+	const sweepFile = (filePath) => {
+		if (keep.has(filePath)) return;
+		try {
+			if (now - fs.statSync(filePath).mtimeMs > maxAgeMs) {
+				fs.unlinkSync(filePath);
+				deleted.push(filePath);
+			}
+		} catch {
+			// It's perfectly fine if this fails.
+		}
+	};
+
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		const entryPath = path.join(dir, entry.name);
+		if (entry.isFile()) {
+			sweepFile(entryPath);
+		} else if (entry.isDirectory()) {
+			for (const file of fs.readdirSync(entryPath)) {
+				sweepFile(path.join(entryPath, file));
+			}
+			try {
+				if (fs.readdirSync(entryPath).length === 0) fs.rmdirSync(entryPath);
+			} catch {
+				// It's perfectly fine if this fails.
+			}
+		}
+	}
+	return deleted;
+};

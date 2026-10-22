@@ -15,6 +15,7 @@ import {
 	triggerArrImport,
 	verifyArrImport,
 	isImportableService,
+	getMovieFileId,
 } from "../import.js";
 import { translatePath } from "../utils.js";
 import { setSetting } from "../db.js";
@@ -209,6 +210,55 @@ describe("Import: verifyArrImport does not trust an accepted command", () => {
 		});
 		expect(verdict.imported).toBe(false);
 		expect(verdict.reason).toMatch(/imported nothing for movie 2099/);
+	});
+
+	// An upgrade/re-download targets a movie that ALREADY has a file: hasFile is
+	// true before the scan runs, so it must not count as proof of an import.
+	it("Should not count a file the movie already had as an import", async () => {
+		axios.get.mockResolvedValue({ data: { hasFile: true, movieFile: { id: 7 } } });
+
+		const verdict = await verifyArrImport({
+			config,
+			service: "radarr",
+			serviceId: 2099,
+			filePath: dropFile,
+			previousFileId: 7,
+			timeoutMs: 5,
+			intervalMs: 1,
+			sleep: async () => {},
+		});
+		expect(verdict.imported).toBe(false);
+	});
+
+	it("Should report success once the movie's file is replaced", async () => {
+		axios.get
+			.mockResolvedValueOnce({ data: { hasFile: true, movieFile: { id: 7 } } })
+			.mockResolvedValueOnce({ data: { hasFile: true, movieFile: { id: 8 } } });
+
+		const verdict = await verifyArrImport({
+			config,
+			service: "radarr",
+			serviceId: 2099,
+			filePath: dropFile,
+			previousFileId: 7,
+			timeoutMs: 10000,
+			intervalMs: 1,
+			sleep: async () => {},
+		});
+		expect(verdict.imported).toBe(true);
+		expect(axios.get).toHaveBeenCalledTimes(2);
+	});
+
+	it("Should snapshot the movie's current file id, or null without one", async () => {
+		axios.get
+			.mockResolvedValueOnce({ data: { hasFile: true, movieFile: { id: 7 } } })
+			.mockResolvedValueOnce({ data: { hasFile: false, movieFile: null } })
+			.mockRejectedValueOnce(new Error("ECONNRESET"));
+
+		const args = { config, service: "radarr", serviceId: 2099 };
+		expect(await getMovieFileId(args)).toBe(7);
+		expect(await getMovieFileId(args)).toBe(null);
+		expect(await getMovieFileId(args)).toBe(null);
 	});
 
 	it("Should treat a vanished drop-folder file as an import (Move consumed it)", async () => {

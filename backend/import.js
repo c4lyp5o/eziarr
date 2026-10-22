@@ -74,6 +74,37 @@ const hasFile = (item) =>
 
 export const isImportableService = (service) => service === "radarr";
 
+const movieUrl = (config, service, serviceId) =>
+	`${config.url}/api/${API_VER(service)}/movie/${Number(serviceId)}`;
+
+/**
+ * Snapshot the movie's current file id BEFORE the scan, so verification can
+ * tell a fresh import apart from a file the movie already had (an upgrade or
+ * re-download). Returns null when the movie has no file, or when it can't be
+ * read — verification then falls back to plain hasFile.
+ */
+export const getMovieFileId = async ({ config, service, serviceId }) => {
+	try {
+		const res = await axios.get(movieUrl(config, service, serviceId), {
+			headers: { "X-Api-Key": config.apiKey },
+			timeout: 15000,
+		});
+		return res.data?.movieFile?.id ?? null;
+	} catch (err) {
+		logger.warn(
+			`[WORKER] ⚠️ Could not snapshot movie ${serviceId} before import: ${err?.message ?? err}`,
+		);
+		return null;
+	}
+};
+
+// With a prior file, only a NEW movieFile id proves this scan imported ours;
+// otherwise the pre-existing file would verify instantly.
+const landedNewFile = (item, previousFileId) =>
+	previousFileId == null
+		? hasFile(item)
+		: item?.movieFile?.id != null && item.movieFile.id !== previousFileId;
+
 /**
  * The *Arr scan is fire-and-forget, so "the command was accepted" proves
  * nothing — a scan pointed at a path the *Arr can't use is accepted and then
@@ -92,6 +123,7 @@ export const verifyArrImport = async ({
 	service,
 	serviceId,
 	filePath,
+	previousFileId = null,
 	timeoutMs = 120000,
 	intervalMs = 5000,
 	sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -101,11 +133,11 @@ export const verifyArrImport = async ({
 
 	do {
 		try {
-			const res = await axios.get(
-				`${config.url}/api/${API_VER(service)}/movie/${Number(serviceId)}`,
-				{ headers: { "X-Api-Key": config.apiKey }, timeout: 15000 },
-			);
-			if (hasFile(res.data)) {
+			const res = await axios.get(movieUrl(config, service, serviceId), {
+				headers: { "X-Api-Key": config.apiKey },
+				timeout: 15000,
+			});
+			if (landedNewFile(res.data, previousFileId)) {
 				logger.info(
 					`[WORKER] ✅ Import verified: movie ${serviceId} now has a file.`,
 				);

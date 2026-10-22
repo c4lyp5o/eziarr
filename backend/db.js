@@ -564,6 +564,20 @@ export const markDownloadedPayload = (id, filePath) => {
 	});
 };
 
+/** Files that queued jobs already downloaded and still need for an import retry. */
+export const getQueuedDownloadedPaths = () => {
+	const paths = new Set();
+	for (const row of db.query("SELECT payload FROM download_queue").all()) {
+		try {
+			const { downloadedPath } = JSON.parse(row.payload);
+			if (downloadedPath) paths.add(downloadedPath);
+		} catch {
+			// Unparseable payloads hold no downloaded file.
+		}
+	}
+	return paths;
+};
+
 export const scheduleRetryDownloadQueue = (id, errMessage) => {
 	const row = db
 		.query("SELECT attempts FROM download_queue WHERE id = $id")

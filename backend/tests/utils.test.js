@@ -3,10 +3,12 @@ import {
 	isSafeUrl,
 	translatePath,
 	prepareFileDownload,
+	sweepOldDownloads,
 	getClientIp,
 } from "../utils.js";
 import { setSetting } from "../db.js";
 import path from "node:path";
+import fs from "node:fs";
 import { DOWNLOAD_DIR } from "../config.js";
 
 describe("Security: SSRF Protection", () => {
@@ -140,5 +142,46 @@ describe("Security: Client IP Resolution", () => {
 		const request = new Request("http://localhost/api/v1/login");
 
 		expect(getClientIp(request, null)).toBe("unknown");
+	});
+});
+
+describe("Downloads: sweeper", () => {
+	const dir = "/tmp/eziarr-sweep-test";
+	const DAY = 24 * 60 * 60 * 1000;
+	const now = Date.now();
+	const write = (rel, ageMs) => {
+		const p = path.join(dir, rel);
+		fs.mkdirSync(path.dirname(p), { recursive: true });
+		fs.writeFileSync(p, "bytes");
+		const t = new Date(now - ageMs);
+		fs.utimesSync(p, t, t);
+		return p;
+	};
+
+	beforeEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+	// Downloads land flat in DOWNLOAD_DIR; the sweeper used to only look inside
+	// subfolders, so unimported flat files piled up forever.
+	it("Should delete old flat files and keep fresh or still-queued ones", () => {
+		const stale = write("Stale (2020).mp4", 2 * DAY);
+		const fresh = write("Fresh (2026).mp4", 60 * 1000);
+		const queued = write("Queued (2026).mp4", 2 * DAY);
+
+		const deleted = sweepOldDownloads(dir, {
+			maxAgeMs: DAY,
+			keep: new Set([queued]),
+			now,
+		});
+
+		expect(deleted).toEqual([stale]);
+		expect(fs.existsSync(fresh)).toBe(true);
+		expect(fs.existsSync(queued)).toBe(true);
+	});
+
+	it("Should still sweep legacy per-file subfolders and remove them once empty", () => {
+		const legacy = write("Old Movie/Old Movie.mp4", 2 * DAY);
+
+		expect(sweepOldDownloads(dir, { maxAgeMs: DAY, now })).toEqual([legacy]);
+		expect(fs.existsSync(path.join(dir, "Old Movie"))).toBe(false);
 	});
 });

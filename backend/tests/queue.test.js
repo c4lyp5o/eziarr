@@ -7,6 +7,7 @@ import {
 	scheduleRetryDownloadQueue,
 	finalizeDownloadQueue,
 	markDownloadedPayload,
+	getQueuedDownloadedPaths,
 	getDownloadQueue,
 	getDownloadHistory,
 } from "../db.js";
@@ -99,6 +100,16 @@ describe("SQLite Queue State Machine", () => {
 		expect(JSON.parse(retried[0].payload).downloadedPath).toBe(
 			"/app/downloads/Polong (2026).mp4",
 		);
+	});
+
+	it("Should list downloaded files that queued jobs still need", () => {
+		const kept = addToDownloadQueue("telegram", { filename: "Polong (2026).mp4" });
+		addToDownloadQueue("telegram", { filename: "Not Yet (2026).mp4" });
+		markDownloadedPayload(kept, "/app/downloads/Polong (2026).mp4");
+
+		expect([...getQueuedDownloadedPaths()]).toEqual([
+			"/app/downloads/Polong (2026).mp4",
+		]);
 	});
 
 	it("Should not corrupt payload when marking an unknown job", () => {

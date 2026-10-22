@@ -17,15 +17,21 @@ import {
 	scheduleRetryDownloadQueue,
 	markAsFailedDownloadQueue,
 	markDownloadedPayload,
+	getQueuedDownloadedPaths,
 	finalizeDownloadQueue,
 	pruneDownloadQueue,
 	// pruneDownloadHistory,
 } from "./db";
 import { downloadTelegramFile } from "./telegram";
 import { downloadHttpFile } from "./downloader";
-import { triggerArrImport, verifyArrImport, isImportableService } from "./import";
+import {
+	triggerArrImport,
+	verifyArrImport,
+	isImportableService,
+	getMovieFileId,
+} from "./import";
 import { generalLogger as logger, hunterLogger } from "./logger";
-import { getPosterUrl } from "./utils";
+import { getPosterUrl, sweepOldDownloads } from "./utils";
 import { DEFAULT_SETTINGS, DOWNLOAD_DIR } from "./config";
 
 const MAX_ATTEMPTS = 5;
@@ -421,6 +427,15 @@ const processDownloadQueue = async () => {
 				`${payload.service} is not configured. Cannot import file.`,
 			);
 
+		const verifiable = isImportableService(payload.service);
+		const previousFileId = verifiable
+			? await getMovieFileId({
+					config,
+					service: payload.service,
+					serviceId: payload.serviceId,
+				})
+			: null;
+
 		const commandPayload = await triggerArrImport({
 			config,
 			service: payload.service,
@@ -428,12 +443,13 @@ const processDownloadQueue = async () => {
 			filePath: result.filePath,
 		});
 
-		if (isImportableService(payload.service)) {
+		if (verifiable) {
 			const verdict = await verifyArrImport({
 				config,
 				service: payload.service,
 				serviceId: payload.serviceId,
 				filePath: result.filePath,
+				previousFileId,
 			});
 			if (!verdict.imported) {
 				// Nothing imported — fail loudly instead of a hollow ✅, so the
@@ -475,7 +491,6 @@ const cleanupOldDownloads = () => {
 	if (!fs.existsSync(DOWNLOAD_DIR)) return;
 
 	const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-	const now = Date.now();
 
 	try {
 		upsertTask(
@@ -485,38 +500,14 @@ const cleanupOldDownloads = () => {
 			"Cleaning up old downloads...",
 		);
 		logger.info("[WORKER/SWEEPER] 🧹 Cleaning up old downloads...");
-		const folders = fs.readdirSync(DOWNLOAD_DIR);
-		for (const folder of folders) {
-			const folderPath = path.join(DOWNLOAD_DIR, folder);
-
-			if (fs.statSync(folderPath).isDirectory()) {
-				const files = fs.readdirSync(folderPath);
-
-				// Check and delete old files
-				for (const file of files) {
-					const filePath = path.join(folderPath, file);
-					const stats = fs.statSync(filePath);
-
-					if (now - stats.mtimeMs > MAX_AGE_MS) {
-						try {
-							fs.unlinkSync(filePath);
-							logger.info(
-								`[WORKER/SWEEPER] 🧹 Sweeper: Deleted old zombie file: ${filePath}`,
-							);
-						} catch (err) {
-							// It's perfectly fine if this fails.
-						}
-					}
-				}
-
-				try {
-					if (fs.readdirSync(folderPath).length === 0) {
-						fs.rmdirSync(folderPath);
-					}
-				} catch (err) {
-					// It's perfectly fine if this fails.
-				}
-			}
+		const deleted = sweepOldDownloads(DOWNLOAD_DIR, {
+			maxAgeMs: MAX_AGE_MS,
+			keep: getQueuedDownloadedPaths(),
+		});
+		for (const filePath of deleted) {
+			logger.info(
+				`[WORKER/SWEEPER] 🧹 Sweeper: Deleted old zombie file: ${filePath}`,
+			);
 		}
 		logger.info("[WORKER/SWEEPER] ✅ Cleanup sweeper complete.");
 	} catch (err) {

@@ -307,28 +307,34 @@ export const MissingService = {
 		) {
 			// --- Fix B: decide the language bypass BEFORE touching anything ---
 			// A wrong-language release for a title whose original language differs
-			// must be rejected outright (unless forceLanguage). release/push's
-			// response carries `languages` (plural).
-			const releaseLanguages = res.data[0]?.languages || [];
-			const langGate = await MissingService._languageAllowsBypass(
-				config,
-				service,
-				sid,
-				releaseLanguages,
-				forceLanguage,
-			);
-			if (!langGate.allowed) {
-				logger.warn(
-					`[SERVER] 🚫 [${service}] Language mismatch, not bypassing: ${langGate.reason}`,
+			// must be rejected outright (unless forceLanguage). Only gate when the
+			// *Arr actually rejected on language: a size/profile-only rejection
+			// never asked for a language bypass. release/push's response carries
+			// `languages` (plural).
+			const isLanguageRejection =
+				rejections.includes("language") || rejections.includes("english");
+			if (isLanguageRejection) {
+				const releaseLanguages = res.data[0]?.languages || [];
+				const langGate = await MissingService._languageAllowsBypass(
+					config,
+					service,
+					sid,
+					releaseLanguages,
+					forceLanguage,
 				);
-				recordForceGrabHistory(service, sid, title, downloadUrl, false, langGate.reason);
-				return {
-					success: false,
-					message: `Not grabbing: ${langGate.reason}. Pass forceLanguage=true to grab anyway.`,
-				};
-			}
-			if (langGate.reason !== "forceLanguage override") {
-				logger.info(`[SERVER] ℹ️ [${service}] Language gate: ${langGate.reason}`);
+				if (!langGate.allowed) {
+					logger.warn(
+						`[SERVER] 🚫 [${service}] Language mismatch, not bypassing: ${langGate.reason}`,
+					);
+					recordForceGrabHistory(service, sid, title, downloadUrl, false, langGate.reason);
+					return {
+						success: false,
+						message: `Not grabbing: ${langGate.reason}. Pass forceLanguage=true to grab anyway.`,
+					};
+				}
+				if (langGate.reason !== "forceLanguage override") {
+					logger.info(`[SERVER] ℹ️ [${service}] Language gate: ${langGate.reason}`);
+				}
 			}
 
 			logger.info(
@@ -345,7 +351,7 @@ export const MissingService = {
 
 			if (service === "radarr") {
 				itemEndpoint = "/api/v3/movie";
-				if (rejections.includes("language") || rejections.includes("english")) {
+				if (isLanguageRejection) {
 					const anyLangProfile =
 						await MissingService._ensureAnyLanguageProfile(config);
 					if (anyLangProfile) {

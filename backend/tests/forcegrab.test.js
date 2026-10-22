@@ -213,4 +213,54 @@ describe("Force-grab language bypass", () => {
 		expect(body.message).toContain("Not grabbing");
 		expect(axios.put).not.toHaveBeenCalled(); // never mutated the series
 	});
+
+	// The gate only runs for LANGUAGE rejections. A size-only rejection of a
+	// release whose tagged language differs from the title's (common with
+	// mislabelled rips) must still go through the normal profile relax.
+	it("Size-only rejection is not blocked by the language gate", async () => {
+		axios.post.mockResolvedValueOnce({
+			data: [
+				{
+					rejected: true,
+					rejections: ["Size is too large"],
+					languages: [{ id: 1, name: "English" }],
+				},
+			],
+		});
+		// The movie item: original language Malay. Had the gate run, it would
+		// have read this and refused (English release vs Malay title).
+		axios.get.mockResolvedValueOnce({
+			data: {
+				id: 41,
+				title: "Polong",
+				qualityProfileId: 2,
+				tags: [],
+				originalLanguage: { id: 29, name: "Malay" },
+			},
+		});
+		axios.get.mockResolvedValueOnce({
+			data: [
+				{ id: 1, name: "Any" },
+				{ id: 2, name: "HD" },
+			],
+		});
+		axios.post.mockResolvedValueOnce({ data: [{ rejected: false }] });
+
+		const res = await app.handle(
+			forceGrab({
+				service: "radarr",
+				serviceId: 41,
+				title: "Polong 2026",
+				downloadUrl: "https://fake-indexer.com/download.torrent",
+			}),
+		);
+		const body = await res.json();
+
+		expect(body.success).toBe(true);
+		expect(axios.put).toHaveBeenCalledWith(
+			"http://fake-radarr:7878/api/v3/movie/41",
+			expect.objectContaining({ qualityProfileId: 1 }),
+			expect.anything(),
+		);
+	});
 });
