@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Logs rotate at 5 MB (3 files kept), the worker writes its own `worker.log`,
   and the Logs tab reads only the tail of each file, merged by time.
 - Download size cap raised from 2 GiB to 5 GiB.
+- Tests run with `bun test` (Vitest removed) against a throwaway database;
+  the data directories can be moved with `EZIARR_DB_DIR`, `EZIARR_LOG_DIR`
+  and `EZIARR_DOWNLOAD_DIR`. CI runs the tests and the frontend build.
+- Frontend dependencies updated (Vite 8.3.4 clears the dev-server advisories).
 - Queue items from `GET /missing` carry a `progress` field (0-100 or null).
 - New UI with a light/dark theme toggle and motion.
 
