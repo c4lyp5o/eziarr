@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-10-23
+
 ### Changed
 - **Telegram search:** the channel picker is gone. A search covers every
   channel you have joined, a few at a time, and lists the results together
