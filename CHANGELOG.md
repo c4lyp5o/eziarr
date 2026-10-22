@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   password change bumps; the caller is re-issued a session.
 - Refresh tokens are no longer accepted as access tokens.
 - `POST /settings` enforces the 8-character password minimum.
+- The session is checked before the request body is validated, so a caller
+  without one always gets 401 rather than a validation error.
+- The download URL guard covers more internal ranges (benchmarking,
+  multicast, reserved, Teredo, local NAT64) and checks the IPv4 address
+  behind IPv4-mapped, NAT64 and 6to4 IPv6 addresses; IPv6 literals are now
+  actually evaluated.
+- A download never overwrites a file another queued job is still waiting to
+  import; it is numbered instead.
 
 ### Fixed
 - **One offline *Arr no longer takes the UI down:** `GET /missing` and the
@@ -42,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transaction, and never cleans up from a partial list.
 - **Queue progress never reached the UI:** the `/missing` response schema
   stripped the new `progress` field.
+- **Force-grab's temporary Radarr profile** now copies the "Any" quality
+  profile, reclaims a temp profile left by an earlier run, and force-grabs
+  run one at a time per service so they can't delete it from under each
+  other.
 - **"Test connection" refused LAN *Arr URLs** (the SSRF guard rejects private
   addresses). The *Arr URLs are the admin's own, so Test now only requires
   http(s).
