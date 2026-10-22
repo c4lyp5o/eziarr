@@ -21,6 +21,6 @@
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
-		"concurrently": "^9.2.4"
+		"concurrently": "^9.2.5"
 	}
 }
