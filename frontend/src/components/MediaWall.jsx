@@ -80,7 +80,7 @@ export function MediaWall({ items, renderItem }) {
 						.slice(row.index * columns, (row.index + 1) * columns)
 						.map((item) => (
 							// biome-ignore lint/a11y/useSemanticElements: see the list above
-							<div role="listitem" key={item.id}>
+							<div role="listitem" key={item.key ?? item.id}>
 								{renderItem(item)}
 							</div>
 						))}

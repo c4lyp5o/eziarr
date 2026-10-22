@@ -13,17 +13,21 @@ import {
 	WebGLRenderer,
 } from "three";
 
-// A slow drift of blank poster cards toward the viewer, behind the sign-in
-// form. Loaded lazily with the login screen only, so the app itself never
-// downloads three.js. Decoration: it renders nothing without WebGL, holds
-// still for reduced motion, and stops when the screen unmounts.
+// A slow drift of blank poster cards toward the viewer: behind the sign-in
+// form, and (calmer) behind "All caught up". Loaded lazily with those
+// screens only, so the wall never downloads three.js. Decoration: it renders
+// nothing without WebGL, holds still for reduced motion, and stops when the
+// screen unmounts.
 
-const COUNT = 120;
 const NEAR = 1; // a card past this z recycles to the back...
 const FADE = 7; // ...after fading out over this distance, so it never pops
 const FAR = -44;
-const SPEED = 1; // units per second
-const CLEAR = 4.5; // keep the middle column free near the form
+const CLEAR = 4.5; // keep the middle column free near the content
+
+const MOODS = {
+	login: { count: 120, speed: 1 }, // speed in units per second
+	calm: { count: 60, speed: 0.45 },
+};
 
 const css = (name) =>
 	getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -54,11 +58,12 @@ const place = (card, z) => {
 	card.z = z;
 };
 
-export default function LoginScene() {
+export default function PosterDrift({ mood = "login" }) {
 	const hostRef = useRef(null);
 	const [ready, setReady] = useState(false);
 
 	useEffect(() => {
+		const { count: COUNT, speed: SPEED } = MOODS[mood] ?? MOODS.login;
 		const host = hostRef.current;
 		let renderer;
 		try {
@@ -185,7 +190,7 @@ export default function LoginScene() {
 			renderer.dispose();
 			renderer.domElement.remove();
 		};
-	}, []);
+	}, [mood]);
 
 	return (
 		<div

@@ -9,7 +9,7 @@ import { spring } from "../ui/motion";
 import { Button } from "./Buttons";
 import { Mark } from "./Mark";
 
-const LoginScene = lazy(() => import("./LoginScene"));
+const PosterDrift = lazy(() => import("./PosterDrift"));
 
 const Field = ({ id, label, ...props }) => (
 	<div>
@@ -46,7 +46,7 @@ const ErrorLine = ({ error }) => (
 const Frame = ({ title, subtitle, children }) => (
 	<div className="min-h-dvh bg-ground flex flex-col items-center justify-center px-4 py-10">
 		<Suspense fallback={null}>
-			<LoginScene />
+			<PosterDrift />
 		</Suspense>
 		<motion.div
 			className="relative w-full max-w-sm"
