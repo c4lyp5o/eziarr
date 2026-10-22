@@ -1,89 +1,145 @@
 # Eziarr Developer Documentation
 
-Eziarr is structured as a decoupled Single Page Application (SPA) interacting with a high-performance, asynchronous REST API. 
+How Eziarr is put together. For setting up a dev environment, the branch flow and what a PR needs, see [CONTRIBUTING.md](CONTRIBUTING.md); for the traps that have bitten this codebase before, see [AGENTS.md](AGENTS.md).
 
-## 🏗️ Architecture & Tech Stack
+## 🏗️ Architecture
 
-Eziarr runs as a microservice architecture using PM2 to manage two distinct Node.js processes: the **API Server** and the **Background Worker**. Because they run in separate memory spaces, they use SQLite in WAL (Write-Ahead Logging) mode as an ultra-fast Inter-Process Communication (IPC) bridge.
+Eziarr is two Bun processes run by PM2 (`ecosystem.config.js`), sharing one SQLite database in WAL mode:
 
-### Backend
-* **Framework:** ElysiaJS (A fast Bun-native web framework with TypeBox validation).
-* **Database:** `bun:sqlite` with `PRAGMA journal_mode = WAL;` enabled to allow highly concurrent read/writes between the Server and Worker.
-* **Process Manager:** PM2 (runs `index.js` and `worker.js` concurrently).
-* **MTProto Client:** GramJS is used to handle native Telegram API interactions, bypassing the standard Telegram Bot API file-size limits.
-* **HTTP Client:** Axios for interacting with the *Arr stack APIs and streaming HTTP downloads.
-* **Testing:** `bun test` (Bun's runner; the suites use the Vitest-style `describe`/`it`/`vi` API, which Bun provides). Run `bun test` in `backend/`, or `bun run test` from the repo root. A preload (`tests/setup.js`, wired in `bunfig.toml`) points the database, logs and downloads at a throwaway temp directory, so tests never touch `db/`. CI runs the suite and the frontend build on every PR (`.github/workflows/test.yml`).
+```
+            browser (React SPA, served from client/)
+                         │  HttpOnly session cookies
+                         ▼
+ ┌───────────────────────────────┐        ┌────────────────────────────────┐
+ │ server  (backend/index.js)    │        │ worker  (backend/worker.js)    │
+ │ Elysia REST API under /api/v1 │        │ sync · hunter · download queue │
+ │ deep search, force grab,      │        │ · import · sweeper             │
+ │ settings, auth                │        │                                │
+ └──────────────┬────────────────┘        └───────────────┬────────────────┘
+                │      db/eziarr.sqlite (WAL): settings,   │
+                └──────► missing_items, download_queue, ◄──┘
+                         active_tasks, download_history
+                │                                          │
+                ▼                                          ▼
+      Radarr · Sonarr · Lidarr · Prowlarr        Telegram (MTProto) · HTTP
+```
 
-### Frontend
-* **Framework:** React 19.
-* **Build Tool:** Vite.
-* **Lint & format:** Biome (`biome.json`). `bun run check` in `frontend/` lints and checks formatting; `bunx biome check --write` applies fixes. CI runs `biome ci`.
-* **Styling:** Tailwind CSS v4 & Lucide-React icons.
-* **Data Fetching:** SWR for aggressive, stale-while-revalidate data syncing and live UI polling (e.g., Active Tasks and Logs). Custom wrapper (`apiCall.js`) handles silent HTTP-Only JWT token refreshes automatically.
+- The **server** answers the UI and never downloads anything. Queuing a download inserts a `download_queue` row.
+- The **worker** syncs missing lists from the *Arrs, runs the hunter, processes the download queue one job at a time (download → `/app/downloads` → *Arr import scan → verify), and sweeps old files.
+- They share state only through SQLite. `active_tasks` carries live progress from the worker to the UI.
 
-## 📂 Backend File Structure (MVC-style)
+### Stack
 
-Eziarr's backend is modularized to ensure clean separation of concerns:
+| | |
+| --- | --- |
+| Runtime | Bun 1.4 (the Docker image pins `oven/bun:1.4.3-alpine`; CI uses the same) |
+| API | ElysiaJS, with TypeBox schemas for every body and response |
+| Database | `bun:sqlite`, WAL mode |
+| *Arr / HTTP | Axios, through `arr.js` |
+| Telegram | GramJS (MTProto, your own account) |
+| UI | React 19, Vite, Tailwind CSS v4, Motion, SWR, Lucide icons |
+| Lint / format | Biome (frontend) |
+| Tests | `bun test` |
 
-* **`index.js`**: The main application entry point. Mounts the Elysia application, registers plugins, and sets up static file serving for the frontend.
-* **`worker.js`**: The core background processor. It runs a continuous loop to process the `download_queue`, sync missing items from *Arr apps, run the Prowlarr "Hunter", and execute a 24-hour file sweeper.
-* **`/routes`**: Contains Elysia route definitions (e.g., `auth.route.js`, `missing.route.js`). Maps HTTP endpoints to service functions and attaches TypeBox validation schemas.
-* **`/services`**: Contains the core business logic (e.g., `auth.service.js`, `missing.service.js`). Processes requests and interacts with the database or external APIs.
-* **`/models`**: TypeBox schemas used by routes to strictly validate incoming JSON bodies and outgoing responses.
-* **`/plugins`**: Elysia middleware. Contains `auth.plugin.js` (decodes JWTs) and `protector.plugin.js` (guards private routes with a 401 Unauthorized wall).
-* **`/tests`**: `bun test` suites covering external service mocks, the SQLite state machine, and authentication flows.
-* **`db.js`**: SQLite interface. Handles the schema, settings, and the crucial `active_tasks` and `download_queue` tables for IPC.
-* **`telegram.js`**: Manages Telegram authentication and media downloading via GramJS.
-* **`utils.js`**: Security and utility helpers. Includes the `isSafeUrl` SSRF protection filter and `translatePath` cross-OS path mapper.
+## 📂 Backend (`backend/`)
 
-## 🗄️ Database Schema
+| File | Role |
+| --- | --- |
+| `index.js` | Entry point: Elysia app, error handling, the two route guards (auth routes; protected routes), static UI, first-boot setup. |
+| `worker.js` | Worker entry point: schedules sync, hunter, queue processing and the sweeper; runs a download job end to end. |
+| `config.js` | Defaults and paths (`DOWNLOAD_DIR`, `DB_DIR`, `LOG_DIR`, overridable by env) and `MAX_DOWNLOAD_BYTES` (5 GiB). |
+| `db.js` | Schema and every query. Nothing else talks SQL. |
+| `arr.js` | `arr(config, service)`: the one way to call an *Arr. Applies the base URL, API version (v3 Radarr/Sonarr, v1 Lidarr/Prowlarr) and API key. |
+| `sync.js` | Pages each *Arr's full missing list and applies it in one transaction; never cleans up from a partial list. |
+| `import.js` | Import scan command, Radarr import verification, and `buildImportFilename()` (the name a download is saved under). |
+| `session.js` | Session versions (`tokenVersion`) and access/refresh token verification. |
+| `setup.js` | First boot: the one-time setup code, or `EZIARR_PASSWORD`. |
+| `downloader.js`, `telegram.js` | HTTP and Telegram downloads into `DOWNLOAD_DIR`. |
+| `opendir.js`, `ia.js` | Open-directory scanning and Internet Archive search. |
+| `logger.js`, `logtail.js` | Rotating logs (one file per process) and the merged tail the Logs tab shows. |
+| `utils.js` | SSRF guard (`isSafeUrl`, safe agents), client IP, path translation, queue fetching and caching, download naming, the sweeper. |
+| `routes/`, `models/`, `services/` | Per area (auth, missing, settings, system, downloads, telegram, ia, opendir, httpimport): routes attach the TypeBox models and call the services. |
+| `plugins/` | `auth.plugin.js` derives `isAdmin` from the session cookie; `protector.plugin.js` refuses requests without one. Both are `scoped`. |
+| `tests/` | `bun test` suites; `setup.js` (preloaded via `bunfig.toml`) points data dirs at a temp directory. |
 
-**Table: `missing_items`** (Caches *Arr missing lists)
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `id` | TEXT | Primary Key (e.g., `radarr-123`) |
-| `service_id` | INTEGER | The ID relative to the *Arr service |
-| `title` | TEXT | Movie, Episode, or Album title |
+### Request lifecycle and auth
 
-**Table: `active_tasks`** (IPC for Live UI Updates)
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `id` | TEXT | Primary Key |
-| `type` | TEXT | E.g., `Download`, `Sync`, `Hunter` |
-| `message` | TEXT | Status description (e.g., `Downloading: Movie.mkv (45%)`) |
+Protected routes sit in one Elysia `guard` that uses `AuthPlugin` then `ProtectorPlugin`:
 
-**Table: `download_queue`** (Worker Queue State Machine)
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `id` | TEXT | Primary Key |
-| `status` | TEXT | `pending`, `downloading`, `retry`, or `failed` |
-| `attempts` | INTEGER| Exponential backoff tracker |
+1. `AuthPlugin` (`derive`, transform phase) verifies the `eziarr_access` cookie against the current session version and sets `isAdmin`.
+2. `ProtectorPlugin` (`onTransform`, also before body validation) throws a 401 when `isAdmin` is not set.
+3. Then validation, then the handler.
 
-**Table: `download_history`** (Audit Log & Analytics)
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `id` | TEXT | Primary Key |
-| `type` | TEXT | Source of download (`telegram`, `http`, `forcegrab`) |
-| `status` | TEXT | `completed` or `failed` |
-| `duration_ms` | INTEGER | Time taken to download and import |
-| `download_bytes` | INTEGER| File size for bandwidth analytics |
+Both hooks must be `{ as: "scoped" }`. Elysia hooks are local to the plugin that declares them, so an unscoped hook silently stops protecting anything (that was a real, critical bug until 1.4). `tests/protected-routes.test.js` walks `app.routes` and requires a 401 from every protected route without a session; adding a public route means adding it to that test's `PUBLIC` list on purpose.
 
-**Table: `settings`** (User Config & Application State)
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `key` | TEXT | Primary Key (e.g., `telegramSession`, `password`, `radarrUrl`) |
-| `value` | TEXT | The raw string or JSON-stringified value of the setting |
+Sessions: a 15-minute access token and a refresh token (1 day, or 30 with "keep me signed in"), both carrying `tv`, the session version. A password change bumps the version, revoking every other session, and re-issues the caller's.
 
-## 🔌 Core API Routes
+### Data flow of a download
 
-* `GET /api/v1/system/tasks`: Returns active background tasks running on the Worker.
-* `GET /api/v1/missing`: Returns a combined payload of local DB missing items and live *Arr queues.
-* `POST /api/v1/missing/forcegrab`: Pushes a release directly to the *Arr client, temporarily bypassing quality profiles if rejected.
-* `POST /api/v1/telegram/import`: Downloader for Telegram channels. Fetches exact metadata, renames the file, and inserts a job into the `download_queue`.
-* `POST /api/v1/http/import`: Generic downloader for Internet Archive and Open Directories. Enforces strict SSRF protection, downloads in streams, and pushes to *Arr.
+1. The UI calls `POST /telegram/import` or `POST /http/import`. The service asks the *Arr for the proper name (`buildImportFilename`) and inserts a `download_queue` row.
+2. The worker claims the job, downloads to `DOWNLOAD_DIR/<name>`, records `downloadedPath` on the job (so an import retry never downloads again), and asks the *Arr to scan that **file path** (not the folder: Radarr silently imports nothing from a folder scan of flat files).
+3. For Radarr it then polls the movie until a *new* file id appears or the file leaves the drop folder; otherwise the job fails and retries with backoff (5 attempts).
+4. The job moves to `download_history` as `completed` or `failed`.
 
-## 🛠️ Development Notes
+## 🗄️ Database
 
-1. **State Management:** The Telegram session is stored as a `StringSession` in the `settings` table.
-2. **Database Thrashing:** Because `worker.js` constantly polls the queue and updates progress bars, it relies heavily on WAL mode. Do not remove `PRAGMA journal_mode = WAL;`.
-3. **Authentication:** User passwords are encrypted using Bun's native `Argon2` hasher. The frontend relies on HttpOnly cookies (`eziarr_access`, `eziarr_refresh`) for session management, and requires `credentials: "same-origin"` fetch configurations in local development.
+`db/eziarr.sqlite`, WAL mode, `busy_timeout = 5000`. All access goes through `db.js`.
+
+| Table | Purpose | Columns |
+| --- | --- | --- |
+| `missing_items` | Cache of the *Arrs' missing lists (written by sync) | `id` (`radarr-123`), `service_id`, `title`, `series_title`, `type` (movie/episode/album), `service`, `release_date`, `poster_url`, `status`, `last_searched_at` (hunter) |
+| `download_queue` | Worker job queue | `id`, `type` (telegram/http), `payload` (JSON, incl. `downloadedPath` once downloaded), `status` (pending/downloading/retry), `attempts`, `last_error`, `next_attempt`, `created_at`, `updated_at`, `started_at` |
+| `active_tasks` | Live progress, worker → UI | `id`, `type`, `status`, `message`, `progress` (0–100), `updated_at` |
+| `download_history` | Audit trail, kept forever | `id`, `type`, `service`, `service_id`, `filename`, `source_url`, `channel`, `message_id`, `status` (completed/failed), `attempts`, `last_error`, `result_file_path`, `duration_ms`, `download_bytes`, timestamps |
+| `settings` | Key/value, JSON-encoded values | User settings (the keys in `DEFAULT_SETTINGS`, the only ones the API can write) plus internal state: `password` (Argon2 hash), `jwtSecret`, `isFirstTime`, `tokenVersion`, `telegramSession`, `telegramTempHash`, `telegramTempPhoneNumber` |
+
+## 🔌 API
+
+Everything is under `/api/v1`. Public: `GET /` (health), `GET`/`POST /firsttime`, `POST /login`, `GET /me`, `POST /refresh`, `POST /logout`. Everything else needs a session.
+
+| Area | Routes |
+| --- | --- |
+| Missing | `GET /missing` (missing items + all queues + `unavailable` services) · `POST /missing/search` · `POST /missing/deepsearch` (Prowlarr) · `POST /missing/forcegrab` · `POST /missing/unmonitor` |
+| Downloads | `POST /telegram/import` · `POST /http/import` · `GET /downloads/queue` · `GET /downloads/history` · `GET /downloads/stats` |
+| Sources | `GET /telegram/status` · `POST /telegram/auth/send-code` · `POST /telegram/auth/login` · `POST /telegram/search` · `POST /ia/search` · `GET /ia/files/:identifier` · `POST /opendir/scan` |
+| Settings & system | `GET`/`POST /settings` · `POST /settings/batch` · `GET /system/status` · `POST /system/test` · `GET /system/tasks` · `GET /system/logs?type=general\|hunter` |
+
+Response schemas are enforced: Elysia **drops fields a response model doesn't declare**, so a new field needs adding to its model in `models/` or it never reaches the UI. With `NODE_ENV=development`, the OpenAPI UI is served at `/openapi`.
+
+## 🎨 Frontend (`frontend/src/`)
+
+| Path | Role |
+| --- | --- |
+| `App.jsx` | Shell (top bar, theme toggle), title row, count-card filters, poster wall; lazy-loads the two sheets. |
+| `components/MediaCard.jsx` | A poster tile: download rail and state, search / deep search / unmonitor. |
+| `components/ResultsModal.jsx` + `*Tab.jsx` | Deep search: Indexers, Telegram, Internet Archive, Open directory. |
+| `components/SettingsModal.jsx` + `settings/*Tab.jsx` | Settings sheet shell (state and data) and one presentational file per tab. |
+| `components/Modal.jsx`, `Tabs.jsx`, `Buttons.jsx`, `Mark.jsx` | Shared primitives: portalled animated dialog, underline tabs, buttons, the logo. |
+| `context/Theme.jsx`, `context/Toast.jsx` | Light/dark theme (follows the OS until chosen) and toasts. |
+| `ui/styles.js`, `ui/motion.js` | Class recipes and the shared motion presets. |
+| `utils/apiCall.js` | `fetch` wrapper; on a 401 it refreshes the session once and retries. |
+| `index.css` | Design tokens for both themes (`--ground`, `--surface`, `--ink`, `--accent`, …) exposed to Tailwind as `bg-surface`, `text-ink`, etc. |
+
+**Design rules:** use the tokens, never raw Tailwind palette colours, so both themes work. Surfaces separate by lightness, not borders or shadows (only floating things like dialogs and toasts get a shadow). The one accent colour goes on data (download progress, the selected filter), not on chrome. The main action is an inverted pill.
+
+**Motion** (`motion/react`, wrapped in `MotionConfig reducedMotion="user"`) is feedback: presses, sheets, rows arriving and leaving, the wall reflowing on filter, progress. Animate transform and opacity only.
+
+## 🧪 Tests and CI
+
+- `bun test` in `backend/` (or `bun run test` from the root). The suites use the Vitest-style API (`describe`, `it`, `vi.mock`), which Bun provides; there is no Vitest dependency.
+- `tests/setup.js` is preloaded (`bunfig.toml`) and points `EZIARR_DB_DIR`, `EZIARR_LOG_DIR` and `EZIARR_DOWNLOAD_DIR` at a temp directory, removed after the run. Tests never touch `db/`.
+- Test files share one process and one database: clean up rows you create, and don't depend on another file or test having run first. `bun test --randomize` should pass.
+- CI (`.github/workflows/test.yml`) runs on pushes to `main`/`staging`/`dev` and on PRs: backend tests, then `biome ci` and the frontend build, on Bun 1.4.3 with `--frozen-lockfile`.
+
+## 🐳 Docker
+
+Two stages on `oven/bun:1.4.3-alpine`: build the UI, then install the backend (`--production --frozen-lockfile --ignore-scripts`) and run as the non-root `eziarr` user under `pm2-runtime`.
+
+`--ignore-scripts` matters. Bun 1.4 runs `bufferutil`/`utf-8-validate`'s native build by default; on Alpine it fails (no musl prebuilds, no compiler) and Bun then deletes both packages, so the Telegram client can't load and the server crashes on boot. Without the script they fall back to pure JS. Pushing to `main` publishes `calypso666/eziarr:<version>` and `:latest`.
+
+## 🛠️ Notes
+
+- **Keep WAL mode.** The server and worker write concurrently; `PRAGMA journal_mode = WAL` is what makes that safe.
+- **One writer per log file.** `deadslog` tracks file size within each process, so the server writes `general.log` and the worker `worker.log`.
+- **Telegram** is your own account: the session is a `StringSession` in `settings`, created by the in-app login (code, then 2FA if enabled).
+- **Passwords** are hashed with Bun's Argon2 (`Bun.password`).

@@ -1,57 +1,142 @@
-# Eziarr - *Arr Missing Media Manager
+# Eziarr
 
-Eziarr is a powerful, production-ready missing-media manager designed to work alongside your existing *Arr stack (Radarr, Sonarr, Lidarr). When standard indexers fail to find your missing movies, shows, or albums, Eziarr steps in to give you manual and automated tools to hunt them down across alternative sources like Telegram, the Internet Archive, and Open Directories.
+**Find and grab what Radarr, Sonarr and Lidarr are still missing.**
 
-## ✨ Key Features
+Eziarr sits beside your *Arr stack. It lists every missing movie, episode and album in one place, keeps asking your indexers for them, and when the indexers come up empty it searches the places they don't look (Telegram channels, the Internet Archive and open directories), downloads what you pick, and hands the file to the right *Arr to import.
 
-* **Unified Dashboard:** View all your missing media from Radarr, Sonarr, and Lidarr in one clean, filterable interface.
-* **Periodical Searches:** A background worker continuously monitors your missing items and periodically triggers automated searches on your indexers to find missing items.
-* **Asynchronous IPC Queue:** Downloads are handled by a dedicated background worker communicating via a high-performance SQLite WAL queue, keeping the UI fast and preventing memory crashes.
-* **Deep Search Capabilities:** * **Telegram (MTProto):** Connect your Telegram account to search channels and download large media files directly bypassing bot limits.
-  * **Internet Archive:** Search and download public domain or archived media directly from archive.org.
-  * **Open Directories:** Paste an Apache/Nginx directory link, and Eziarr will scan it for video files.
-* **Force Grab:** Instantly bypass *Arr quality profiles or stalled queues to force a release to download.
-* **Auto-Import:** Eziarr downloads alternative media locally and automatically commands Radarr/Sonarr to import and move the files.
+![The Eziarr poster wall: every missing title, with live download state](assets/dashboard.png)
 
-## 🔐 Security & Authentication
+## ✨ Features
 
-* **First-Time Setup:** On first boot Eziarr prints a one-time **setup code** to its console (`docker logs eziarr`). Setting the password needs that code, so nobody who merely reaches the server can claim it first. The code works once and changes on every restart until setup is done. To skip it, set `EZIARR_PASSWORD` (or `EZIARR_PASSWORD_FILE`, at least 8 characters) before the first start.
-* **Session Revocation:** Changing the password signs out every other browser and device; the one you changed it from stays signed in.
-* **Login Rate Limiting:** 10 attempts per minute per client. Behind a reverse proxy, set `TRUST_PROXY` to the number of proxies in front of Eziarr (usually `1`) so each client is limited by its real address. Leave it unset otherwise: `X-Forwarded-For` is then ignored, because any client can send it.
-* **HttpOnly JWT Cookies:** Sessions are secured using HttpOnly cookies with silent automated refresh cycles, rendering them immune to XSS attacks.
-* **SSRF Protection:** Built-in DNS and IP validation prevents Server-Side Request Forgery attacks when downloading from alternative web sources.
-* **Local Network Safe:** Authentication cookies are designed to work smoothly over local `http://` network IPs. *(Note: If you expose Eziarr to the public internet, it is highly recommended to place it behind an HTTPS reverse proxy).*
+- **One wall for everything missing.** Radarr, Sonarr and Lidarr in a single poster wall, filtered by movies, episodes, albums or what's on its way, with a search box and a light/dark theme.
+- **Live download state on every title.** Each poster shows whether it's downloading (with real progress), queued or stalled, and the title row says how many are missing, on the way and stalled.
+- **Hunter.** A background worker re-searches old missing items on your indexers on a schedule.
+- **Deep search** when the indexers fail:
+  - **Indexers** via Prowlarr, with a **force grab** that temporarily lifts quality-profile, language and queue restrictions to push a release through.
+  - **Telegram** (your own account over MTProto, so large files work).
+  - **Internet Archive** and **open directories** (Apache/Nginx listings).
+- **Auto-import.** Downloads are renamed the way the *Arr expects ("Title (Year).ext", "Series S01E02.ext") and imported with a targeted scan. For movies, Eziarr checks with Radarr that the file really landed before calling it done.
+- **Keeps running when an *Arr doesn't.** If one *Arr is down, the rest of the wall still loads and the UI says which service isn't answering.
 
-## ⚙️ Configuration & Path Mapping
+| | |
+| --- | --- |
+| ![Deep search: indexers](assets/results.png) | ![Deep search: Telegram](assets/telegram.png) |
+| ![Settings](assets/settings.png) | ![Download queue](assets/queues.png) |
 
-Eziarr features a built-in Settings UI to manage your setup, view active background tasks, and monitor system logs in real-time.
+<details>
+<summary>More screenshots</summary>
 
-### The "Docker vs. Host" Problem (Path Translation)
-If you run Eziarr in a Docker container, but Radarr/Sonarr are on your host machine (or another NAS), they won't agree on where downloaded files live. 
+| | |
+| --- | --- |
+| ![Light theme](assets/dashboard-light.png) | ![Internet Archive](assets/ia.png) |
+| ![Open directory](assets/opendir.png) | ![Download history](assets/history.png) |
+| ![Download stats](assets/stats.png) | ![Logs](assets/logs.png) |
+| ![Sign in](assets/login.png) | ![First-start setup](assets/firsttime.png) |
 
-1. Eziarr downloads a movie to `/app/downloads/movie.mkv`.
-2. Eziarr tells Radarr to import `/app/downloads/movie.mkv`.
-3. Radarr looks at its own hard drive, can't find it, and fails.
+<img src="assets/dashboard-mobile.png" alt="On a phone" width="320">
 
-**The Fix:**
-In the Eziarr Settings UI, configure the **Path Translation**:
-* **Eziarr Local Path (Docker Prefix):** `/app/downloads`
-* **Arr Remote Path (Host Prefix):** `C:\Imports` (or whatever your shared network folder is mapped to).
+</details>
 
-Eziarr will seamlessly translate the paths before asking Radarr to import them.
+## 🚀 Getting started
 
-## 🚀 Getting Started
-1. Configure your `.env` or use the built-in Settings UI.
-2. Start the backend server and worker using Docker Compose or PM2.
-3. Open the web UI and enter the setup code from the server log, then choose a password. Eziarr then syncs your missing items automatically.
+### Docker (recommended)
+
+```yaml
+# docker-compose.yml
+services:
+  eziarr:
+    image: calypso666/eziarr:latest
+    container_name: eziarr
+    ports:
+      - "5000:5000"
+    environment:
+      - TZ=Asia/Kuala_Lumpur
+      # - TRUST_PROXY=1        # only behind a reverse proxy, see below
+    volumes:
+      - ./eziarr/db:/app/db
+      - ./eziarr/logs:/app/logs
+      - /path/your/arrs/can/read:/app/downloads
+    restart: unless-stopped
+```
+
+Then:
+
+1. `docker compose up -d` and read the setup code from the log: `docker logs eziarr`.
+
+   ```
+   ┌───────────────────────────────────────────────┐
+   │ First start: set the Eziarr password          │
+   │ setup code  ZF38-JKBJ                         │
+   └───────────────────────────────────────────────┘
+   ```
+
+2. Open `http://<your-server>:5000`, enter the code and choose a password (8+ characters).
+3. In **Settings**, add Radarr, Sonarr and/or Lidarr (URL + API key; **Test** checks each one), and optionally Prowlarr and Telegram.
+
+Eziarr then syncs your missing lists and starts hunting.
+
+To skip the setup code, set `EZIARR_PASSWORD` (or `EZIARR_PASSWORD_FILE`) before the first start.
+
+### From source
+
+Requires [Bun](https://bun.sh) 1.4.
+
+```bash
+bun run install           # installs backend and frontend
+bun run build:client      # builds the UI into client/
+bun start                 # runs the server and worker under PM2
+```
+
+For development, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## ⚙️ Configuration
+
+### Path mapping (Docker vs. your *Arrs)
+
+Eziarr downloads into `/app/downloads` inside its container and then asks the *Arr to import that path. If the *Arr runs elsewhere (on the host, another container or a Windows box), it sees that folder under a different path, and the import finds nothing.
+
+Mount a folder both can reach to `/app/downloads`, then set **Settings → Path Translation → *Arr Remote Path** to where the *Arr sees that same folder, for example `D:\Eziarr` or `/data/eziarr`. Eziarr rewrites the path (including slashes for Windows) before asking for the import.
 
 ### Environment variables
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `EZIARR_PASSWORD` / `EZIARR_PASSWORD_FILE` | unset | Sets the password on first boot and skips the setup code. Ignored once a password exists. |
-| `TRUST_PROXY` | `0` | Number of reverse proxies whose `X-Forwarded-For` entries are trusted for rate limiting. |
-| `COOKIE_SECURE` | auto | Force `true`/`false` for the `Secure` cookie flag. |
-| `JWT_SECRET` | generated | Signing key for sessions; generated and stored on first boot when unset. |
+| `EZIARR_PASSWORD` / `EZIARR_PASSWORD_FILE` | unset | Sets the password on first start and skips the setup code. Ignored once a password exists. |
+| `TRUST_PROXY` | `0` | How many reverse proxies sit in front of Eziarr. Set it (usually `1`) behind nginx, Traefik or Caddy; leave it unset otherwise. |
+| `COOKIE_SECURE` | auto | Force `true`/`false` for the `Secure` cookie flag (auto: on when the request came in over HTTPS). |
+| `JWT_SECRET` | generated | Session signing key; generated and stored on first start when unset. |
+| `TZ` | `Asia/Kuala_Lumpur` | Time zone for logs and schedules. |
+| `PORT` | `5000` | HTTP port. |
+| `EZIARR_DB_DIR`, `EZIARR_LOG_DIR`, `EZIARR_DOWNLOAD_DIR` | `/app/db`, `/app/logs`, `/app/downloads` | Move the data directories (mainly for tests and non-Docker installs). |
 
-Single downloads (HTTP or Telegram) are capped at 5 GiB.
+Other settings (*Arr connections, Prowlarr, Telegram, sync and hunter intervals, path translation) live in the Settings screen.
+
+### Limits and housekeeping
+
+- A single download (HTTP or Telegram) is capped at **5 GiB**.
+- Downloaded files that were never imported are swept after 24 hours; files a queued job still needs are kept.
+- Logs rotate at 5 MB (three files kept): `general.log` (server), `worker.log` (worker) and `hunter.log`. The Logs tab shows the server and worker logs merged.
+- Download history is kept indefinitely as an audit trail.
+
+## 🔐 Security
+
+- **Every page and API route requires a session**, except sign-in and first-start setup. A test walks the whole route table to keep it that way.
+- **First start needs a one-time setup code** printed on the server console, so nobody who merely reaches a fresh install can claim it. It works once and changes on every restart until setup is done.
+- **Sessions** are HttpOnly, `SameSite=Strict` cookies with a short-lived access token and a refresh token (1 day, or 30 with "keep me signed in"). Changing the password signs out every other browser and device.
+- **Login is rate limited** to 10 attempts a minute per client. Behind a reverse proxy, set `TRUST_PROXY` so clients are told apart by their real address. Without it, `X-Forwarded-For` is ignored, because any client can send it.
+- **Download sources are SSRF-guarded:** URLs must be http(s), may not resolve to private, loopback, link-local, multicast or reserved addresses (including IPv4 hidden inside IPv6 forms), are re-checked at connect time, and redirects aren't followed.
+- Eziarr works over plain `http://` on a LAN. If you expose it to the internet, put it behind an HTTPS reverse proxy.
+
+Found a security problem? Please report it privately; see [CONTRIBUTING.md](CONTRIBUTING.md#reporting-security-issues).
+
+## ⬆️ Upgrading to 1.4
+
+- **Behind a reverse proxy, set `TRUST_PROXY=1`.** Otherwise every client shares the proxy's login rate-limit bucket.
+- **1.3 and earlier didn't enforce login on the API.** If your instance was reachable by people you don't trust, change the password after upgrading and check that the *Arr URLs in Settings are still yours.
+- The worker now writes `worker.log` next to `general.log`.
+
+The full list is in the [CHANGELOG](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE.md)
