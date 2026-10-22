@@ -160,6 +160,22 @@ export const unmonitorMissingMedia = (id) => {
 	db.run("DELETE FROM missing_items WHERE id = ?", [id]);
 };
 
+/**
+ * Apply one sync in a single transaction: upsert every row fetched, then
+ * remove rows of services that synced completely but no longer list them
+ * (downloaded or unmonitored). Services that failed keep their rows.
+ * Returns how many rows were removed.
+ */
+export const applyMissingSync = db.transaction((rows, syncedServices) => {
+	for (const row of rows) upsertMissingMedia(row);
+	const seen = new Set(rows.map((r) => r.id));
+	const stale = getMissingMedia().filter(
+		(item) => syncedServices.has(item.service) && !seen.has(item.id),
+	);
+	for (const item of stale) unmonitorMissingMedia(item.id);
+	return stale.length;
+});
+
 export const markAsSearchedMissingMedia = (id) => {
 	db.run("UPDATE missing_items SET last_searched_at = ? WHERE id = ?", [
 		Date.now(),

@@ -37,17 +37,23 @@ export const queueProgress = (size, sizeleft) => {
 	return Math.min(100, Math.max(0, Math.round((1 - left / total) * 100)));
 };
 
-export const fetchQueue = async (serviceName, idKey) => {
+const QUEUE_ID_KEYS = { radarr: "movieId", sonarr: "episodeId", lidarr: "albumId" };
+const QUEUE_TTL_MS = 5000;
+const queueCache = new Map(); // service -> { at, promise }
+const queueDown = new Set(); // services whose last fetch failed, to log transitions only
+
+const fetchQueueUncached = async (serviceName) => {
 	const SERVICES = getAllServices();
 	const conf = SERVICES[serviceName];
 	if (!conf.url || !conf.apiKey) return [];
 
 	// Lidarr uses v1, others v3
 	const apiVer = serviceName === "lidarr" ? "v1" : "v3";
+	const idKey = QUEUE_ID_KEYS[serviceName];
 
 	const res = await axios.get(`${conf.url}/api/${apiVer}/queue`, {
 		headers: { "X-Api-Key": conf.apiKey },
-		timeout: 30000,
+		timeout: 10000,
 	});
 
 	return res.data.records
@@ -63,6 +69,54 @@ export const fetchQueue = async (serviceName, idKey) => {
 			timeleft: item.timeleft, // '00:05:30'
 			progress: queueProgress(item.size, item.sizeleft),
 		}));
+};
+
+/**
+ * One *Arr's queue. Every browser tab polls /missing (10s) and the Queue tab
+ * polls every 2s, so a result (or failure) is shared for QUEUE_TTL_MS and a
+ * fetch already in flight is reused rather than repeated.
+ */
+export const fetchQueue = (serviceName) => {
+	const now = Date.now();
+	const hit = queueCache.get(serviceName);
+	if (hit && now - hit.at < QUEUE_TTL_MS) return hit.promise;
+	const promise = fetchQueueUncached(serviceName);
+	queueCache.set(serviceName, { at: now, promise });
+	return promise;
+};
+
+export const resetQueueCache = () => {
+	queueCache.clear();
+	queueDown.clear();
+};
+
+/**
+ * All three *Arr queues. A service that doesn't answer is listed in
+ * `unavailable` instead of failing the whole request, so one *Arr restarting
+ * doesn't take the UI down with it.
+ */
+export const fetchAllQueues = async () => {
+	const services = Object.keys(QUEUE_ID_KEYS);
+	const results = await Promise.allSettled(services.map(fetchQueue));
+	const items = [];
+	const unavailable = [];
+	results.forEach((r, i) => {
+		const service = services[i];
+		if (r.status === "fulfilled") {
+			items.push(...r.value);
+			if (queueDown.delete(service))
+				logger.info(`[QUEUE] ${service} is answering again.`);
+		} else {
+			unavailable.push(service);
+			if (!queueDown.has(service)) {
+				queueDown.add(service);
+				logger.warn(
+					`[QUEUE] ${service} queue unavailable: ${r.reason?.message ?? r.reason}`,
+				);
+			}
+		}
+	});
+	return { items, unavailable };
 };
 
 export const translatePath = (localPath) => {

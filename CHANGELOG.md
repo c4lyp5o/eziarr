@@ -23,7 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refresh tokens are no longer accepted as access tokens.
 - `POST /settings` enforces the 8-character password minimum.
 
+### Fixed
+- **One offline *Arr no longer takes the UI down:** `GET /missing` and the
+  Queue tab return the queues that answered plus an `unavailable` list, and
+  the UI says which service isn't answering.
+- **Sync saw only the first 100 missing items per service** (and its cleanup
+  then deleted the rest). It now pages through the whole list, writes in one
+  transaction, and never cleans up from a partial list.
+- **Queue progress never reached the UI:** the `/missing` response schema
+  stripped the new `progress` field.
+- **"Test connection" refused LAN *Arr URLs** (the SSRF guard rejects private
+  addresses). The *Arr URLs are the admin's own, so Test now only requires
+  http(s).
+
 ### Changed
+- *Arr queues are fetched once per 5 s and shared by every poll, instead of
+  per request (up to ~110 *Arr calls a minute from one open browser).
+- Logs rotate at 5 MB (3 files kept), the worker writes its own `worker.log`,
+  and the Logs tab reads only the tail of each file, merged by time.
 - Download size cap raised from 2 GiB to 5 GiB.
 - Queue items from `GET /missing` carry a `progress` field (0-100 or null).
 - New UI with a light/dark theme toggle and motion.

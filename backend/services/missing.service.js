@@ -7,18 +7,14 @@ import {
 	recordForceGrabHistory,
 	getTasks,
 } from "../db";
-import { coerceNumericId, fetchQueue } from "../utils";
+import { coerceNumericId, fetchAllQueues } from "../utils";
 import { generalLogger as logger } from "../logger";
 
 export const MissingService = {
 	getMissing: async () => {
 		const missingItems = getMissingMedia();
 
-		const [radarrQ, sonarrQ, lidarrQ] = await Promise.all([
-			fetchQueue("radarr", "movieId"),
-			fetchQueue("sonarr", "episodeId"),
-			fetchQueue("lidarr", "albumId"),
-		]);
+		const { items: arrQueue, unavailable } = await fetchAllQueues();
 
 		const eziarrQueue = getDownloadQueue();
 		// The worker reports live percent on its task row, keyed by job id.
@@ -48,14 +44,14 @@ export const MissingService = {
 			};
 		});
 
-		const queueItems = [
-			...radarrQ,
-			...sonarrQ,
-			...lidarrQ,
-			...normalizedEziarrQueue,
-		];
+		const queueItems = [...arrQueue, ...normalizedEziarrQueue];
 
-		return { success: true, missing: missingItems, queue: queueItems };
+		return {
+			success: true,
+			missing: missingItems,
+			queue: queueItems,
+			unavailable,
+		};
 	},
 
 	postMissingSearch: async ({ body: { service, id } }) => {

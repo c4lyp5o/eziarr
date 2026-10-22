@@ -4,7 +4,7 @@ import axios from "axios";
 import { getAllSettings, getTasks } from "../db";
 import { LOG_DIR } from "../config";
 import { generalLogger as logger } from "../logger";
-import { isSafeUrl, safeHttpAgent, safeHttpsAgent } from "../utils";
+import { tailLogs } from "../logtail";
 
 let latestVersionCache = null;
 let lastVersionCheck = 0;
@@ -83,10 +83,19 @@ export const SystemService = {
 			});
 		}
 
-		if (!(await isSafeUrl(url))) {
+		// The *Arr URLs are the admin's own servers, usually on the LAN, so the
+		// SSRF guard (which refuses private addresses) doesn't apply here: it
+		// made "Test" fail for every LAN install. Only plain http(s) is allowed.
+		let parsed;
+		try {
+			parsed = new URL(url);
+		} catch {
+			parsed = null;
+		}
+		if (!parsed || !["http:", "https:"].includes(parsed.protocol)) {
 			return status(400, {
 				success: false,
-				message: "Invalid or unsafe URL provided.",
+				message: "Enter an http:// or https:// URL.",
 			});
 		}
 
@@ -97,8 +106,6 @@ export const SystemService = {
 		await axios.get(`${cleanUrl}/api/${apiVer}/system/status`, {
 			headers: { "X-Api-Key": apiKey },
 			timeout: 5000,
-			httpAgent: safeHttpAgent,
-			httpsAgent: safeHttpsAgent,
 		});
 		return { success: true, message: "Test successful" };
 	},
@@ -109,15 +116,15 @@ export const SystemService = {
 	},
 
 	getSystemLogs: ({ query: { type } }) => {
-		const filename = type === "hunter" ? "hunter.log" : "general.log";
-		const logPath = path.join(LOG_DIR, filename);
-
-		if (!fs.existsSync(logPath)) return { success: true, logs: [] };
+		// General = the server's log and the worker's, merged by time.
+		const files =
+			type === "hunter"
+				? ["hunter.log"]
+				: ["general.log", "worker.log"];
 
 		try {
-			const content = fs.readFileSync(logPath, "utf-8");
-			const lines = content.split("\n").filter(Boolean).slice(-100);
-			return { success: true, logs: lines };
+			const logs = tailLogs(files.map((f) => path.join(LOG_DIR, f)));
+			return { success: true, logs };
 		} catch (_err) {
 			return { success: false, message: "Could not read logs", logs: [] };
 		}

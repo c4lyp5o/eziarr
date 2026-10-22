@@ -11,6 +11,7 @@ export const DownloadsModel = {
 	getDownloadsQueueResponse: t.Object({
 		success: t.Boolean(),
 		queue: t.Array(t.Any()),
+		unavailable: t.Optional(t.Array(t.String())),
 	}),
 	getDownloadsHistoryResponse: t.Object({
 		success: t.Boolean(),

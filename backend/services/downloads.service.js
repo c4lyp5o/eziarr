@@ -1,17 +1,11 @@
 import { getDownloadQueue, getDownloadHistory, getDownloadStats } from "../db";
-import { fetchQueue } from "../utils";
+import { fetchAllQueues } from "../utils";
 
 export const DownloadsService = {
 	getDownloadsQueue: async () => {
 		const eziarrQueue = getDownloadQueue();
 
-		const [radarrQ, sonarrQ, lidarrQ] = await Promise.all([
-			fetchQueue("radarr", "movieId"),
-			fetchQueue("sonarr", "episodeId"),
-			fetchQueue("lidarr", "albumId"),
-		]);
-
-		const arrQueueRaw = [...radarrQ, ...sonarrQ, ...lidarrQ];
+		const { items: arrQueueRaw, unavailable } = await fetchAllQueues();
 
 		const arrQueueNormalized = arrQueueRaw.map((item, index) => ({
 			id: `arr-${item.service}-${index}`,
@@ -32,6 +26,7 @@ export const DownloadsService = {
 		return {
 			success: true,
 			queue: [...eziarrQueue, ...arrQueueNormalized],
+			unavailable,
 		};
 	},
 

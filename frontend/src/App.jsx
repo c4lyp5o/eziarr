@@ -45,6 +45,13 @@ const FILTERS = [
 	{ id: "onTheWay", label: "On the way" },
 ];
 
+const SERVICE_NAMES = { radarr: "Radarr", sonarr: "Sonarr", lidarr: "Lidarr" };
+const listNames = (services) =>
+	services
+		.map((s) => SERVICE_NAMES[s] ?? s)
+		.join(" and ")
+		.replace(/ and (?=.* and )/g, ", ");
+
 const formatClock = (ts) =>
 	ts
 		? new Date(ts).toLocaleTimeString(undefined, {
@@ -213,6 +220,7 @@ function App() {
 
 	const missing = useMemo(() => missingMedia?.missing || [], [missingMedia]);
 	const queue = useMemo(() => missingMedia?.queue || [], [missingMedia]);
+	const unavailable = missingMedia?.unavailable ?? [];
 
 	// One lookup per title: which queue entry (if any) is bringing it in.
 	const queueByItem = useMemo(() => {
@@ -368,6 +376,21 @@ function App() {
 								</>
 							)}
 						</p>
+						<AnimatePresence initial={false}>
+							{unavailable.length > 0 && (
+								<motion.p
+									className="text-sm text-warning mt-1"
+									initial={{ opacity: 0, height: 0 }}
+									animate={{ opacity: 1, height: "auto" }}
+									exit={{ opacity: 0, height: 0 }}
+									transition={spring}
+								>
+									{listNames(unavailable)} {unavailable.length === 1 ? "isn't" : "aren't"}{" "}
+									answering, so {unavailable.length === 1 ? "its" : "their"} downloads
+									may be missing below.
+								</motion.p>
+							)}
+						</AnimatePresence>
 					</div>
 
 					<div className="flex items-center gap-2">
