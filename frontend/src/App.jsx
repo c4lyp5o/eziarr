@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import {
 	AnimatePresence,
 	LayoutGroup,
@@ -23,12 +23,14 @@ import { spring, stagger, tile } from "./ui/motion.js";
 
 import MediaCard from "./components/MediaCard.jsx";
 import { describeQueue } from "./utils/queueState.js";
-import ResultsModal from "./components/ResultsModal.jsx";
-import SettingsModal from "./components/SettingsModal.jsx";
 import ErrorScreen from "./components/ErrorScreen.jsx";
 import Login from "./components/Login.jsx";
 import { Button } from "./components/Buttons.jsx";
 import { Mark } from "./components/Mark.jsx";
+
+// The two sheets load on first open: most visits only look at the wall.
+const ResultsModal = lazy(() => import("./components/ResultsModal.jsx"));
+const SettingsModal = lazy(() => import("./components/SettingsModal.jsx"));
 
 // Destinations that live in the settings sheet, reachable from the top bar.
 const NAV = [
@@ -112,6 +114,9 @@ function App() {
 	const [activeFilter, setActiveFilter] = useState("all");
 	const [modalData, setModalData] = useState(null);
 	const [settingsTab, setSettingsTab] = useState(null); // null = closed
+	// Once loaded the sheet stays mounted, so closing it can animate out.
+	const [settingsLoaded, setSettingsLoaded] = useState(false);
+	if (settingsTab !== null && !settingsLoaded) setSettingsLoaded(true);
 	const [scrolled, setScrolled] = useState(false);
 
 	// auth
@@ -550,6 +555,7 @@ function App() {
 				)}
 			</main>
 
+			<Suspense fallback={null}>
 			{modalData && (
 				<ResultsModal
 					sysStatus={sysStatus}
@@ -563,12 +569,15 @@ function App() {
 				/>
 			)}
 
-			<SettingsModal
-				isOpen={settingsTab !== null}
-				initialTab={settingsTab ?? "settings"}
-				onClose={() => setSettingsTab(null)}
-				onSaveSuccess={mutateSysStatus}
-			/>
+			{settingsLoaded && (
+				<SettingsModal
+					isOpen={settingsTab !== null}
+					initialTab={settingsTab ?? "settings"}
+					onClose={() => setSettingsTab(null)}
+					onSaveSuccess={mutateSysStatus}
+				/>
+			)}
+			</Suspense>
 		</div>
 	);
 }
