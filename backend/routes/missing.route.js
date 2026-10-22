@@ -51,4 +51,22 @@ export const MissingRoutes = new Elysia({ prefix: "/api/v1/missing" })
 				"Stop monitoring a movie/episode/album in Radarr/Sonarr/Lidarr by setting monitored=false. This will remove it from the missing list and prevent future monitoring.",
 			tags: ["*Arr Integration"],
 		},
+	})
+	.post("/bulk", MissingService.postMissingBulk, {
+		body: MissingModel.postMissingBulk,
+		response: MissingModel.postMissingBulkResponse,
+		detail: {
+			summary: "Search or Unmonitor Many Items",
+			description:
+				"Trigger a search for, or stop monitoring, a selection of titles: one *Arr call per service.",
+			tags: ["*Arr Integration"],
+		},
+	})
+	.get("/stream", MissingService.streamMissing, {
+		detail: {
+			summary: "Live Missing List",
+			description:
+				"Server-sent events: `missing` and `queue`, each sent when it changes.",
+			tags: ["*Arr Integration"],
+		},
 	});

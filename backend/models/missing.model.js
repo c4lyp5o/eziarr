@@ -42,6 +42,21 @@ export const MissingModel = {
 		serviceId: t.Union([t.String(), t.Number()]),
 	}),
 
+	postMissingBulk: t.Object({
+		action: t.Union([t.Literal("search"), t.Literal("unmonitor")]),
+		items: t.Array(
+			t.Object({
+				service: t.Union([
+					t.Literal("radarr"),
+					t.Literal("sonarr"),
+					t.Literal("lidarr"),
+				]),
+				serviceId: t.Union([t.String(), t.Number()]),
+			}),
+			{ minItems: 1, maxItems: 1000 },
+		),
+	}),
+
 	// responses
 	getMissingResponse: t.Object({
 		success: t.Boolean(),
@@ -97,6 +112,12 @@ export const MissingModel = {
 	postMissingForcegrabResponse: t.Object({
 		success: t.Boolean(),
 		message: t.String(),
+	}),
+	postMissingBulkResponse: t.Object({
+		success: t.Boolean(),
+		message: t.String(),
+		done: t.Integer(),
+		failed: t.Array(t.String()),
 	}),
 	postMissingUnmonitorResponse: t.Object({
 		success: t.Boolean(),
