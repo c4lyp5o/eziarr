@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The Missing wall renders only the rows on screen.** Large libraries
+  (thousands of missing titles) now open in under a second instead of
+  several, and switching filters no longer freezes the page. Cards no
+  longer animate in and out when the filter changes.
+
 ## [1.4.1] - 2026-10-22
 
 ### Fixed

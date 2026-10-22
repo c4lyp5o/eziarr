@@ -19,19 +19,6 @@ export const press = {
 	transition: spring,
 };
 
-// A tile arriving in, or leaving, a list or grid.
-export const tile = {
-	initial: { opacity: 0, y: 16, scale: 0.98 },
-	animate: { opacity: 1, y: 0, scale: 1 },
-	exit: { opacity: 0, scale: 0.94, transition: { duration: 0.16 } },
-};
-
-// Stagger tiles that arrive together, capped so a long wall settles fast.
-export const stagger = (index, step = 0.035, cap = 0.4) => ({
-	...softSpring,
-	delay: Math.min(index * step, cap),
-});
-
 // A row arriving in, or leaving, a live list (tasks, queue, history).
 export const rowMotion = {
 	layout: true,

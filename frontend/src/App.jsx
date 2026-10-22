@@ -15,9 +15,10 @@ import { useToast } from "./context/Toast.jsx";
 import { useTheme } from "./context/Theme.jsx";
 import { apiCall } from "./utils/apiCall.js";
 import { ui } from "./ui/styles.js";
-import { spring, stagger, tile } from "./ui/motion.js";
+import { spring } from "./ui/motion.js";
 
 import MediaCard from "./components/MediaCard.jsx";
+import { MediaWall } from "./components/MediaWall.jsx";
 import { describeQueue } from "./utils/queueState.js";
 import ErrorScreen from "./components/ErrorScreen.jsx";
 import Login from "./components/Login.jsx";
@@ -564,33 +565,19 @@ function App() {
 						</Button>
 					</EmptyFrame>
 				) : (
-					<motion.ul
-						layout
-						className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5"
-					>
-						<AnimatePresence mode="popLayout">
-							{filteredItems.map((item, i) => (
-								<motion.li
-									key={item.id}
-									layout
-									variants={tile}
-									initial="initial"
-									animate="animate"
-									exit="exit"
-									transition={stagger(i)}
-								>
-									<MediaCard
-										item={item}
-										queueItem={queueByItem.get(item.id)}
-										onSearch={handleTriggerSearch}
-										onDeepSearch={() => handleOpenDeepSearch(item)}
-										isSearching={searchingId === item.id}
-										mutate={mutate}
-									/>
-								</motion.li>
-							))}
-						</AnimatePresence>
-					</motion.ul>
+					<MediaWall
+						items={filteredItems}
+						renderItem={(item) => (
+							<MediaCard
+								item={item}
+								queueItem={queueByItem.get(item.id)}
+								onSearch={handleTriggerSearch}
+								onDeepSearch={() => handleOpenDeepSearch(item)}
+								isSearching={searchingId === item.id}
+								mutate={mutate}
+							/>
+						)}
+					/>
 				)}
 			</main>
 
