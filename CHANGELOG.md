@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **First-boot setup code:** setting the initial password now needs a
+  one-time code printed on the server console, so an exposed fresh install
+  can't be claimed by whoever reaches it first. `EZIARR_PASSWORD` /
+  `EZIARR_PASSWORD_FILE` skip it.
+- **Login rate limit could be bypassed** by sending a fresh `X-Forwarded-For`
+  per request: the leftmost (client-controlled) entry was trusted whenever the
+  peer had a private IP. The header is now ignored unless `TRUST_PROXY` is
+  set, and then the entry the trusted proxy appended is used.
+  **Behaviour change:** behind a reverse proxy, set `TRUST_PROXY=1`, or all
+  clients share the proxy's rate-limit bucket.
+- **Password change revokes sessions:** tokens carry a session version that a
+  password change bumps; the caller is re-issued a session.
+- Refresh tokens are no longer accepted as access tokens.
+- `POST /settings` enforces the 8-character password minimum.
+
+### Changed
+- Download size cap raised from 2 GiB to 5 GiB.
+- Queue items from `GET /missing` carry a `progress` field (0-100 or null).
+- New UI with a light/dark theme toggle and motion.
+
 ## [1.3.0] - 2026-10-04
 
 ### Fixed

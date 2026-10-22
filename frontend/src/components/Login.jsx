@@ -56,6 +56,7 @@ const Frame = ({ title, subtitle, children }) => (
 );
 
 const SetUpInitialUserAndPassword = ({ onClose }) => {
+	const [setupCode, setSetupCode] = useState("");
 	const [password, setPassword] = useState("");
 	const [repeatPassword, setRepeatPassword] = useState("");
 	const [error, setError] = useState("");
@@ -64,6 +65,11 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 	const handleSaveUsernameAndPassword = async (e) => {
 		e.preventDefault();
 		setError("");
+
+		if (!setupCode.trim()) {
+			setError("Enter the setup code from the server log.");
+			return;
+		}
 
 		if (!password) {
 			setError("Choose a password first.");
@@ -79,7 +85,7 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 			setIsLoading(true);
 			await apiCall("/api/v1/firsttime", {
 				method: "POST",
-				body: { password },
+				body: { password, setupCode },
 			});
 			onClose();
 		} catch (err) {
@@ -97,6 +103,26 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 			<form onSubmit={handleSaveUsernameAndPassword}>
 				<ErrorLine error={error} />
 				<div className="space-y-4">
+					<div>
+						<Field
+							id="setup-code"
+							label="Setup code"
+							value={setupCode}
+							onChange={(e) => setSetupCode(e.target.value)}
+							placeholder="XXXX-XXXX"
+							autoComplete="one-time-code"
+							autoCapitalize="characters"
+							spellCheck={false}
+							disabled={isLoading}
+							// biome-ignore lint/a11y/noAutofocus: the first field of the only form
+							autoFocus
+						/>
+						<p className="text-xs text-faint mt-2">
+							Printed in the server log when Eziarr starts:{" "}
+							<span className="text-muted">docker logs eziarr</span>. It changes on
+							every restart.
+						</p>
+					</div>
 					<Field
 						id="new-password"
 						label="Password"

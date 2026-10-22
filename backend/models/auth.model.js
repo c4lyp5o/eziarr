@@ -4,6 +4,7 @@ export const AuthModel = {
 	// bodies
 	postFirstTime: t.Object({
 		password: t.String({ minLength: 8 }),
+		setupCode: t.String({ minLength: 1, maxLength: 32 }),
 	}),
 	login: t.Object({
 		password: t.String({ minLength: 8 }),

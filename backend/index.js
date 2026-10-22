@@ -8,6 +8,7 @@ import staticPlugin from "@elysiajs/static";
 import { getSetting, setSetting } from "./db";
 import { generalLogger as logger } from "./logger";
 import { CLIENT_DIR } from "./config";
+import { prepareSetup } from "./setup";
 
 import { AuthPlugin } from "./plugins/auth.plugin";
 import { ProtectorPlugin } from "./plugins/protector.plugin";
@@ -165,6 +166,9 @@ if (process.env.NODE_ENV === "development") {
 }
 
 try {
+	// First boot: an env password completes setup, otherwise this prints the
+	// one-time setup code on stdout (see setup.js).
+	await prepareSetup();
 	app.listen(process.env.PORT || 5000);
 	process.env.NODE_ENV === "development" &&
 		logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");

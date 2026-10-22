@@ -15,7 +15,9 @@ Eziarr is a powerful, production-ready missing-media manager designed to work al
 
 ## 🔐 Security & Authentication
 
-* **First-Time Setup:** Forces the creation of an admin account on the first boot.
+* **First-Time Setup:** On first boot Eziarr prints a one-time **setup code** to its console (`docker logs eziarr`). Setting the password needs that code, so nobody who merely reaches the server can claim it first. The code works once and changes on every restart until setup is done. To skip it, set `EZIARR_PASSWORD` (or `EZIARR_PASSWORD_FILE`, at least 8 characters) before the first start.
+* **Session Revocation:** Changing the password signs out every other browser and device; the one you changed it from stays signed in.
+* **Login Rate Limiting:** 10 attempts per minute per client. Behind a reverse proxy, set `TRUST_PROXY` to the number of proxies in front of Eziarr (usually `1`) so each client is limited by its real address. Leave it unset otherwise: `X-Forwarded-For` is then ignored, because any client can send it.
 * **HttpOnly JWT Cookies:** Sessions are secured using HttpOnly cookies with silent automated refresh cycles, rendering them immune to XSS attacks.
 * **SSRF Protection:** Built-in DNS and IP validation prevents Server-Side Request Forgery attacks when downloading from alternative web sources.
 * **Local Network Safe:** Authentication cookies are designed to work smoothly over local `http://` network IPs. *(Note: If you expose Eziarr to the public internet, it is highly recommended to place it behind an HTTPS reverse proxy).*
@@ -41,4 +43,15 @@ Eziarr will seamlessly translate the paths before asking Radarr to import them.
 ## 🚀 Getting Started
 1. Configure your `.env` or use the built-in Settings UI.
 2. Start the backend server and worker using Docker Compose or PM2.
-3. Open the web UI. Eziarr will prompt you to secure your installation and then automatically sync your missing items!
+3. Open the web UI and enter the setup code from the server log, then choose a password. Eziarr then syncs your missing items automatically.
+
+### Environment variables
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `EZIARR_PASSWORD` / `EZIARR_PASSWORD_FILE` | unset | Sets the password on first boot and skips the setup code. Ignored once a password exists. |
+| `TRUST_PROXY` | `0` | Number of reverse proxies whose `X-Forwarded-For` entries are trusted for rate limiting. |
+| `COOKIE_SECURE` | auto | Force `true`/`false` for the `Secure` cookie flag. |
+| `JWT_SECRET` | generated | Signing key for sessions; generated and stored on first boot when unset. |
+
+Single downloads (HTTP or Telegram) are capped at 5 GiB.

@@ -1,6 +1,12 @@
-import { getSetting, setSetting } from "../db";
+import { getSetting } from "../db";
 import { generalLogger as logger } from "../logger";
 import { getClientIp } from "../utils";
+import {
+	getTokenVersion,
+	verifyAccessToken,
+	verifyRefreshToken,
+} from "../session";
+import { isFirstTime, checkSetupCode, completeSetup } from "../setup";
 
 const shouldSecureCookies = (request) => {
 	// Explicit env override wins (COOKIE_SECURE=true/false)
@@ -55,24 +61,43 @@ function clearAuthCookies({ cookie, request }) {
 	});
 }
 
+/**
+ * Sign a fresh access/refresh pair under the current session version and set
+ * the cookies. Used by login, and after a password change so the person who
+ * changed it stays signed in while every other session is revoked.
+ */
+export const issueSession = async ({ jwt, cookie, request, rememberMe }) => {
+	const tv = getTokenVersion();
+	const accessToken = await jwt.sign({ isAdmin: true, tv }, { expiresIn: "15m" });
+	const refreshToken = await jwt.sign(
+		{ isAdmin: true, type: "refresh", tv },
+		{ expiresIn: rememberMe ? "30d" : "1d" },
+	);
+	setAuthCookies({ cookie, accessToken, refreshToken, rememberMe, request });
+};
+
 export const AuthService = {
 	getFirstTime: () => {
-		let isFirstTime = getSetting("isFirstTime");
-		isFirstTime = !!(isFirstTime === null || isFirstTime === "true");
-		return { success: true, isFirstTime };
+		return { success: true, isFirstTime: isFirstTime() };
 	},
 
-	postFirstTime: async ({ body: { password }, status }) => {
-		const isFirstTime = getSetting("isFirstTime");
-		if (isFirstTime === "false")
+	postFirstTime: async ({ request, server, body: { password, setupCode }, status }) => {
+		if (!isFirstTime())
 			return status(401, { success: false, message: "Unauthorized" });
 
-		if (!password)
-			return status(401, { success: false, message: "Unauthorized" });
+		// The one-time code printed on the server's console proves the caller
+		// owns this install (see setup.js).
+		if (!checkSetupCode(setupCode)) {
+			logger.warn(
+				`[AUTH] Wrong setup code from ${getClientIp(request, server)}`,
+			);
+			return status(401, {
+				success: false,
+				message: "That setup code isn't right. Check the server log.",
+			});
+		}
 
-		const hashedPassword = await Bun.password.hash(password);
-		setSetting("password", hashedPassword);
-		setSetting("isFirstTime", "false");
+		await completeSetup(password);
 
 		return { success: true, message: "Setting updated." };
 	},
@@ -85,8 +110,7 @@ export const AuthService = {
 		body: { password, rememberMe },
 		status,
 	}) => {
-		const isFirstTime = getSetting("isFirstTime");
-		if (isFirstTime === "true" || isFirstTime === null)
+		if (isFirstTime())
 			return status(401, { success: false, message: "Unauthorized" });
 
 		if (!password) {
@@ -105,34 +129,20 @@ export const AuthService = {
 			return status(401, { success: false, message: "Unauthorized" });
 		}
 
-		const accessToken = await jwt.sign({ isAdmin: true }, { expiresIn: "15m" });
-		const refreshExp = rememberMe ? "30d" : "1d";
-		const refreshToken = await jwt.sign(
-			{ isAdmin: true, type: "refresh" },
-			{ expiresIn: refreshExp },
-		);
-
-		setAuthCookies({
-			cookie,
-			accessToken,
-			refreshToken,
-			rememberMe: !!rememberMe,
-			request,
-		});
+		await issueSession({ jwt, cookie, request, rememberMe: !!rememberMe });
 
 		return { success: true };
 	},
 
 	me: async ({ request, server, jwt, cookie, status }) => {
-		const isFirstTime = getSetting("isFirstTime");
-		if (isFirstTime === "true" || isFirstTime === null)
+		if (isFirstTime())
 			return status(401, { success: false, message: "Unauthorized" });
 
 		const token = cookie.eziarr_access?.value;
 		if (!token) return status(401, { success: false, message: "Unauthorized" });
 
-		const payload = await jwt.verify(token);
-		if (!payload || !payload.isAdmin) {
+		const payload = await verifyAccessToken(jwt, token);
+		if (!payload) {
 			logger.warn(
 				`[AUTH] Unauthorized access attempt to /auth/me from ${getClientIp(request, server)}`,
 			);
@@ -143,15 +153,14 @@ export const AuthService = {
 	},
 
 	refresh: async ({ request, server, jwt, cookie, status }) => {
-		const isFirstTime = getSetting("isFirstTime");
-		if (isFirstTime === "true" || isFirstTime === null)
+		if (isFirstTime())
 			return status(401, { success: false, message: "Unauthorized" });
 
 		const token = cookie.eziarr_refresh?.value;
 		if (!token) return status(401, { success: false, message: "Unauthorized" });
 
-		const payload = await jwt.verify(token);
-		if (!payload || payload.type !== "refresh" || !payload.isAdmin) {
+		const payload = await verifyRefreshToken(jwt, token);
+		if (!payload) {
 			logger.warn(
 				`[AUTH] Unauthorized refresh attempt from ${getClientIp(request, server)}`,
 			);
@@ -159,7 +168,7 @@ export const AuthService = {
 		}
 
 		const accessToken = await jwt.sign(
-			{ isAdmin: payload.isAdmin },
+			{ isAdmin: payload.isAdmin, tv: getTokenVersion() },
 			{ expiresIn: "15m" },
 		);
 

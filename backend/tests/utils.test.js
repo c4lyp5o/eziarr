@@ -121,22 +121,46 @@ describe("Security: Client IP Resolution", () => {
 		expect(getClientIp(request, server)).toBe("127.0.0.1");
 	});
 
-	it("Should trust X-Forwarded-For only when the direct peer is a proxy", () => {
+	// Security sweep #1: the client-controlled part of X-Forwarded-For is on
+	// the LEFT; each proxy appends what it saw on the right.
+	it("Should ignore X-Forwarded-For unless TRUST_PROXY is set", () => {
 		const request = new Request("http://localhost/api/v1/login", {
-			headers: { "x-forwarded-for": "203.0.113.9, 10.0.0.2" },
+			headers: { "x-forwarded-for": "203.0.113.9" },
 		});
-		const proxyPeer = { requestIP: () => ({ address: "10.0.0.2" }) };
+		const lanPeer = { requestIP: () => ({ address: "192.168.1.40" }) };
 
-		expect(getClientIp(request, proxyPeer)).toBe("203.0.113.9");
+		expect(getClientIp(request, lanPeer)).toBe("192.168.1.40");
+	});
+
+	it("Should take the entry the trusted proxy appended, not the spoofable left one", () => {
+		process.env.TRUST_PROXY = "1";
+		try {
+			const request = new Request("http://localhost/api/v1/login", {
+				headers: { "x-forwarded-for": "1.2.3.4, 203.0.113.9" },
+			});
+			const proxyPeer = { requestIP: () => ({ address: "10.0.0.2" }) };
+			expect(getClientIp(request, proxyPeer)).toBe("203.0.113.9");
+
+			// Two hops (CDN in front of nginx): the client is second from the right.
+			process.env.TRUST_PROXY = "2";
+			const chained = new Request("http://localhost/api/v1/login", {
+				headers: { "x-forwarded-for": "1.2.3.4, 203.0.113.9, 172.70.1.1" },
+			});
+			expect(getClientIp(chained, proxyPeer)).toBe("203.0.113.9");
+		} finally {
+			delete process.env.TRUST_PROXY;
+		}
 	});
 
 	it("Should ignore spoofed X-Forwarded-For from a public direct peer", () => {
+		process.env.TRUST_PROXY = "1";
 		const request = new Request("http://localhost/api/v1/login", {
 			headers: { "x-forwarded-for": "203.0.113.9" },
 		});
 		const publicPeer = { requestIP: () => ({ address: "198.51.100.7" }) };
 
 		expect(getClientIp(request, publicPeer)).toBe("198.51.100.7");
+		delete process.env.TRUST_PROXY;
 	});
 
 	it("Should fall back to unknown when no peer info is available", () => {
