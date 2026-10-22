@@ -1,6 +1,6 @@
 import path from "node:path";
 import crypto from "node:crypto";
-import { Elysia, file } from "elysia";
+import { Elysia, ElysiaCustomStatusResponse, file } from "elysia";
 import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import { openapi } from "@elysiajs/openapi";
@@ -36,6 +36,9 @@ if (!JWT_SECRET) {
 
 export const app = new Elysia()
 	.onError(({ code, error, set }) => {
+		// A status a hook threw on purpose (e.g. ProtectorPlugin's 401): let
+		// Elysia send it as-is instead of turning it into a 500.
+		if (error instanceof ElysiaCustomStatusResponse) return;
 		if (code === "VALIDATION") {
 			process.env.NODE_ENV === "development" && logger.error(error);
 			set.status = 400;

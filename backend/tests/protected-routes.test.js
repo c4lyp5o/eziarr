@@ -49,13 +49,9 @@ describe("Every protected API route requires a session", () => {
 		for (const r of apiRoutes()) {
 			if (PUBLIC.has(`${r.method} ${r.path}`)) continue;
 			const res = await call(r.method, r.path);
-			// Elysia validates the body before onBeforeHandle, so an empty body
-			// can be refused as 400 by validation first. That still means the
-			// handler never ran; a 400 from the handler itself would not.
-			const body = await res.json().catch(() => ({}));
-			const refused =
-				res.status === 401 ||
-				(res.status === 400 && body.message === "Bad request");
+			// Strictly 401: the session check runs before body validation, so
+			// even a malformed body must not get a different answer.
+			const refused = res.status === 401;
 			if (!refused) open.push(`${r.method} ${r.path} -> ${res.status}`);
 		}
 		expect(open).toEqual([]);
