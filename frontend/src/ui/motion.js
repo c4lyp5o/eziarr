@@ -26,3 +26,12 @@ export const stagger = (index, step = 0.035, cap = 0.4) => ({
 	...softSpring,
 	delay: Math.min(index * step, cap),
 });
+
+// A row arriving in, or leaving, a live list (tasks, queue, history).
+export const rowMotion = {
+	layout: true,
+	initial: { opacity: 0, y: 12 },
+	animate: { opacity: 1, y: 0 },
+	exit: { opacity: 0, x: -24, transition: { duration: 0.16 } },
+	transition: spring,
+};
