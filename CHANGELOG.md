@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   several, and switching filters no longer freezes the page. Cards no
   longer animate in and out when the filter changes.
 
+### Added
+- **Sign-in backdrop:** blank poster cards drift slowly towards you behind
+  the sign-in and setup forms (three.js, loaded only on those screens). It
+  holds still for reduced motion and is skipped without WebGL.
+- **Poster tilt:** with a mouse, a poster leans towards the pointer and
+  catches a soft light.
+
 ## [1.4.1] - 2026-10-22
 
 ### Fixed

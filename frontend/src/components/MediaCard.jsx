@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { motion } from "motion/react";
+import {
+	motion,
+	useMotionValue,
+	useReducedMotion,
+	useSpring,
+	useTransform,
+} from "motion/react";
 import {
 	Search,
 	RefreshCw,
@@ -87,6 +93,44 @@ const DownloadRail = ({ progress, tone }) => {
 	);
 };
 
+const TILT = 9; // degrees at the poster's edge
+const tiltSpring = { stiffness: 300, damping: 26 };
+
+// The poster leans toward a mouse pointer and catches a soft light where it
+// points. Mouse only: on touch a tilt would fight the scroll.
+const usePosterTilt = () => {
+	const still = useReducedMotion();
+	const px = useMotionValue(0.5);
+	const py = useMotionValue(0.5);
+	const rotateY = useSpring(
+		useTransform(px, [0, 1], [-TILT, TILT]),
+		tiltSpring,
+	);
+	const rotateX = useSpring(
+		useTransform(py, [0, 1], [TILT, -TILT]),
+		tiltSpring,
+	);
+	const glareX = useTransform(px, [0, 1], ["-25%", "25%"]);
+	const glareY = useTransform(py, [0, 1], ["-25%", "25%"]);
+
+	const onPointerMove = (e) => {
+		if (still || e.pointerType !== "mouse") return;
+		const r = e.currentTarget.getBoundingClientRect();
+		px.set((e.clientX - r.left) / r.width);
+		py.set((e.clientY - r.top) / r.height);
+	};
+	const onPointerLeave = () => {
+		px.set(0.5);
+		py.set(0.5);
+	};
+
+	return {
+		handlers: { onPointerMove, onPointerLeave },
+		style: { rotateX, rotateY, transformPerspective: 700 },
+		glare: { x: glareX, y: glareY },
+	};
+};
+
 const MediaCard = ({
 	item,
 	queueItem,
@@ -101,6 +145,7 @@ const MediaCard = ({
 	const [imgLoaded, setImgLoaded] = useState(false);
 	const [showUnmonitorModal, setShowUnmonitorModal] = useState(false);
 	const [isUnmonitoring, setIsUnmonitoring] = useState(false);
+	const tilt = usePosterTilt();
 
 	const kind = KIND[item.service] ?? { label: item.service, icon: Film };
 	const released = formatDate(item.releaseDate);
@@ -139,7 +184,11 @@ const MediaCard = ({
 				initial="rest"
 				animate="rest"
 			>
-				<div className="relative aspect-2/3 overflow-hidden rounded-[14px] bg-raised">
+				<motion.div
+					className="relative aspect-2/3 overflow-hidden rounded-[14px] bg-raised"
+					style={tilt.style}
+					{...tilt.handlers}
+				>
 					{imgFailed ? (
 						<PosterFallback item={item} />
 					) : (
@@ -156,8 +205,15 @@ const MediaCard = ({
 							transition={{ opacity: { duration: 0.35 }, scale: softSpring }}
 						/>
 					)}
+					<motion.div
+						aria-hidden="true"
+						className="pointer-events-none absolute -inset-1/4 bg-[radial-gradient(circle_at_center,rgb(255_255_255/0.22),transparent_55%)]"
+						style={tilt.glare}
+						variants={{ hover: { opacity: 1 }, rest: { opacity: 0 } }}
+						transition={{ duration: 0.25 }}
+					/>
 					{state && <DownloadRail progress={progress} tone={state.tone} />}
-				</div>
+				</motion.div>
 
 				<div className="flex flex-col gap-0.5 px-1.5 pt-3 pb-1">
 					<h3
