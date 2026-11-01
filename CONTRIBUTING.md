@@ -34,14 +34,14 @@ CI runs the same checks on every pull request.
 
 ## Branches and releases
 
-Changes flow **feature branch → `dev` → `staging` → `main`**:
+Changes flow **feature branch → `development` → `master`**:
 
-1. Branch from `dev` (`fix/…`, `feat/…`, `chore/…`) and open the PR against `dev`.
-2. `dev` is promoted to `staging`, and `staging` to `main`, each by a PR.
+1. Branch from `development` (`fix/…`, `feat/…`, `chore/…`) and open the PR against `development`.
+2. `development` is promoted to `master` by a PR; `master` only takes PRs.
 3. A release bumps the version in `package.json`, `backend/package.json` and `frontend/package.json` and dates the `[Unreleased]` section of the changelog (a `chore: bumpver to x.y.z` PR).
-4. A push to `main` builds and publishes the Docker image `calypso666/eziarr:<version>` and `:latest`.
+4. A push to `master` builds and publishes the Docker image `calypso666/eziarr:<version>` and `:latest`.
 
-An urgent fix (a security hole, say) may go straight to `main` in a release PR; afterwards, merge `main` back into `staging` and `dev` so the next change starts from current code.
+An urgent fix (a security hole, say) may go to `master` in a release PR; afterwards, merge `master` back into `development` so the next change starts from current code.
 
 ## Commit messages
 
