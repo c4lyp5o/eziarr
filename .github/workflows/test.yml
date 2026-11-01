@@ -3,9 +3,8 @@ name: Test
 on:
   push:
     branches:
-      - main
-      - staging
-      - dev
+      - master
+      - development
   pull_request:
   workflow_dispatch:
 
