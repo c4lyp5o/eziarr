@@ -56,7 +56,14 @@ const NoServicesConfiguredModal = ({
 	</Modal>
 );
 
+const InlinePanel = ({ isOpen, children }) =>
+	isOpen ? <section className="ez-settings">{children}</section> : null;
+
 const SettingsModal = ({
+	inline = false,
+	notifications,
+	toggleNotifications,
+	systemStatus,
 	isOpen,
 	initialTab = "settings",
 	onClose,
@@ -164,10 +171,12 @@ const SettingsModal = ({
 			};
 
 			loadConfig();
-			setActiveTab(initialTab);
 		}
 		return () => setNoServicesConfiguredPrompt(false);
 	}, [isOpen]);
+	useEffect(() => {
+		if (isOpen) setActiveTab(initialTab);
+	}, [isOpen, initialTab]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: later
 	useEffect(() => {
@@ -287,9 +296,10 @@ const SettingsModal = ({
 		{ id: "logs", label: "Logs", icon: ScrollText },
 	];
 
+	const Container = inline ? InlinePanel : Modal;
 	return (
 		<>
-			<Modal
+			<Container
 				isOpen={isOpen}
 				onClose={onClose}
 				size="lg"
@@ -297,15 +307,39 @@ const SettingsModal = ({
 				title="Settings"
 				subtitle="Libraries, sources, and what the worker is doing."
 			>
-				<Tabs
-					id="settings"
-					tabs={TABS}
-					active={activeTab}
-					onChange={setActiveTab}
-				/>
+				{inline && (
+					<h1 className="text-xl font-semibold p-6">
+						{
+							{
+								settings: "Configuration",
+								queues: "Queue",
+								history: "History",
+								stats: "Statistics",
+								tasks: "Tasks",
+								logs: "Logs",
+								notifications: "Notifications",
+								system: "System",
+							}[activeTab]
+						}
+					</h1>
+				)}
+				{!inline && (
+					<Tabs
+						id="settings"
+						tabs={TABS}
+						active={activeTab}
+						onChange={setActiveTab}
+					/>
+				)}
 
 				{/* CONTENT AREA */}
-				<div className="flex-auto min-h-0 h-[70dvh] overflow-y-auto p-4 sm:p-6 bg-ground relative">
+				<div
+					className={
+						inline
+							? "p-4 sm:p-6 min-w-0"
+							: "flex-auto min-h-0 h-[70dvh] overflow-y-auto p-4 sm:p-6 bg-ground relative"
+					}
+				>
 					{isLoadingConfig && activeTab === "settings" ? (
 						<div className="space-y-4" aria-busy="true">
 							{[0, 1, 2].map((i) => (
@@ -330,6 +364,59 @@ const SettingsModal = ({
 								{/* ============================== */}
 								{/* TAB 1: SETTINGS                */}
 								{/* ============================== */}
+								{activeTab === "notifications" && (
+									<div className="bg-surface border border-line rounded-md p-6">
+										<h2 className="font-semibold">Download notifications</h2>
+										<p className="text-muted my-3">
+											Notify this browser when a tracked download finishes.
+										</p>
+										<Button
+											onClick={toggleNotifications}
+											disabled={
+												notifications === "blocked" ||
+												notifications === "unsupported"
+											}
+										>
+											{notifications === "on"
+												? "Disable notifications"
+												: "Enable notifications"}
+										</Button>
+										<p className="text-muted mt-3">
+											Browser permission: {notifications}
+										</p>
+									</div>
+								)}
+								{activeTab === "system" && (
+									<div className="bg-surface border border-line rounded-md p-6">
+										<h2 className="font-semibold">
+											eziarr v{systemStatus?.currentVersion}
+										</h2>
+										<p className="text-muted my-3">
+											Bun {systemStatus?.runtime?.bunVersion || "—"} ·{" "}
+											{systemStatus?.runtime?.platform || "—"} · uptime{" "}
+											{systemStatus?.runtime?.uptimeSeconds ?? "—"} seconds
+										</p>
+										<p className="text-muted my-3">
+											Configured services (not a health check)
+										</p>
+										{Object.entries(systemStatus?.features || {}).map(
+											([name, enabled]) => (
+												<p key={name}>
+													{name}: {enabled ? "Configured" : "Not configured"}
+												</p>
+											),
+										)}
+										{systemStatus?.updateAvailable && (
+											<a
+												href="https://github.com/c4lyp5o/eziarr/releases/latest"
+												target="_blank"
+												rel="noreferrer"
+											>
+												Version {systemStatus.latestVersion} available
+											</a>
+										)}
+									</div>
+								)}
 								{activeTab === "settings" && (
 									<ConfigTab
 										settings={settings}
@@ -413,7 +500,7 @@ const SettingsModal = ({
 						</motion.div>
 					)}
 				</AnimatePresence>
-			</Modal>
+			</Container>
 
 			<NoServicesConfiguredModal
 				isOpen={noServicesConfiguredPrompt}

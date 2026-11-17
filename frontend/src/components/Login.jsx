@@ -49,18 +49,18 @@ const Frame = ({ title, subtitle, children }) => (
 			<PosterDrift />
 		</Suspense>
 		<motion.div
-			className="relative w-full max-w-sm"
+			className="relative w-full max-w-sm bg-surface border border-control rounded-md p-6 sm:p-8"
 			initial={{ opacity: 0, y: 16 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={spring}
 		>
 			<div className="flex items-center gap-2 mb-8 text-ink">
 				<Mark size={28} />
-				<span className="text-lg font-semibold tracking-[-0.01em]">Eziarr</span>
+				<span className="text-lg font-semibold tracking-[-0.01em]">eziarr</span>
 			</div>
 			<h1 className="text-xl font-semibold text-ink">{title}</h1>
 			<p className="text-sm text-muted mt-1 mb-6">{subtitle}</p>
-			<div className="bg-surface rounded-[20px] p-5 sm:p-6">{children}</div>
+			<div className="bg-surface">{children}</div>
 		</motion.div>
 	</div>
 );

@@ -1,20 +1,13 @@
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/public-sans";
 @import "tailwindcss";
 
-/*
- * True-black flat: elevation by lightness alone (ground → surface → raised),
- * no borders or shadows on cards at rest, colour only on data (the download
- * rail) and on status. The primary control is an inverted pill.
- *
- * Theme: follows the OS unless the user picked one; the choice is written to
- * <html data-theme="light|dark"> by context/Theme.jsx.
- */
+/* Shared ez semantic palette, paired for light and dark. */
 :root,
 :root[data-theme="dark"] {
 	color-scheme: dark;
-	--ground: #000000;
-	--surface: #111111;
-	--raised: #222222;
+	--ground: #171719;
+	--surface: #131217;
+	--raised: #212023;
 	--active: #2a2a2a;
 	--line: #1f1f1f;
 	--rule: #191919;
@@ -22,11 +15,11 @@
 	--ink: #ffffff;
 	--muted: #b4b4b4;
 	--faint: #949494;
-	--accent: #c6f24e;
-	--accent-ink: #0b0f00;
+	--accent: #38bdf8;
+	--accent-ink: #08131a;
 	--primary: #ffffff;
-	--on-primary: #000000;
-	--positive: #c6f24e;
+	--on-primary: #171719;
+	--positive: #38bdf8;
 	--negative: #e5566f;
 	--warning: #e5a93b;
 	--pos-bg: #222a10;
@@ -37,21 +30,21 @@
 
 :root[data-theme="light"] {
 	color-scheme: light;
-	--ground: #f2f2f0;
+	--ground: #f9fafb;
 	--surface: #ffffff;
-	--raised: #ececea;
+	--raised: #f4f4f5;
 	--active: #e2e2df;
 	--line: #e3e3e0;
 	--rule: #ededea;
 	--control: #c9c9c5;
-	--ink: #111111;
+	--ink: #131217;
 	--muted: #4f4f4c;
 	--faint: #6b6b67;
-	--accent: #6e9800;
+	--accent: #0369a1;
 	--accent-ink: #ffffff;
-	--primary: #111111;
+	--primary: #131217;
 	--on-primary: #ffffff;
-	--positive: #4d6b00;
+	--positive: #247b50;
 	--negative: #b4232f;
 	--warning: #8a5a00;
 	--pos-bg: #eaf6c9;
@@ -61,7 +54,7 @@
 }
 
 @theme inline {
-	--font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+	--font-sans: "Public Sans Variable", "Public Sans", system-ui, sans-serif;
 	--color-ground: var(--ground);
 	--color-surface: var(--surface);
 	--color-raised: var(--raised);
@@ -124,5 +117,127 @@
 	.no-scrollbar {
 		-ms-overflow-style: none; /* IE and Edge */
 		scrollbar-width: none; /* Firefox */
+	}
+}
+
+/* Shared ez application shell. Content retains its virtualized media wall. */
+.ez-sidebar {
+	position: fixed;
+	inset: 0 auto 0 0;
+	width: 224px;
+	background: var(--surface);
+	border-right: 1px solid var(--line);
+	display: flex;
+	flex-direction: column;
+	z-index: 40;
+}
+.ez-brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 24px 20px;
+	color: var(--ink);
+}
+.ez-brand span {
+	margin-left: auto;
+	font-size: 12px;
+	color: var(--faint);
+}
+.ez-sidebar nav {
+	padding: 8px 14px;
+	flex: 1;
+	overflow: auto;
+}
+.ez-sidebar nav button {
+	display: block;
+	width: 100%;
+	text-align: left;
+	padding: 10px;
+	color: var(--muted);
+	border-radius: 6px;
+	cursor: pointer;
+}
+.ez-sidebar nav button:hover {
+	background: var(--raised);
+}
+.ez-sidebar nav button[aria-current] {
+	color: var(--ink);
+	background: var(--active);
+}
+.ez-sidebar-footer {
+	display: flex;
+	justify-content: space-around;
+	align-items: center;
+	border-top: 1px solid var(--line);
+	padding: 12px;
+}
+.ez-sidebar-footer a {
+	padding: 10px;
+}
+.ez-topbar {
+	margin-left: 224px;
+	padding: 20px 28px;
+	display: flex;
+	align-items: center;
+}
+.ez-updated {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 12px;
+	color: var(--faint);
+	padding: 10px;
+	cursor: pointer;
+}
+.ez-menu,
+.ez-mobile-brand {
+	display: none;
+}
+.ez-content,
+.ez-settings {
+	margin-left: 224px;
+	max-width: none;
+}
+.ez-settings {
+	padding: 0 16px 40px;
+	min-width: 0;
+}
+[class*="rounded-[20px]"],
+[class*="rounded-2xl"] {
+	border-radius: 6px;
+}
+@media (max-width: 767px) {
+	.ez-sidebar {
+		display: none;
+	}
+	.ez-sidebar.is-open {
+		display: flex;
+		top: 64px;
+	}
+	.ez-topbar {
+		margin-left: 0;
+		padding: 10px 12px;
+		height: 64px;
+	}
+	.ez-menu,
+	.ez-mobile-brand {
+		display: block;
+	}
+	.ez-menu {
+		padding: 10px;
+	}
+	.ez-mobile-brand {
+		font-weight: 600;
+	}
+	.ez-content,
+	.ez-settings {
+		margin-left: 0;
+	}
+	.ez-updated {
+		font-size: 11px;
+		padding: 8px;
+	}
+	.ez-sidebar-footer button {
+		min-height: 44px;
 	}
 }

@@ -269,6 +269,34 @@ describe("The wall", () => {
 		).toBe(true);
 	}, 20000);
 
+	it("uses inline workspace navigation and puts update time before notifications", async () => {
+		await fresh();
+		await browser.waitFor(
+			`document.querySelector(".ez-updated").textContent.includes("Updated")`,
+		);
+		expect(
+			await browser.evaluate(
+				`document.querySelector(".ez-updated").nextElementSibling.getAttribute("aria-label")`,
+			),
+		).toBe("Download notifications");
+		await click(byText(".ez-sidebar nav button", /^Queue$/));
+		await browser.waitFor(
+			`document.querySelector(".ez-settings h1")?.textContent === "Queue"`,
+		);
+		expect(
+			await browser.evaluate(`document.querySelector('main').hidden`),
+		).toBe(true);
+		expect(
+			await browser.evaluate(`!!document.querySelector('[role="dialog"]')`),
+		).toBe(false);
+		await click(byText(".ez-sidebar nav button", /^System$/));
+		await browser.waitFor(
+			`document.querySelector(".ez-settings h1")?.textContent === "System"`,
+		);
+		await click(byText(".ez-sidebar nav button", /^Missing media$/));
+		await browser.waitFor(`!document.querySelector('main').hidden`);
+	}, 15000);
+
 	it("logged no errors", () => {
 		expect(browser.errors).toEqual([]);
 	});
