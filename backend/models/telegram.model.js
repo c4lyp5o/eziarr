@@ -8,7 +8,8 @@ export const TelegramModel = {
 		password: t.Optional(t.String()),
 	}),
 	postTelegramSearch: t.Object({
-		channel: t.String(),
+		// Left out, every channel the account has is searched.
+		channel: t.Optional(t.String()),
 		query: t.String({ minLength: 1, maxLength: 200 }),
 		// The title being searched for, so its alternate names and year can
 		// be used too. Optional: a search works from the query alone.
@@ -55,6 +56,7 @@ export const TelegramModel = {
 			t.Object({
 				id: t.Number(),
 				channel: t.String(),
+				channelTitle: t.String(),
 				filename: t.String(),
 				size: t.Number(),
 				date: t.Number(),

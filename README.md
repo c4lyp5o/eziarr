@@ -17,7 +17,7 @@ Eziarr sits beside your *Arr stack. It lists every missing movie, episode and al
 - **Hunter.** A background worker re-searches old missing items on your indexers on a schedule.
 - **Deep search** when the indexers fail:
   - **Indexers** via Prowlarr, with a **force grab** that temporarily lifts quality-profile, language and queue restrictions to push a release through. Each release shows what its name says (resolution, source, codec, HDR, audio), its peers, grabs and age, and warnings for camera rips, dead torrents and files too small to be real; the same release on several indexers is one row.
-  - **Telegram** (your own account over MTProto, so large files work). The search box is editable, and Eziarr also tries the other ways a name gets written ("5 cm" and "5cm", "Part 2" and "Part II") and the alternate titles your *Arr knows, then ranks files by how well they match.
+  - **Telegram** (your own account over MTProto, so large files work). One search covers every channel you've joined, and each result says which channel it's from. The search box is editable, and Eziarr also tries the other ways a name gets written ("5 cm" and "5cm", "Part 2" and "Part II") and the alternate titles your *Arr knows, then ranks files by how well they match.
   - **Internet Archive** and **open directories** (Apache/Nginx listings).
 - **Auto-import.** Downloads are renamed the way the *Arr expects ("Title (Year).ext", "Series S01E02.ext") and imported with a targeted scan. For movies, Eziarr checks with Radarr that the file really landed before calling it done.
 - **Keeps running when an *Arr doesn't.** If one *Arr is down, the rest of the wall still loads and the UI says which service isn't answering.

@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"module": "index.js",
-	"version": "1.5.0",
+	"version": "1.5.1",
 	"scripts": {
 		"test": "bun test",
 		"test:watch": "bun test --watch"
