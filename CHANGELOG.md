@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Merge the System page into one panel: version, uptime and release status above the configured services. Drop the Bun runtime and platform readouts.
 - Use the shared ez mark for the favicon, home-screen and notification icons, with the house ground colour as the theme colour.
 - Make the sidebar identical to ezllm's: its divider, colours, row sizes and footer, a 1px selection line that slides between items, the version linking to GitHub, and the drawer below 1024px with Escape to close.
 - Match ezllm mobile branding and icon navigation, strengthen the active underline and remove the sidebar divider.
