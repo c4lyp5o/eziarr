@@ -64,6 +64,7 @@ export const SystemService = {
 			success: true,
 			isSetup: hasRadarr || hasSonarr || hasLidarr,
 			currentVersion,
+			runtime: { bunVersion: Bun.version, uptimeSeconds: Math.floor(process.uptime()), platform: process.platform },
 			latestVersion,
 			updateAvailable,
 			features: {
