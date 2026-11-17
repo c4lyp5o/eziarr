@@ -79,7 +79,7 @@ Then:
    ```
 
 2. Open `http://<your-server>:5000`, enter the code and choose a password (8+ characters).
-3. In **Settings**, add Radarr, Sonarr and/or Lidarr (URL + API key; **Test** checks each one), and optionally Prowlarr and Telegram.
+3. In **Configuration**, add Radarr, Sonarr and/or Lidarr (URL + API key; **Test** checks each one), and optionally Prowlarr and Telegram.
 
 Eziarr then syncs your missing lists and starts hunting.
 
@@ -103,7 +103,7 @@ For development, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Eziarr downloads into `/app/downloads` inside its container and then asks the *Arr to import that path. If the *Arr runs elsewhere (on the host, another container or a Windows box), it sees that folder under a different path, and the import finds nothing.
 
-Mount a folder both can reach to `/app/downloads`, then set **Settings → Path Translation → *Arr Remote Path** to where the *Arr sees that same folder, for example `D:\Eziarr` or `/data/eziarr`. Eziarr rewrites the path (including slashes for Windows) before asking for the import.
+Mount a folder both can reach to `/app/downloads`, then set **Configuration → Path Translation → *Arr Remote Path** to where the *Arr sees that same folder, for example `D:\Eziarr` or `/data/eziarr`. Eziarr rewrites the path (including slashes for Windows) before asking for the import.
 
 ### Environment variables
 
@@ -117,7 +117,7 @@ Mount a folder both can reach to `/app/downloads`, then set **Settings → Path 
 | `PORT` | `5000` | HTTP port. |
 | `EZIARR_DB_DIR`, `EZIARR_LOG_DIR`, `EZIARR_DOWNLOAD_DIR` | `/app/db`, `/app/logs`, `/app/downloads` | Move the data directories (mainly for tests and non-Docker installs). |
 
-Other settings (*Arr connections, Prowlarr, Telegram, sync and hunter intervals, path translation) live in the Settings screen.
+Other settings (*Arr connections, Prowlarr, Telegram, sync and hunter intervals, path translation) live on the Configuration page.
 
 ### Limits and housekeeping
 
