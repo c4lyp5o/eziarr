@@ -237,7 +237,7 @@ describe("The wall", () => {
 			expect(dialog).toContain(text);
 	}, 20000);
 
-	it("lets the Telegram search be edited and sends the title along", async () => {
+	it("searches Telegram across channels with an editable query", async () => {
 		await openDeepSearch();
 		await click(byText('[role="dialog"] [role=tab]', /Telegram/));
 		await browser.waitFor(`document.getElementById("telegram-query")`);
@@ -245,11 +245,12 @@ describe("The wall", () => {
 			await browser.evaluate(`document.getElementById("telegram-query").value`),
 		).toBe("Tiada Tajuk");
 		await setValue("#telegram-query", "tiada  tajuk 2019");
-		await browser.evaluate(`(() => {
-			const s = document.querySelector('[role="dialog"] select');
-			Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(s, s.options[1].value);
-			s.dispatchEvent(new Event("change", { bubbles: true }));
-		})()`);
+		// No channel picker: a search covers every channel.
+		expect(
+			await browser.evaluate(
+				`document.querySelector('[role="dialog"] select') === null`,
+			),
+		).toBe(true);
 		await click(byText('[role="dialog"] button', /^Search$/));
 		await browser.waitFor(
 			`document.querySelector('[role="dialog"]').textContent.includes("Weak match")`,
@@ -262,12 +263,62 @@ describe("The wall", () => {
 			service: "radarr",
 			serviceId: 2133,
 		});
+		expect(sent.channel).toBeUndefined();
+		const dialog = await browser.evaluate(
+			`document.querySelector('[role="dialog"]').textContent`,
+		);
+		expect(dialog).toContain("Best match");
+		// Results from different channels, each saying where it is from.
+		expect(dialog).toContain("Filem Melayu HD");
+		expect(dialog).toContain("Drama Bersiri");
+	}, 20000);
+
+	it("uses inline workspace navigation and puts update time before notifications", async () => {
+		await fresh();
+		await browser.waitFor(
+			`document.querySelector(".ez-updated").textContent.includes("Updated")`,
+		);
 		expect(
 			await browser.evaluate(
-				`document.querySelector('[role="dialog"]').textContent.includes("Best match")`,
+				`document.querySelector(".ez-updated").nextElementSibling.getAttribute("aria-label")`,
 			),
+		).toBe("Download notifications");
+		await browser.evaluate(
+			`window.workspaceHeadings = []; window.workspaceObserver = new MutationObserver(() => { const h = document.querySelector(".ez-settings h1"); if(h) window.workspaceHeadings.push(h.textContent); }); window.workspaceObserver.observe(document.body, {subtree:true,childList:true,characterData:true});`,
+		);
+		await click(byText(".ez-sidebar nav button", /^Queue$/));
+		await browser.waitFor(
+			`document.querySelector(".ez-settings h1")?.textContent === "Queue"`,
+		);
+		expect(
+			await browser.evaluate(`document.querySelector('main').hidden`),
 		).toBe(true);
-	}, 20000);
+		expect(
+			await browser.evaluate(`!!document.querySelector('[role="dialog"]')`),
+		).toBe(false);
+		expect(
+			await browser.evaluate(
+				`window.workspaceHeadings.includes("Configuration")`,
+			),
+		).toBe(false);
+		await browser.evaluate("window.workspaceObserver.disconnect()");
+		expect(
+			await browser.evaluate(
+				`getComputedStyle(document.querySelector('.ez-sidebar nav button[aria-current]')).backgroundColor`,
+			),
+		).toBe("rgba(0, 0, 0, 0)");
+		expect(
+			await browser.evaluate(
+				`getComputedStyle(document.querySelector('[aria-current] .ez-nav-line')).height`,
+			),
+		).toBe("1px");
+		await click(byText(".ez-sidebar nav button", /^System$/));
+		await browser.waitFor(
+			`document.querySelector(".ez-settings h1")?.textContent === "System"`,
+		);
+		await click(byText(".ez-sidebar nav button", /^Missing media$/));
+		await browser.waitFor(`!document.querySelector('main').hidden`);
+	}, 15000);
 
 	it("logged no errors", () => {
 		expect(browser.errors).toEqual([]);

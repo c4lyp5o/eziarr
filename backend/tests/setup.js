@@ -16,5 +16,9 @@ for (const [env, dir] of [
 	fs.mkdirSync(process.env[env], { recursive: true });
 }
 
+// Tests that import index.js start the real server; let the OS pick a free
+// port so a run never collides with an Eziarr already listening on 5000.
+process.env.PORT ??= "0";
+
 // Registered from the preload, this runs once after every test file.
 afterAll(() => fs.rmSync(root, { recursive: true, force: true }));

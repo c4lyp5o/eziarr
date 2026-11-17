@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Merge the System page into one panel: version, uptime and release status above the configured services. Drop the Bun runtime and platform readouts.
+- Use the shared ez mark for the favicon, home-screen and notification icons, with the house ground colour as the theme colour.
+- Make the sidebar identical to ezllm's: its divider, colours, row sizes and footer, a 1px selection line that slides between items, the version linking to GitHub, and the drawer below 1024px with Escape to close.
+- Match ezllm mobile branding and icon navigation.
+- Contain log auto-scrolling within its own panel.
+- Refresh compatible backend and frontend dependencies and lockfiles, including Elysia, Axios, Vite, Tailwind and frontend tooling. Keep breaking-version upgrades separate.
+- Defer the optional Three.js scene until after the form paints and the browser is idle.
+- Adopt the shared ez sidebar, Public Sans, theme tokens and boxed sign-in panel.
+- Move settings and operational views into inline workspace pages; expose browser notification preferences and authenticated runtime information.
+- Show the live relative update time immediately before the notification control; clicking it refetches displayed data only.
+
+## [1.5.1] - 2026-10-23
+
+### Changed
+- **Telegram search:** the channel picker is gone. A search covers every
+  channel you have joined, a few at a time, and lists the results together
+  with the channel each came from. A channel that fails is skipped.
+
+### Fixed
+- Backend tests no longer fail to start when something is already listening
+  on port 5000.
+
 ## [1.5.0] - 2026-10-22
 
 ### Added

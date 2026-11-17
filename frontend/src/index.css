@@ -1,32 +1,26 @@
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/public-sans";
 @import "tailwindcss";
 
-/*
- * True-black flat: elevation by lightness alone (ground → surface → raised),
- * no borders or shadows on cards at rest, colour only on data (the download
- * rail) and on status. The primary control is an inverted pill.
- *
- * Theme: follows the OS unless the user picked one; the choice is written to
- * <html data-theme="light|dark"> by context/Theme.jsx.
- */
+/* Shared ez semantic palette, paired for light and dark. */
 :root,
 :root[data-theme="dark"] {
 	color-scheme: dark;
-	--ground: #000000;
-	--surface: #111111;
-	--raised: #222222;
+	--ground: #171719;
+	--surface: #131217;
+	--raised: #212023;
 	--active: #2a2a2a;
-	--line: #1f1f1f;
+	--line: #232326;
+	--overlay: rgba(0, 0, 0, 0.62);
 	--rule: #191919;
 	--control: #444444;
 	--ink: #ffffff;
 	--muted: #b4b4b4;
 	--faint: #949494;
-	--accent: #c6f24e;
-	--accent-ink: #0b0f00;
+	--accent: #38bdf8;
+	--accent-ink: #08131a;
 	--primary: #ffffff;
-	--on-primary: #000000;
-	--positive: #c6f24e;
+	--on-primary: #171719;
+	--positive: #38bdf8;
 	--negative: #e5566f;
 	--warning: #e5a93b;
 	--pos-bg: #222a10;
@@ -37,21 +31,22 @@
 
 :root[data-theme="light"] {
 	color-scheme: light;
-	--ground: #f2f2f0;
+	--ground: #f9fafb;
 	--surface: #ffffff;
-	--raised: #ececea;
+	--raised: #f4f4f5;
 	--active: #e2e2df;
-	--line: #e3e3e0;
+	--line: #e8e8e8;
+	--overlay: rgba(17, 17, 17, 0.42);
 	--rule: #ededea;
 	--control: #c9c9c5;
-	--ink: #111111;
+	--ink: #131217;
 	--muted: #4f4f4c;
 	--faint: #6b6b67;
-	--accent: #6e9800;
+	--accent: #0369a1;
 	--accent-ink: #ffffff;
-	--primary: #111111;
+	--primary: #131217;
 	--on-primary: #ffffff;
-	--positive: #4d6b00;
+	--positive: #247b50;
 	--negative: #b4232f;
 	--warning: #8a5a00;
 	--pos-bg: #eaf6c9;
@@ -61,7 +56,7 @@
 }
 
 @theme inline {
-	--font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+	--font-sans: "Public Sans Variable", "Public Sans", system-ui, sans-serif;
 	--color-ground: var(--ground);
 	--color-surface: var(--surface);
 	--color-raised: var(--raised);
@@ -124,5 +119,273 @@
 	.no-scrollbar {
 		-ms-overflow-style: none; /* IE and Edge */
 		scrollbar-width: none; /* Firefox */
+	}
+}
+
+/* Shared ez application shell. Content retains its virtualized media wall. */
+/* The shell (sidebar + mobile top bar) uses ezllm's exact values so the
+   chrome is identical across every ez app. Scoped here so the rest of
+   eziarr keeps its own palette until it moves to the house tokens. */
+.ez-sidebar,
+.ez-topbar {
+	--ink: #f2f2f3;
+	--muted: #8a8c92;
+	--hover: #26252a;
+	--negative: #e5566f;
+	--neg-bg: #2c1a20;
+}
+/* :where() keeps this at the same specificity as the dark block above, so
+   source order picks light and the later shell rules aren't outranked. */
+:where(:root[data-theme="light"]) .ez-sidebar,
+:where(:root[data-theme="light"]) .ez-topbar {
+	--ink: #111111;
+	--muted: #5f6368;
+	--hover: #eeeeef;
+	--negative: #c4242a;
+	--neg-bg: #ffedea;
+}
+.ez-sidebar {
+	position: fixed;
+	inset: 0 auto 0 0;
+	width: 224px;
+	background: var(--ground);
+	border-right: 1px solid var(--line);
+	display: flex;
+	flex-direction: column;
+	z-index: 40;
+}
+.ez-brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 20px;
+	padding-bottom: 24px;
+	color: var(--ink);
+}
+.ez-brand strong {
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: -0.025em;
+}
+.ez-brand a {
+	margin-left: auto;
+	font-size: 12px;
+	color: var(--muted);
+	transition: color 150ms;
+}
+.ez-brand a:hover {
+	color: var(--ink);
+}
+.ez-sidebar nav {
+	padding: 0 12px;
+	flex: 1;
+	overflow: auto;
+}
+.ez-sidebar nav button {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 34px;
+	font-size: 14px;
+	width: 100%;
+	text-align: left;
+	padding: 0 10px;
+	color: var(--muted);
+	border-radius: 4px;
+	cursor: pointer;
+	transition:
+		color 150ms,
+		background-color 150ms;
+}
+.ez-sidebar nav button + button {
+	margin-top: 2px;
+}
+.ez-sidebar nav button:hover {
+	background: var(--hover);
+	color: var(--ink);
+}
+.ez-sidebar nav button[aria-current] {
+	color: var(--ink);
+	background: transparent;
+}
+.ez-nav-label {
+	position: relative;
+	padding-bottom: 1px;
+}
+.ez-nav-line {
+	position: absolute;
+	inset-inline: 0;
+	bottom: -1px;
+	height: 1px;
+	background: var(--accent);
+	pointer-events: none;
+}
+.ez-nav-backdrop {
+	display: none;
+}
+.ez-sidebar-footer {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	border-top: 1px solid var(--line);
+	padding: 8px 12px;
+}
+.ez-foot-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 36px;
+	border-radius: 4px;
+	color: var(--muted);
+	cursor: pointer;
+	transition:
+		color 150ms,
+		background-color 150ms;
+}
+.ez-foot-btn:hover {
+	background: var(--hover);
+	color: var(--ink);
+}
+.ez-foot-btn.ez-logout:hover {
+	background: var(--neg-bg);
+	color: var(--negative);
+}
+.ez-foot-btn:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+/* Sun and moon cross-fade rather than pop, as in the other ez apps. */
+.ez-theme-icon {
+	position: relative;
+	width: 16px;
+	height: 16px;
+}
+.ez-theme-icon svg {
+	position: absolute;
+	inset: 0;
+	transition:
+		opacity 200ms,
+		transform 200ms;
+}
+.ez-theme-icon svg[data-off] {
+	opacity: 0;
+	transform: scale(0.75);
+}
+.ez-topbar {
+	border-bottom: 1px solid var(--line);
+	margin-left: 224px;
+	padding: 20px 28px;
+	display: flex;
+	align-items: center;
+}
+.ez-updated {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 12px;
+	color: var(--faint);
+	padding: 10px;
+	cursor: pointer;
+}
+.ez-menu,
+.ez-mobile-brand {
+	display: none;
+}
+.ez-content,
+.ez-settings {
+	margin-left: 224px;
+	max-width: none;
+}
+.ez-settings {
+	padding: 0 16px 40px;
+	min-width: 0;
+}
+[class*="rounded-[20px]"],
+[class*="rounded-2xl"] {
+	border-radius: 6px;
+}
+@media (max-width: 1023px) {
+	.ez-sidebar {
+		width: 256px;
+		z-index: 60;
+		transform: translateX(-100%);
+		visibility: hidden;
+		transition:
+			transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+			visibility 300ms;
+	}
+	.ez-sidebar.is-open {
+		transform: translateX(0);
+		visibility: visible;
+	}
+	.ez-nav-backdrop {
+		display: block;
+		position: fixed;
+		inset: 0;
+		z-index: 50;
+		background: var(--overlay);
+	}
+	.ez-topbar {
+		margin-left: 0;
+		padding: 0 16px;
+		height: 48px;
+		gap: 12px;
+	}
+	.ez-menu,
+	.ez-mobile-brand {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.ez-menu {
+		padding: 6px;
+		border: 1px solid var(--line);
+		border-radius: 6px;
+		color: var(--muted);
+	}
+	.ez-menu:hover {
+		background: var(--hover);
+		color: var(--ink);
+	}
+	.ez-mobile-brand {
+		font-size: 14px;
+		font-weight: 600;
+		letter-spacing: -0.025em;
+	}
+	.ez-content,
+	.ez-settings {
+		margin-left: 0;
+	}
+	.ez-updated {
+		font-size: 11px;
+		padding: 8px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ez-sidebar {
+		transition: none;
+	}
+}
+
+.ez-log-panel {
+	height: clamp(260px, 60dvh, 720px);
+	min-height: 0;
+	overflow: auto;
+	overscroll-behavior: contain;
+	overflow-anchor: none;
+	border: 1px solid var(--line);
+}
+.ez-sidebar nav button[aria-current] {
+	font-weight: 500;
+}
+.ez-sidebar nav button:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+@media (max-width: 420px) {
+	.ez-updated {
+		font-size: 10px;
+		gap: 4px;
+		padding: 4px;
 	}
 }

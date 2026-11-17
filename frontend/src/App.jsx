@@ -10,15 +10,23 @@ import {
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
 	RefreshCw,
+	Menu,
 	Search,
 	X,
-	Settings as SettingsIcon,
 	LogOut,
 	Sun,
 	Moon,
 	Bell,
 	BellOff,
 	CheckSquare,
+	Library,
+	Download,
+	History,
+	BarChart3,
+	Activity,
+	ScrollText,
+	Settings,
+	Server,
 } from "lucide-react";
 import useSWR from "swr";
 
@@ -26,7 +34,7 @@ import { useToast } from "./context/Toast.jsx";
 import { useTheme } from "./context/Theme.jsx";
 import { apiCall } from "./utils/apiCall.js";
 import { ui } from "./ui/styles.js";
-import { spring } from "./ui/motion.js";
+import { shellSpring, spring } from "./ui/motion.js";
 
 import MediaCard from "./components/MediaCard.jsx";
 import { MediaWall } from "./components/MediaWall.jsx";
@@ -63,13 +71,6 @@ const readSort = () => {
 	}
 };
 
-// Destinations that live in the settings sheet, reachable from the top bar.
-const NAV = [
-	{ id: "queues", label: "Queue" },
-	{ id: "history", label: "History" },
-	{ id: "logs", label: "Logs" },
-];
-
 const FILTERS = [
 	{ id: "all", label: "All missing" },
 	{ id: "radarr", label: "Movies" },
@@ -85,14 +86,6 @@ const listNames = (services) =>
 		.map((s) => SERVICE_NAMES[s] ?? s)
 		.join(" and ")
 		.replace(/ and (?=.* and )/g, ", ");
-
-const formatClock = (ts) =>
-	ts
-		? new Date(ts).toLocaleTimeString(undefined, {
-				hour: "2-digit",
-				minute: "2-digit",
-			})
-		: "—";
 
 // The count changes in place: the old figure lifts out, the new one drops in.
 const Count = ({ value }) => (
@@ -149,7 +142,24 @@ function App() {
 	// Once loaded the sheet stays mounted, so closing it can animate out.
 	const [settingsLoaded, setSettingsLoaded] = useState(false);
 	if (settingsTab !== null && !settingsLoaded) setSettingsLoaded(true);
-	const [scrolled, setScrolled] = useState(false);
+	const [navOpen, setNavOpen] = useState(false);
+	useEffect(() => {
+		document.body.classList.toggle("overflow-hidden", navOpen);
+		if (!navOpen) return;
+		const onKey = (e) => {
+			if (e.key === "Escape") setNavOpen(false);
+		};
+		document.addEventListener("keydown", onKey);
+		return () => {
+			document.removeEventListener("keydown", onKey);
+			document.body.classList.remove("overflow-hidden");
+		};
+	}, [navOpen]);
+	const [clock, setClock] = useState(Date.now());
+	useEffect(() => {
+		const timer = setInterval(() => setClock(Date.now()), 15000);
+		return () => clearInterval(timer);
+	}, []);
 	const [sort, setSort] = useState(readSort);
 	const [selecting, setSelecting] = useState(false);
 	const [selected, setSelected] = useState(() => new Set());
@@ -182,12 +192,6 @@ function App() {
 		checkMe();
 
 		return () => (cancelled = true);
-	}, []);
-
-	useEffect(() => {
-		const onScroll = () => setScrolled(window.scrollY > 4);
-		window.addEventListener("scroll", onScroll, { passive: true });
-		return () => window.removeEventListener("scroll", onScroll);
 	}, []);
 
 	const {
@@ -420,120 +424,187 @@ function App() {
 	return (
 		<div className="min-h-screen bg-ground text-ink">
 			{/* TOP BAR — mark, destinations, account; one column with the content */}
-			<header
-				className={`sticky top-0 z-30 bg-ground transition-[border-color] border-b ${
-					scrolled ? "border-line" : "border-transparent"
-				}`}
-			>
-				<div className="mx-auto max-w-[1208px] h-14 px-4 sm:px-6 flex items-center gap-2">
-					<a
-						href="/"
-						className="flex items-center gap-2 mr-4 shrink-0 text-ink"
-						aria-label="Eziarr home"
-					>
-						<Mark size={24} />
-						<span className="text-base font-semibold tracking-[-0.01em]">
-							Eziarr
-						</span>
-					</a>
-
-					<nav className="hidden md:flex items-center gap-1" aria-label="Main">
-						<span
-							className="h-9 px-3 inline-flex items-center text-sm font-semibold text-ink"
-							aria-current="page"
+			<AnimatePresence>
+				{navOpen && (
+					<motion.button
+						type="button"
+						className="ez-nav-backdrop"
+						aria-label="Close navigation"
+						onClick={() => setNavOpen(false)}
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						transition={{ duration: 0.14 }}
+					/>
+				)}
+			</AnimatePresence>
+			<aside className={`ez-sidebar ${navOpen ? "is-open" : ""}`}>
+				<div className="ez-brand">
+					<Mark size={20} />
+					<strong>eziarr</strong>
+					{sysStatus?.currentVersion && (
+						<a
+							href="https://github.com/c4lyp5o/eziarr"
+							target="_blank"
+							rel="noreferrer noopener"
+							aria-label={`eziarr v${sysStatus.currentVersion}, source on GitHub (opens in a new tab)`}
+							title="Source on GitHub"
 						>
-							Missing
-						</span>
-						{NAV.map((n) => (
+							v{sysStatus.currentVersion}
+						</a>
+					)}
+				</div>
+				<LayoutGroup id="nav-side">
+					<nav aria-label="Main">
+						{[
+							{ id: null, label: "Missing media", icon: Library },
+							{ id: "queues", label: "Queue", icon: Download },
+							{ id: "history", label: "History", icon: History },
+							{ id: "stats", label: "Statistics", icon: BarChart3 },
+							{ id: "tasks", label: "Tasks", icon: Activity },
+							{ id: "logs", label: "Logs", icon: ScrollText },
+							{ id: "settings", label: "Configuration", icon: Settings },
+							{ id: "notifications", label: "Notifications", icon: Bell },
+							{ id: "system", label: "System", icon: Server },
+						].map((n) => (
 							<button
 								type="button"
-								key={n.id}
-								onClick={() => setSettingsTab(n.id)}
-								className="h-9 px-3 rounded-full text-sm font-semibold text-muted hover:text-ink transition-colors cursor-pointer"
+								key={n.id || "missing"}
+								aria-current={settingsTab === n.id ? "page" : undefined}
+								onClick={() => {
+									setSettingsTab(n.id);
+									setNavOpen(false);
+								}}
 							>
-								{n.label}
+								<n.icon size={16} strokeWidth={1.7} aria-hidden="true" />
+								{/* The selection mark: a 1px accent line as wide as the
+								label that slides between items, as in every ez app. */}
+								<span className="ez-nav-label">
+									{n.label}
+									{settingsTab === n.id && (
+										<motion.span
+											layoutId="nav-line"
+											aria-hidden="true"
+											className="ez-nav-line"
+											transition={shellSpring}
+										/>
+									)}
+								</span>
 							</button>
 						))}
 					</nav>
-
-					<div className="ml-auto flex items-center gap-1">
-						{sysStatus?.updateAvailable && (
-							<a
-								href="https://github.com/c4lyp5o/eziarr/releases/latest"
-								target="_blank"
-								rel="noreferrer"
-								className={`${ui.pillPositive} h-7! px-3! mr-1 hover:brightness-110`}
-								title={`Update to v${sysStatus.latestVersion}`}
-							>
-								v{sysStatus.latestVersion} available
-							</a>
+				</LayoutGroup>
+				<div className="ez-sidebar-footer">
+					<a
+						className="ez-foot-btn"
+						href="https://github.com/c4lyp5o/eziarr"
+						target="_blank"
+						rel="noreferrer noopener"
+						aria-label="eziarr source on GitHub (opens in a new tab)"
+						title="Source on GitHub"
+					>
+						{/* The GitHub mark shared by the ez* apps' sidebars. */}
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="currentColor"
+							aria-hidden="true"
+							focusable="false"
+						>
+							<path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.23 2.75.11 3.04.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" />
+						</svg>
+					</a>
+					<button
+						type="button"
+						className="ez-foot-btn"
+						onClick={toggleTheme}
+						role="switch"
+						aria-checked={theme === "dark"}
+						aria-label={
+							theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+						}
+						title={
+							theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+						}
+					>
+						<span className="ez-theme-icon" aria-hidden="true">
+							<Moon
+								size={16}
+								strokeWidth={1.8}
+								data-off={theme === "dark" ? undefined : ""}
+							/>
+							<Sun
+								size={16}
+								strokeWidth={1.8}
+								data-off={theme === "dark" ? "" : undefined}
+							/>
+						</span>
+					</button>
+					<button
+						type="button"
+						className="ez-foot-btn ez-logout"
+						onClick={handleLogout}
+						aria-label="Log out"
+						title="Log out"
+					>
+						<LogOut size={16} strokeWidth={1.8} aria-hidden="true" />
+					</button>
+				</div>
+			</aside>
+			<header className="ez-topbar">
+				<button
+					type="button"
+					className="ez-menu"
+					aria-label="Toggle navigation"
+					aria-expanded={navOpen}
+					onClick={() => setNavOpen(!navOpen)}
+				>
+					<Menu size={16} strokeWidth={1.8} aria-hidden="true" />
+				</button>
+				<span
+					className="ez-mobile-brand"
+					style={{ visibility: navOpen ? "hidden" : undefined }}
+				>
+					<Mark size={20} />
+					<strong>eziarr</strong>
+				</span>
+				<div className="ml-auto flex items-center gap-2">
+					<button
+						type="button"
+						onClick={() => mutate()}
+						disabled={isValidating || !sysStatus?.isSetup}
+						className="ez-updated"
+						title="Refresh displayed data"
+					>
+						<RefreshCw
+							size={13}
+							className={isValidating ? "animate-spin" : ""}
+						/>
+						{isValidating
+							? "Updating…"
+							: !syncedAt
+								? "Waiting for data"
+								: clock - syncedAt < 60000
+									? "Updated just now"
+									: `Updated ${Math.max(1, Math.floor((clock - syncedAt) / 60000))}m ago`}
+					</button>
+					<Button
+						variant="icon"
+						onClick={toggleNotifications}
+						disabled={
+							notifications === "blocked" || notifications === "unsupported"
+						}
+						aria-label="Download notifications"
+						title="Toggle download notifications"
+						aria-pressed={notifications === "on"}
+					>
+						{notifications === "on" ? (
+							<Bell size={18} />
+						) : (
+							<BellOff size={18} />
 						)}
-						{notifications !== "unsupported" && (
-							<Button
-								variant="icon"
-								onClick={toggleNotifications}
-								disabled={notifications === "blocked"}
-								aria-pressed={notifications === "on"}
-								title={
-									notifications === "on"
-										? "Notifications on: you'll hear when a download finishes"
-										: notifications === "blocked"
-											? "Notifications are blocked in this browser's site settings"
-											: "Notify me when a download finishes"
-								}
-								aria-label="Download notifications"
-							>
-								{notifications === "on" ? (
-									<Bell size={18} />
-								) : (
-									<BellOff size={18} />
-								)}
-							</Button>
-						)}
-						<Button
-							variant="icon"
-							onClick={toggleTheme}
-							title={
-								theme === "dark"
-									? "Switch to light mode"
-									: "Switch to dark mode"
-							}
-							aria-label={
-								theme === "dark"
-									? "Switch to light mode"
-									: "Switch to dark mode"
-							}
-						>
-							<AnimatePresence mode="wait" initial={false}>
-								<motion.span
-									key={theme}
-									initial={{ rotate: -90, opacity: 0, scale: 0.6 }}
-									animate={{ rotate: 0, opacity: 1, scale: 1 }}
-									exit={{ rotate: 90, opacity: 0, scale: 0.6 }}
-									transition={spring}
-									className="inline-flex"
-								>
-									{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-								</motion.span>
-							</AnimatePresence>
-						</Button>
-						<Button
-							variant="icon"
-							title="Settings"
-							aria-label="Settings"
-							onClick={() => setSettingsTab("settings")}
-						>
-							<SettingsIcon size={18} />
-						</Button>
-						<Button
-							variant="icon"
-							title="Log out"
-							aria-label="Log out"
-							onClick={handleLogout}
-						>
-							<LogOut size={18} />
-						</Button>
-					</div>
+					</Button>
 				</div>
 			</header>
 
@@ -543,7 +614,10 @@ function App() {
 				</Suspense>
 			)}
 
-			<main className="relative mx-auto max-w-[1208px] px-4 sm:px-6 pt-6 pb-24">
+			<main
+				hidden={settingsTab !== null}
+				className="ez-content relative px-4 sm:px-6 pt-6 pb-24"
+			>
 				{/* TITLE ROW — the screen's question and today's answer */}
 				<div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-5">
 					<div className="min-w-0">
@@ -621,18 +695,6 @@ function App() {
 								)}
 							</AnimatePresence>
 						</div>
-						<button
-							type="button"
-							onClick={() => mutate()}
-							className="hidden sm:inline-flex items-center gap-2 h-9 px-3 rounded-full whitespace-nowrap text-xs text-faint hover:text-ink hover:bg-surface transition-colors cursor-pointer num"
-							title="Refresh now"
-						>
-							<RefreshCw
-								size={13}
-								className={isValidating ? "animate-spin" : ""}
-							/>
-							Synced {formatClock(syncedAt)}
-						</button>
 					</div>
 				</div>
 
@@ -825,8 +887,12 @@ function App() {
 
 				{settingsLoaded && (
 					<SettingsModal
+						inline
 						isOpen={settingsTab !== null}
 						initialTab={settingsTab ?? "settings"}
+						notifications={notifications}
+						toggleNotifications={toggleNotifications}
+						systemStatus={sysStatus}
 						onClose={() => setSettingsTab(null)}
 						onSaveSuccess={mutateSysStatus}
 					/>

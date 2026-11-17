@@ -245,4 +245,84 @@ describe("Telegram search", () => {
 		expect(res.status).toBe(200);
 		expect(body.files[0].filename).toBe("5cm.2007.1080p.mkv");
 	});
+
+	it("searches every channel when none is given, tagging each result", async () => {
+		mockTelegramClientInstance.getDialogs = vi.fn().mockResolvedValue([
+			{ isChannel: true, id: 111n },
+			{ isChannel: false, id: 222n },
+			{ isChannel: true, id: 333n },
+		]);
+		const peers = new Set();
+		mockTelegramClientInstance.invoke.mockImplementation(async (req) => {
+			if (req?.peer) peers.add(req.peer);
+			return telegramSearch(req);
+		});
+		mockTelegramClientInstance.getEntity.mockImplementation(async (id) => ({
+			title: `Channel ${id}`,
+			id,
+		}));
+
+		const res = await app.handle(
+			new Request("http://localhost/api/v1/telegram/search", {
+				method: "POST",
+				headers: { Cookie: cookie, "Content-Type": "application/json" },
+				body: JSON.stringify({ query: "5cm" }),
+			}),
+		);
+		const body = await res.json();
+
+		expect(res.status).toBe(200);
+		expect(peers.size).toBe(2);
+		expect(new Set(body.files.map((f) => f.channel))).toEqual(
+			new Set(["111", "333"]),
+		);
+		// The name comes through the route, so the UI can say where each is from.
+		expect(new Set(body.files.map((f) => f.channelTitle))).toEqual(
+			new Set(["Channel 111", "Channel 333"]),
+		);
+		mockTelegramClientInstance.getEntity.mockResolvedValue({
+			title: "Test channel",
+		});
+	});
+
+	it("searches a few channels at once, and skips one that fails", async () => {
+		mockTelegramClientInstance.getDialogs = vi
+			.fn()
+			.mockResolvedValue(
+				Array.from({ length: 10 }, (_, i) => ({ isChannel: true, id: BigInt(i) })),
+			);
+		mockTelegramClientInstance.getEntity.mockImplementation(async (id) => ({
+			title: `Channel ${id}`,
+			id,
+		}));
+		let inFlight = 0;
+		let most = 0;
+		mockTelegramClientInstance.invoke.mockImplementation(async (req) => {
+			if (String(req?.peer?.id) === "3") throw new Error("CHANNEL_PRIVATE");
+			inFlight++;
+			most = Math.max(most, inFlight);
+			await new Promise((r) => setTimeout(r, 5));
+			inFlight--;
+			return telegramSearch(req);
+		});
+
+		const res = await app.handle(
+			new Request("http://localhost/api/v1/telegram/search", {
+				method: "POST",
+				headers: { Cookie: cookie, "Content-Type": "application/json" },
+				body: JSON.stringify({ query: "5cm" }),
+			}),
+		);
+		const body = await res.json();
+
+		expect(res.status).toBe(200);
+		expect(most).toBeGreaterThan(1);
+		expect(most).toBeLessThanOrEqual(4);
+		const channels = new Set(body.files.map((f) => f.channel));
+		expect(channels.size).toBe(9);
+		expect(channels.has("3")).toBe(false);
+		mockTelegramClientInstance.getEntity.mockResolvedValue({
+			title: "Test channel",
+		});
+	});
 });
