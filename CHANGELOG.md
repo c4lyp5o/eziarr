@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-17
+
 ### Changed
 - Merge the System page into one panel: version, uptime and release status above the configured services. Drop the Bun runtime and platform readouts.
 - Use the shared ez mark for the favicon, home-screen and notification icons, with the house ground colour as the theme colour.
