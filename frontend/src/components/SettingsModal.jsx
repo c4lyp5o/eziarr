@@ -25,6 +25,7 @@ import QueueTab from "./settings/QueueTab";
 import HistoryTab from "./settings/HistoryTab";
 import StatsTab from "./settings/StatsTab";
 import LogsTab from "./settings/LogsTab";
+import SystemTab from "./settings/SystemTab";
 
 const NoServicesConfiguredModal = ({
 	isOpen,
@@ -183,7 +184,8 @@ const SettingsModal = ({
 	// biome-ignore lint/correctness/useExhaustiveDependencies: later
 	useEffect(() => {
 		if (activeTab === "logs" && logsEndRef.current) {
-			logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+			const panel = logsEndRef.current.parentElement;
+			panel.scrollTop = panel.scrollHeight;
 		}
 	}, [logs, activeTab]);
 
@@ -388,37 +390,7 @@ const SettingsModal = ({
 										</p>
 									</div>
 								)}
-								{activeTab === "system" && (
-									<div className="bg-surface border border-line rounded-md p-6">
-										<h2 className="font-semibold">
-											eziarr v{systemStatus?.currentVersion}
-										</h2>
-										<p className="text-muted my-3">
-											Bun {systemStatus?.runtime?.bunVersion || "—"} ·{" "}
-											{systemStatus?.runtime?.platform || "—"} · uptime{" "}
-											{systemStatus?.runtime?.uptimeSeconds ?? "—"} seconds
-										</p>
-										<p className="text-muted my-3">
-											Configured services (not a health check)
-										</p>
-										{Object.entries(systemStatus?.features || {}).map(
-											([name, enabled]) => (
-												<p key={name}>
-													{name}: {enabled ? "Configured" : "Not configured"}
-												</p>
-											),
-										)}
-										{systemStatus?.updateAvailable && (
-											<a
-												href="https://github.com/c4lyp5o/eziarr/releases/latest"
-												target="_blank"
-												rel="noreferrer"
-											>
-												Version {systemStatus.latestVersion} available
-											</a>
-										)}
-									</div>
-								)}
+								{activeTab === "system" && <SystemTab status={systemStatus} />}
 								{activeTab === "settings" && (
 									<ConfigTab
 										settings={settings}

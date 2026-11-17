@@ -19,6 +19,14 @@ import {
 	Bell,
 	BellOff,
 	CheckSquare,
+	Library,
+	Download,
+	History,
+	BarChart3,
+	Activity,
+	ScrollText,
+	Settings,
+	Server,
 } from "lucide-react";
 import useSWR from "swr";
 
@@ -420,15 +428,15 @@ function App() {
 				</a>
 				<nav aria-label="Main">
 					{[
-						{ id: null, label: "Missing media" },
-						{ id: "queues", label: "Queue" },
-						{ id: "history", label: "History" },
-						{ id: "stats", label: "Statistics" },
-						{ id: "tasks", label: "Tasks" },
-						{ id: "logs", label: "Logs" },
-						{ id: "settings", label: "Configuration" },
-						{ id: "notifications", label: "Notifications" },
-						{ id: "system", label: "System" },
+						{ id: null, label: "Missing media", icon: Library },
+						{ id: "queues", label: "Queue", icon: Download },
+						{ id: "history", label: "History", icon: History },
+						{ id: "stats", label: "Statistics", icon: BarChart3 },
+						{ id: "tasks", label: "Tasks", icon: Activity },
+						{ id: "logs", label: "Logs", icon: ScrollText },
+						{ id: "settings", label: "Configuration", icon: Settings },
+						{ id: "notifications", label: "Notifications", icon: Bell },
+						{ id: "system", label: "System", icon: Server },
 					].map((n) => (
 						<button
 							type="button"
@@ -439,6 +447,7 @@ function App() {
 								setNavOpen(false);
 							}}
 						>
+							<n.icon size={16} aria-hidden="true" />
 							<span className="ez-nav-label">{n.label}</span>
 						</button>
 					))}
@@ -492,7 +501,8 @@ function App() {
 					className="ez-mobile-brand"
 					style={{ visibility: navOpen ? "hidden" : undefined }}
 				>
-					eziarr
+					<Mark size={20} />
+					<strong>eziarr</strong>
 				</span>
 				<div className="ml-auto flex items-center gap-2">
 					<button

@@ -24,8 +24,9 @@ export default function LogsTab({
 				</button>
 			</div>
 
-			<div /* taste-skill-ignore: log output is literal text */
-				className="flex-1 bg-ground rounded-2xl p-4 overflow-y-auto font-mono text-xs text-ink leading-relaxed custom-scrollbar"
+			<section /* taste-skill-ignore: log output is literal text */
+				aria-label="Log output"
+				className="ez-log-panel bg-ground rounded-2xl p-4 overflow-y-auto font-mono text-xs text-ink leading-relaxed custom-scrollbar"
 			>
 				{logs.length === 0 && !logsIsLoading ? (
 					<div className="text-faint italic">Waiting for logs...</div>
@@ -51,7 +52,7 @@ export default function LogsTab({
 					))
 				)}
 				<div ref={logsEndRef} />
-			</div>
+			</section>
 		</div>
 	);
 }

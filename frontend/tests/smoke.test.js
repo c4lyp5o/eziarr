@@ -307,7 +307,7 @@ describe("The wall", () => {
 			await browser.evaluate(
 				`getComputedStyle(document.querySelector('[aria-current] .ez-nav-label'), '::after').height`,
 			),
-		).toBe("1px");
+		).toBe("2px");
 		await click(byText(".ez-sidebar nav button", /^System$/));
 		await browser.waitFor(
 			`document.querySelector(".ez-settings h1")?.textContent === "System"`,

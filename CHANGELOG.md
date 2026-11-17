@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Match ezllm mobile branding and icon navigation, strengthen the active underline and remove the sidebar divider.
+- Contain log auto-scrolling within its own panel and organize System into runtime and configured-service sections.
 - Refresh compatible backend and frontend dependencies and lockfiles, including Elysia, Axios, Vite, Tailwind and frontend tooling. Keep breaking-version upgrades separate.
 - Defer the optional Three.js scene until after the form paints and the browser is idle.
 - Adopt the shared ez sidebar, Public Sans, theme tokens and boxed sign-in panel.
