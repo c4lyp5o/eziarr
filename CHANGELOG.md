@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Make the sidebar identical to ezllm's: its divider, colours, row sizes and footer, a 1px selection line that slides between items, the version linking to GitHub, and the drawer below 1024px with Escape to close.
 - Match ezllm mobile branding and icon navigation, strengthen the active underline and remove the sidebar divider.
 - Contain log auto-scrolling within its own panel and organize System into runtime and configured-service sections.
 - Refresh compatible backend and frontend dependencies and lockfiles, including Elysia, Axios, Vite, Tailwind and frontend tooling. Keep breaking-version upgrades separate.

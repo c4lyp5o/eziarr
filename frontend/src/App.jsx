@@ -34,7 +34,7 @@ import { useToast } from "./context/Toast.jsx";
 import { useTheme } from "./context/Theme.jsx";
 import { apiCall } from "./utils/apiCall.js";
 import { ui } from "./ui/styles.js";
-import { spring } from "./ui/motion.js";
+import { shellSpring, spring } from "./ui/motion.js";
 
 import MediaCard from "./components/MediaCard.jsx";
 import { MediaWall } from "./components/MediaWall.jsx";
@@ -143,6 +143,18 @@ function App() {
 	const [settingsLoaded, setSettingsLoaded] = useState(false);
 	if (settingsTab !== null && !settingsLoaded) setSettingsLoaded(true);
 	const [navOpen, setNavOpen] = useState(false);
+	useEffect(() => {
+		document.body.classList.toggle("overflow-hidden", navOpen);
+		if (!navOpen) return;
+		const onKey = (e) => {
+			if (e.key === "Escape") setNavOpen(false);
+		};
+		document.addEventListener("keydown", onKey);
+		return () => {
+			document.removeEventListener("keydown", onKey);
+			document.body.classList.remove("overflow-hidden");
+		};
+	}, [navOpen]);
 	const [clock, setClock] = useState(Date.now());
 	useEffect(() => {
 		const timer = setInterval(() => setClock(Date.now()), 15000);
@@ -412,79 +424,132 @@ function App() {
 	return (
 		<div className="min-h-screen bg-ground text-ink">
 			{/* TOP BAR — mark, destinations, account; one column with the content */}
-			{navOpen && (
-				<button
-					type="button"
-					className="ez-nav-backdrop"
-					aria-label="Close navigation"
-					onClick={() => setNavOpen(false)}
-				/>
-			)}
+			<AnimatePresence>
+				{navOpen && (
+					<motion.button
+						type="button"
+						className="ez-nav-backdrop"
+						aria-label="Close navigation"
+						onClick={() => setNavOpen(false)}
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						transition={{ duration: 0.14 }}
+					/>
+				)}
+			</AnimatePresence>
 			<aside className={`ez-sidebar ${navOpen ? "is-open" : ""}`}>
-				<a href="/" className="ez-brand">
+				<div className="ez-brand">
 					<Mark size={20} />
 					<strong>eziarr</strong>
-					<span>v{sysStatus?.currentVersion || "…"}</span>
-				</a>
-				<nav aria-label="Main">
-					{[
-						{ id: null, label: "Missing media", icon: Library },
-						{ id: "queues", label: "Queue", icon: Download },
-						{ id: "history", label: "History", icon: History },
-						{ id: "stats", label: "Statistics", icon: BarChart3 },
-						{ id: "tasks", label: "Tasks", icon: Activity },
-						{ id: "logs", label: "Logs", icon: ScrollText },
-						{ id: "settings", label: "Configuration", icon: Settings },
-						{ id: "notifications", label: "Notifications", icon: Bell },
-						{ id: "system", label: "System", icon: Server },
-					].map((n) => (
-						<button
-							type="button"
-							key={n.id || "missing"}
-							aria-current={settingsTab === n.id ? "page" : undefined}
-							onClick={() => {
-								setSettingsTab(n.id);
-								setNavOpen(false);
-							}}
+					{sysStatus?.currentVersion && (
+						<a
+							href="https://github.com/c4lyp5o/eziarr"
+							target="_blank"
+							rel="noreferrer noopener"
+							aria-label={`eziarr v${sysStatus.currentVersion}, source on GitHub (opens in a new tab)`}
+							title="Source on GitHub"
 						>
-							<n.icon size={16} aria-hidden="true" />
-							<span className="ez-nav-label">{n.label}</span>
-						</button>
-					))}
-				</nav>
+							v{sysStatus.currentVersion}
+						</a>
+					)}
+				</div>
+				<LayoutGroup id="nav-side">
+					<nav aria-label="Main">
+						{[
+							{ id: null, label: "Missing media", icon: Library },
+							{ id: "queues", label: "Queue", icon: Download },
+							{ id: "history", label: "History", icon: History },
+							{ id: "stats", label: "Statistics", icon: BarChart3 },
+							{ id: "tasks", label: "Tasks", icon: Activity },
+							{ id: "logs", label: "Logs", icon: ScrollText },
+							{ id: "settings", label: "Configuration", icon: Settings },
+							{ id: "notifications", label: "Notifications", icon: Bell },
+							{ id: "system", label: "System", icon: Server },
+						].map((n) => (
+							<button
+								type="button"
+								key={n.id || "missing"}
+								aria-current={settingsTab === n.id ? "page" : undefined}
+								onClick={() => {
+									setSettingsTab(n.id);
+									setNavOpen(false);
+								}}
+							>
+								<n.icon size={16} strokeWidth={1.7} aria-hidden="true" />
+								{/* The selection mark: a 1px accent line as wide as the
+								label that slides between items, as in every ez app. */}
+								<span className="ez-nav-label">
+									{n.label}
+									{settingsTab === n.id && (
+										<motion.span
+											layoutId="nav-line"
+											aria-hidden="true"
+											className="ez-nav-line"
+											transition={shellSpring}
+										/>
+									)}
+								</span>
+							</button>
+						))}
+					</nav>
+				</LayoutGroup>
 				<div className="ez-sidebar-footer">
 					<a
+						className="ez-foot-btn"
 						href="https://github.com/c4lyp5o/eziarr"
 						target="_blank"
-						rel="noreferrer"
-						aria-label="GitHub"
+						rel="noreferrer noopener"
+						aria-label="eziarr source on GitHub (opens in a new tab)"
+						title="Source on GitHub"
 					>
-						<span className="sr-only">GitHub</span>
+						{/* The GitHub mark shared by the ez* apps' sidebars. */}
 						<svg
-							width="18"
-							height="18"
+							width="16"
+							height="16"
 							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
+							fill="currentColor"
 							aria-hidden="true"
+							focusable="false"
 						>
-							<path d="M9 19c-5 1-5-3-7-3m14 5v-4c0-1-.3-2-1-2.5 3-.3 6-1.5 6-6A4.6 4.6 0 0 0 20 5c.1-1-.1-2-.5-3-2 0-3 1-4 1.5a13 13 0 0 0-7 0C7.5 3 6 2 4.5 2 4 3 3.8 4 4 5a4.6 4.6 0 0 0-1 3.5c0 4.5 3 5.7 6 6-.6.5-1 1.5-1 2.5v4" />
+							<path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.23 2.75.11 3.04.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" />
 						</svg>
 					</a>
-					<Button
-						variant="icon"
+					<button
+						type="button"
+						className="ez-foot-btn"
 						onClick={toggleTheme}
 						role="switch"
 						aria-checked={theme === "dark"}
 						aria-label={
 							theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
 						}
+						title={
+							theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+						}
 					>
-						{theme === "dark" ? <Moon size={18} /> : <Sun size={18} />}
-					</Button>
-					<Button variant="icon" onClick={handleLogout} aria-label="Log out">
-						<LogOut size={18} />
-					</Button>
+						<span className="ez-theme-icon" aria-hidden="true">
+							<Moon
+								size={16}
+								strokeWidth={1.8}
+								data-off={theme === "dark" ? undefined : ""}
+							/>
+							<Sun
+								size={16}
+								strokeWidth={1.8}
+								data-off={theme === "dark" ? "" : undefined}
+							/>
+						</span>
+					</button>
+					<button
+						type="button"
+						className="ez-foot-btn ez-logout"
+						onClick={handleLogout}
+						aria-label="Log out"
+						title="Log out"
+					>
+						<LogOut size={16} strokeWidth={1.8} aria-hidden="true" />
+					</button>
 				</div>
 			</aside>
 			<header className="ez-topbar">
@@ -495,7 +560,7 @@ function App() {
 					aria-expanded={navOpen}
 					onClick={() => setNavOpen(!navOpen)}
 				>
-					<Menu size={20} />
+					<Menu size={16} strokeWidth={1.8} aria-hidden="true" />
 				</button>
 				<span
 					className="ez-mobile-brand"

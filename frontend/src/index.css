@@ -10,7 +10,7 @@
 	--raised: #212023;
 	--active: #2a2a2a;
 	--line: #232326;
-	--overlay: rgba(0, 0, 0, 0.55);
+	--overlay: rgba(0, 0, 0, 0.62);
 	--rule: #191919;
 	--control: #444444;
 	--ink: #ffffff;
@@ -123,12 +123,33 @@
 }
 
 /* Shared ez application shell. Content retains its virtualized media wall. */
+/* The shell (sidebar + mobile top bar) uses ezllm's exact values so the
+   chrome is identical across every ez app. Scoped here so the rest of
+   eziarr keeps its own palette until it moves to the house tokens. */
+.ez-sidebar,
+.ez-topbar {
+	--ink: #f2f2f3;
+	--muted: #8a8c92;
+	--hover: #26252a;
+	--negative: #e5566f;
+	--neg-bg: #2c1a20;
+}
+/* :where() keeps this at the same specificity as the dark block above, so
+   source order picks light and the later shell rules aren't outranked. */
+:where(:root[data-theme="light"]) .ez-sidebar,
+:where(:root[data-theme="light"]) .ez-topbar {
+	--ink: #111111;
+	--muted: #5f6368;
+	--hover: #eeeeef;
+	--negative: #c4242a;
+	--neg-bg: #ffedea;
+}
 .ez-sidebar {
 	position: fixed;
 	inset: 0 auto 0 0;
 	width: 224px;
 	background: var(--ground);
-
+	border-right: 1px solid var(--line);
 	display: flex;
 	flex-direction: column;
 	z-index: 40;
@@ -141,10 +162,19 @@
 	padding-bottom: 24px;
 	color: var(--ink);
 }
-.ez-brand span {
+.ez-brand strong {
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: -0.025em;
+}
+.ez-brand a {
 	margin-left: auto;
 	font-size: 12px;
-	color: var(--faint);
+	color: var(--muted);
+	transition: color 150ms;
+}
+.ez-brand a:hover {
+	color: var(--ink);
 }
 .ez-sidebar nav {
 	padding: 0 12px;
@@ -155,17 +185,24 @@
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	min-height: 34px;
+	height: 34px;
 	font-size: 14px;
 	width: 100%;
 	text-align: left;
-	padding: 6px 10px;
+	padding: 0 10px;
 	color: var(--muted);
-	border-radius: 6px;
+	border-radius: 4px;
 	cursor: pointer;
+	transition:
+		color 150ms,
+		background-color 150ms;
+}
+.ez-sidebar nav button + button {
+	margin-top: 2px;
 }
 .ez-sidebar nav button:hover {
-	background: var(--raised);
+	background: var(--hover);
+	color: var(--ink);
 }
 .ez-sidebar nav button[aria-current] {
 	color: var(--ink);
@@ -175,27 +212,63 @@
 	position: relative;
 	padding-bottom: 1px;
 }
-.ez-sidebar nav button[aria-current] .ez-nav-label::after {
-	content: "";
+.ez-nav-line {
 	position: absolute;
-	bottom: 0;
-	left: 0;
-	right: 0;
-	height: 2px;
+	inset-inline: 0;
+	bottom: -1px;
+	height: 1px;
 	background: var(--accent);
+	pointer-events: none;
 }
 .ez-nav-backdrop {
 	display: none;
 }
 .ez-sidebar-footer {
-	display: flex;
-	justify-content: space-around;
-	align-items: center;
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
 	border-top: 1px solid var(--line);
 	padding: 8px 12px;
 }
-.ez-sidebar-footer a {
-	padding: 10px;
+.ez-foot-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 36px;
+	border-radius: 4px;
+	color: var(--muted);
+	cursor: pointer;
+	transition:
+		color 150ms,
+		background-color 150ms;
+}
+.ez-foot-btn:hover {
+	background: var(--hover);
+	color: var(--ink);
+}
+.ez-foot-btn.ez-logout:hover {
+	background: var(--neg-bg);
+	color: var(--negative);
+}
+.ez-foot-btn:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+/* Sun and moon cross-fade rather than pop, as in the other ez apps. */
+.ez-theme-icon {
+	position: relative;
+	width: 16px;
+	height: 16px;
+}
+.ez-theme-icon svg {
+	position: absolute;
+	inset: 0;
+	transition:
+		opacity 200ms,
+		transform 200ms;
+}
+.ez-theme-icon svg[data-off] {
+	opacity: 0;
+	transform: scale(0.75);
 }
 .ez-topbar {
 	border-bottom: 1px solid var(--line);
@@ -230,15 +303,15 @@
 [class*="rounded-2xl"] {
 	border-radius: 6px;
 }
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
 	.ez-sidebar {
 		width: 256px;
 		z-index: 60;
 		transform: translateX(-100%);
 		visibility: hidden;
 		transition:
-			transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
-			visibility 240ms;
+			transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+			visibility 300ms;
 	}
 	.ez-sidebar.is-open {
 		transform: translateX(0);
@@ -253,8 +326,8 @@
 	}
 	.ez-topbar {
 		margin-left: 0;
-		padding: 10px 12px;
-		height: 56px;
+		padding: 0 16px;
+		height: 48px;
 		gap: 12px;
 	}
 	.ez-menu,
@@ -264,12 +337,19 @@
 		gap: 10px;
 	}
 	.ez-menu {
-		padding: 8px;
+		padding: 6px;
 		border: 1px solid var(--line);
 		border-radius: 6px;
+		color: var(--muted);
+	}
+	.ez-menu:hover {
+		background: var(--hover);
+		color: var(--ink);
 	}
 	.ez-mobile-brand {
+		font-size: 14px;
 		font-weight: 600;
+		letter-spacing: -0.025em;
 	}
 	.ez-content,
 	.ez-settings {
@@ -278,9 +358,6 @@
 	.ez-updated {
 		font-size: 11px;
 		padding: 8px;
-	}
-	.ez-sidebar-footer button {
-		min-height: 44px;
 	}
 }
 
