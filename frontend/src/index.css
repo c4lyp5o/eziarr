@@ -9,7 +9,8 @@
 	--surface: #131217;
 	--raised: #212023;
 	--active: #2a2a2a;
-	--line: #1f1f1f;
+	--line: #232326;
+	--overlay: rgba(0, 0, 0, 0.55);
 	--rule: #191919;
 	--control: #444444;
 	--ink: #ffffff;
@@ -34,7 +35,8 @@
 	--surface: #ffffff;
 	--raised: #f4f4f5;
 	--active: #e2e2df;
-	--line: #e3e3e0;
+	--line: #e8e8e8;
+	--overlay: rgba(17, 17, 17, 0.42);
 	--rule: #ededea;
 	--control: #c9c9c5;
 	--ink: #131217;
@@ -125,7 +127,7 @@
 	position: fixed;
 	inset: 0 auto 0 0;
 	width: 224px;
-	background: var(--surface);
+	background: var(--ground);
 	border-right: 1px solid var(--line);
 	display: flex;
 	flex-direction: column;
@@ -135,7 +137,8 @@
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	padding: 24px 20px;
+	padding: 20px;
+	border-bottom: 1px solid var(--line);
 	color: var(--ink);
 }
 .ez-brand span {
@@ -162,19 +165,36 @@
 }
 .ez-sidebar nav button[aria-current] {
 	color: var(--ink);
-	background: var(--active);
+	background: transparent;
+}
+.ez-nav-label {
+	position: relative;
+	padding-bottom: 1px;
+}
+.ez-sidebar nav button[aria-current] .ez-nav-label::after {
+	content: "";
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 1px;
+	background: var(--accent);
+}
+.ez-nav-backdrop {
+	display: none;
 }
 .ez-sidebar-footer {
 	display: flex;
 	justify-content: space-around;
 	align-items: center;
 	border-top: 1px solid var(--line);
-	padding: 12px;
+	padding: 8px 12px;
 }
 .ez-sidebar-footer a {
 	padding: 10px;
 }
 .ez-topbar {
+	border-bottom: 1px solid var(--line);
 	margin-left: 224px;
 	padding: 20px 28px;
 	display: flex;
@@ -208,11 +228,24 @@
 }
 @media (max-width: 767px) {
 	.ez-sidebar {
-		display: none;
+		width: 256px;
+		z-index: 60;
+		transform: translateX(-100%);
+		visibility: hidden;
+		transition:
+			transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+			visibility 240ms;
 	}
 	.ez-sidebar.is-open {
-		display: flex;
-		top: 64px;
+		transform: translateX(0);
+		visibility: visible;
+	}
+	.ez-nav-backdrop {
+		display: block;
+		position: fixed;
+		inset: 0;
+		z-index: 50;
+		background: var(--overlay);
 	}
 	.ez-topbar {
 		margin-left: 0;
@@ -239,5 +272,11 @@
 	}
 	.ez-sidebar-footer button {
 		min-height: 44px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ez-sidebar {
+		transition: none;
 	}
 }

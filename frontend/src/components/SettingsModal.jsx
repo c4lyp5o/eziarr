@@ -72,7 +72,9 @@ const SettingsModal = ({
 	const { toast } = useToast();
 
 	// Tab State
-	const [activeTab, setActiveTab] = useState("settings");
+	const [modalTab, setActiveTab] = useState(initialTab);
+	// Inline navigation is controlled by the shell; never paint a stale tab.
+	const activeTab = inline ? initialTab : modalTab;
 
 	// Live Data States
 	const [logType, setLogType] = useState("general");
@@ -175,8 +177,8 @@ const SettingsModal = ({
 		return () => setNoServicesConfiguredPrompt(false);
 	}, [isOpen]);
 	useEffect(() => {
-		if (isOpen) setActiveTab(initialTab);
-	}, [isOpen, initialTab]);
+		if (isOpen && !inline) setActiveTab(initialTab);
+	}, [isOpen, initialTab, inline]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: later
 	useEffect(() => {
@@ -355,7 +357,7 @@ const SettingsModal = ({
 					) : (
 						<AnimatePresence mode="wait" initial={false}>
 							<motion.div
-								key={activeTab}
+								key={inline ? "workspace" : activeTab}
 								initial={{ opacity: 0, y: 8 }}
 								animate={{ opacity: 1, y: 0 }}
 								exit={{ opacity: 0, y: -6 }}

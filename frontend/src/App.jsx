@@ -404,6 +404,14 @@ function App() {
 	return (
 		<div className="min-h-screen bg-ground text-ink">
 			{/* TOP BAR — mark, destinations, account; one column with the content */}
+			{navOpen && (
+				<button
+					type="button"
+					className="ez-nav-backdrop"
+					aria-label="Close navigation"
+					onClick={() => setNavOpen(false)}
+				/>
+			)}
 			<aside className={`ez-sidebar ${navOpen ? "is-open" : ""}`}>
 				<a href="/" className="ez-brand">
 					<Mark size={20} />
@@ -431,7 +439,7 @@ function App() {
 								setNavOpen(false);
 							}}
 						>
-							{n.label}
+							<span className="ez-nav-label">{n.label}</span>
 						</button>
 					))}
 				</nav>
@@ -457,11 +465,13 @@ function App() {
 					<Button
 						variant="icon"
 						onClick={toggleTheme}
+						role="switch"
+						aria-checked={theme === "dark"}
 						aria-label={
 							theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
 						}
 					>
-						{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+						{theme === "dark" ? <Moon size={18} /> : <Sun size={18} />}
 					</Button>
 					<Button variant="icon" onClick={handleLogout} aria-label="Log out">
 						<LogOut size={18} />
@@ -478,7 +488,12 @@ function App() {
 				>
 					<Menu size={20} />
 				</button>
-				<span className="ez-mobile-brand">eziarr</span>
+				<span
+					className="ez-mobile-brand"
+					style={{ visibility: navOpen ? "hidden" : undefined }}
+				>
+					eziarr
+				</span>
 				<div className="ml-auto flex items-center gap-2">
 					<button
 						type="button"

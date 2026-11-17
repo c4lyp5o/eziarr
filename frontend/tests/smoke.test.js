@@ -279,6 +279,9 @@ describe("The wall", () => {
 				`document.querySelector(".ez-updated").nextElementSibling.getAttribute("aria-label")`,
 			),
 		).toBe("Download notifications");
+		await browser.evaluate(
+			`window.workspaceHeadings = []; window.workspaceObserver = new MutationObserver(() => { const h = document.querySelector(".ez-settings h1"); if(h) window.workspaceHeadings.push(h.textContent); }); window.workspaceObserver.observe(document.body, {subtree:true,childList:true,characterData:true});`,
+		);
 		await click(byText(".ez-sidebar nav button", /^Queue$/));
 		await browser.waitFor(
 			`document.querySelector(".ez-settings h1")?.textContent === "Queue"`,
@@ -289,6 +292,22 @@ describe("The wall", () => {
 		expect(
 			await browser.evaluate(`!!document.querySelector('[role="dialog"]')`),
 		).toBe(false);
+		expect(
+			await browser.evaluate(
+				`window.workspaceHeadings.includes("Configuration")`,
+			),
+		).toBe(false);
+		await browser.evaluate("window.workspaceObserver.disconnect()");
+		expect(
+			await browser.evaluate(
+				`getComputedStyle(document.querySelector('.ez-sidebar nav button[aria-current]')).backgroundColor`,
+			),
+		).toBe("rgba(0, 0, 0, 0)");
+		expect(
+			await browser.evaluate(
+				`getComputedStyle(document.querySelector('[aria-current] .ez-nav-label'), '::after').height`,
+			),
+		).toBe("1px");
 		await click(byText(".ez-sidebar nav button", /^System$/));
 		await browser.waitFor(
 			`document.querySelector(".ez-settings h1")?.textContent === "System"`,
