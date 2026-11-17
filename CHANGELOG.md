@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Refresh compatible backend and frontend dependencies and lockfiles, including Elysia, Axios, Vite, Tailwind and frontend tooling. Keep breaking-version upgrades separate.
+- Defer the optional Three.js scene until after the form paints and the browser is idle.
+- Adopt the shared ez sidebar, Public Sans, theme tokens and boxed sign-in panel.
+- Move settings and operational views into inline workspace pages; expose browser notification preferences and authenticated runtime information.
+- Show the live relative update time immediately before the notification control; clicking it refetches displayed data only.
+
 ## [1.5.0] - 2026-10-22
 
 ### Added
