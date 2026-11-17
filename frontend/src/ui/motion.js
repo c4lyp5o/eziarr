@@ -9,6 +9,14 @@ export const spring = {
 	damping: 38,
 	mass: 0.8,
 };
+// The ez shell's spring (sidebar selection line, drawer): identical in every
+// ez app so the shared chrome moves the same way everywhere.
+export const shellSpring = {
+	type: "spring",
+	stiffness: 420,
+	damping: 34,
+	mass: 0.8,
+};
 export const softSpring = { type: "spring", stiffness: 280, damping: 32 };
 export const ease = [0.22, 1, 0.36, 1];
 

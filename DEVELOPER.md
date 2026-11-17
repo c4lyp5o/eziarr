@@ -135,6 +135,8 @@ Response schemas are enforced: Elysia **drops fields a response model doesn't de
 
 **Design rules:** use the tokens, never raw Tailwind palette colours, so both themes work. Surfaces separate by lightness, not borders or shadows (only floating things like dialogs and toasts get a shadow). The one accent colour goes on data (download progress, the selected filter), not on chrome. The main action is an inverted pill.
 
+**The shell is shared with the other ez apps.** The sidebar, mobile drawer and top bar (`.ez-sidebar`, `.ez-topbar` in `index.css`) copy ezllm's shell exactly, so the chrome looks and moves the same in every ez app. They pin ezllm's ink, mute, hover and red values on those selectors, which keeps eziarr's own palette out of the chrome. The selection mark is a 1px accent line that slides between items on `shellSpring`, and the drawer takes over below 1024px. The favicon, PWA icons and logo are the shared ez mark. Change the shell in ezllm first, then copy it here; don't restyle it locally.
+
 **Motion** (`motion/react`, wrapped in `MotionConfig reducedMotion="user"`) is feedback: presses, sheets, rows arriving and leaving, progress, the poster tilt. Animate transform and opacity only. The wall's cards don't animate in and out: with thousands of titles that cost seconds per filter change.
 
 **The wall must stay virtualized.** Don't render every title (a library can miss thousands), and keep what's derived from the list (filtering, grouping, sorting) in a `useMemo` that doesn't depend on the queue, which changes every few seconds while anything downloads.

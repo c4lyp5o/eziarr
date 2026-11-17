@@ -273,6 +273,53 @@ describe("The wall", () => {
 		expect(dialog).toContain("Drama Bersiri");
 	}, 20000);
 
+	it("uses inline workspace navigation and puts update time before notifications", async () => {
+		await fresh();
+		await browser.waitFor(
+			`document.querySelector(".ez-updated").textContent.includes("Updated")`,
+		);
+		expect(
+			await browser.evaluate(
+				`document.querySelector(".ez-updated").nextElementSibling.getAttribute("aria-label")`,
+			),
+		).toBe("Download notifications");
+		await browser.evaluate(
+			`window.workspaceHeadings = []; window.workspaceObserver = new MutationObserver(() => { const h = document.querySelector(".ez-settings h1"); if(h) window.workspaceHeadings.push(h.textContent); }); window.workspaceObserver.observe(document.body, {subtree:true,childList:true,characterData:true});`,
+		);
+		await click(byText(".ez-sidebar nav button", /^Queue$/));
+		await browser.waitFor(
+			`document.querySelector(".ez-settings h1")?.textContent === "Queue"`,
+		);
+		expect(
+			await browser.evaluate(`document.querySelector('main').hidden`),
+		).toBe(true);
+		expect(
+			await browser.evaluate(`!!document.querySelector('[role="dialog"]')`),
+		).toBe(false);
+		expect(
+			await browser.evaluate(
+				`window.workspaceHeadings.includes("Configuration")`,
+			),
+		).toBe(false);
+		await browser.evaluate("window.workspaceObserver.disconnect()");
+		expect(
+			await browser.evaluate(
+				`getComputedStyle(document.querySelector('.ez-sidebar nav button[aria-current]')).backgroundColor`,
+			),
+		).toBe("rgba(0, 0, 0, 0)");
+		expect(
+			await browser.evaluate(
+				`getComputedStyle(document.querySelector('[aria-current] .ez-nav-line')).height`,
+			),
+		).toBe("1px");
+		await click(byText(".ez-sidebar nav button", /^System$/));
+		await browser.waitFor(
+			`document.querySelector(".ez-settings h1")?.textContent === "System"`,
+		);
+		await click(byText(".ez-sidebar nav button", /^Missing media$/));
+		await browser.waitFor(`!document.querySelector('main').hidden`);
+	}, 15000);
+
 	it("logged no errors", () => {
 		expect(browser.errors).toEqual([]);
 	});

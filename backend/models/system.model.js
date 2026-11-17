@@ -18,6 +18,7 @@ export const SystemModel = {
 		success: t.Boolean(),
 		isSetup: t.Boolean(),
 		currentVersion: t.String(),
+		runtime: t.Object({ bunVersion: t.String(), uptimeSeconds: t.Number(), platform: t.String() }),
 		latestVersion: t.Optional(t.String()),
 		updateAvailable: t.Boolean(),
 		features: t.Object({
