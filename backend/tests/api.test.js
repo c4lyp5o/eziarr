@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { app } from "../index.js";
 import { getAuthCookie } from "./testUtils.js";
 
-describe("Eziarr Core API Flows", () => {
+describe("eziarr Core API Flows", () => {
 	let authCookie = "";
 
 	beforeAll(async () => {

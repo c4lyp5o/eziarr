@@ -1,4 +1,4 @@
-// A mock of the Eziarr API for UI work and the browser smoke test. Not shipped.
+// A mock of the eziarr API for UI work and the browser smoke test. Not shipped.
 //   bun tests/mock-api.js            → http://localhost:5000 (vite proxies /api here)
 //   COUNT=3000   repeat the sample titles to production scale
 //   EMPTY=1      nothing missing ("All caught up")
@@ -448,7 +448,7 @@ Bun.serve({
 						prowlarrApiKey: "",
 						telegramApiId: "",
 						telegramApiHash: "",
-						pathMapRemote: "D:\\Eziarr",
+						pathMapRemote: "D:\\eziarr",
 					},
 				});
 			case "/api/v1/system/tasks":

@@ -114,7 +114,7 @@ if (process.env.NODE_ENV === "development") {
 			},
 			documentation: {
 				info: {
-					title: "Eziarr API 🍿",
+					title: "eziarr API 🍿",
 					version: "1.0.0",
 					description:
 						"The ultimate backend for managing missing *Arr media, scraping Telegram, and deep-searching the high seas.",
@@ -168,9 +168,9 @@ prepareSetup()
 	.then(() => {
 		app.listen(process.env.PORT || 5000);
 		process.env.NODE_ENV === "development" &&
-			logger.info("[SERVER] 📘 Eziarr OpenAPI UI enabled at /openapi");
+			logger.info("[SERVER] 📘 eziarr OpenAPI UI enabled at /openapi");
 		logger.info(
-			`[SERVER] Eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
+			`[SERVER] eziarr is running at ${app.server?.hostname}:${app.server?.port}`,
 		);
 	})
 	.catch((err) => {

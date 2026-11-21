@@ -1,4 +1,4 @@
-// Eziarr's service worker exists for one job: showing "Downloaded"
+// eziarr's service worker exists for one job: showing "Downloaded"
 // notifications (Android only shows them through a worker) and bringing the
 // app forward when one is tapped. It has no fetch handler and caches
 // nothing, so every visit loads the current build from the server.

@@ -436,7 +436,7 @@ export default function ConfigTab({
 						/>
 					</div>
 					<p className="text-xs text-faint">
-						Leave blank if Eziarr and *Arr apps are on the same
+						Leave blank if eziarr and *Arr apps are on the same
 						machine/filesystem.
 					</p>
 				</div>

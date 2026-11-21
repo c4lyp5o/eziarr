@@ -54,7 +54,7 @@ import { describeQueue } from "./utils/queueState.js";
 import ErrorScreen from "./components/ErrorScreen.jsx";
 import Login from "./components/Login.jsx";
 import { Button } from "./components/Buttons.jsx";
-import { Mark } from "./components/Mark.jsx";
+import { Brand } from "./components/Brand.jsx";
 
 // The two sheets load on first open: most visits only look at the wall.
 const ResultsModal = lazy(() => import("./components/ResultsModal.jsx"));
@@ -440,8 +440,7 @@ function App() {
 			</AnimatePresence>
 			<aside className={`ez-sidebar ${navOpen ? "is-open" : ""}`}>
 				<div className="ez-brand">
-					<Mark size={20} />
-					<strong>eziarr</strong>
+					<Brand name="eziarr" />
 					{sysStatus?.currentVersion && (
 						<a
 							href="https://github.com/c4lyp5o/eziarr"
@@ -566,8 +565,7 @@ function App() {
 					className="ez-mobile-brand"
 					style={{ visibility: navOpen ? "hidden" : undefined }}
 				>
-					<Mark size={20} />
-					<strong>eziarr</strong>
+					<Brand name="eziarr" />
 				</span>
 				<div className="ml-auto flex items-center gap-2">
 					<button
@@ -786,7 +784,7 @@ function App() {
 				) : notSetUp ? (
 					<EmptyFrame title="No libraries connected yet">
 						<p className="text-sm text-muted mt-1 max-w-sm">
-							Add Radarr, Sonarr or Lidarr and Eziarr will list everything they
+							Add Radarr, Sonarr or Lidarr and eziarr will list everything they
 							are still missing.
 						</p>
 						<Button className="mt-6" onClick={() => setSettingsTab("settings")}>
@@ -796,7 +794,7 @@ function App() {
 				) : missing.length === 0 ? (
 					<EmptyFrame bare title="All caught up">
 						<p className="text-sm text-muted mt-1">
-							Every monitored title is on disk. Eziarr checks again every 10
+							Every monitored title is on disk. eziarr checks again every 10
 							seconds.
 						</p>
 					</EmptyFrame>

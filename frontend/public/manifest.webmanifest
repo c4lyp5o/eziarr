@@ -1,6 +1,6 @@
 {
-	"name": "Eziarr",
-	"short_name": "Eziarr",
+	"name": "eziarr",
+	"short_name": "eziarr",
 	"description": "Find and grab what Radarr, Sonarr and Lidarr are still missing.",
 	"start_url": "/",
 	"scope": "/",

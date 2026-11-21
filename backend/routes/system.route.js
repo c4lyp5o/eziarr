@@ -35,7 +35,7 @@ export const SystemRoutes = new Elysia({ prefix: "/api/v1/system" })
 		response: SystemModel.getSystemLogsResponse,
 		detail: {
 			summary: "Get System Logs",
-			description: "Returns the tail of the Eziarr system logs.",
+			description: "Returns the tail of the eziarr system logs.",
 			tags: ["General"],
 		},
 	});

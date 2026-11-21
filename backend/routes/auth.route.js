@@ -7,7 +7,7 @@ export const AuthRoutes = new Elysia({ prefix: "/api/v1" })
 		response: AuthModel.getFirstTimeResponse,
 		detail: {
 			summary: "First time run deteminer",
-			description: "Determine if Eziarr is running for the first time.",
+			description: "Determine if eziarr is running for the first time.",
 			tags: ["Auth"],
 		},
 	})
@@ -17,7 +17,7 @@ export const AuthRoutes = new Elysia({ prefix: "/api/v1" })
 		detail: {
 			summary: "First time setup",
 			description:
-				"Sets up Eziarr for the first time with provided credentials and flips the first time run value.",
+				"Sets up eziarr for the first time with provided credentials and flips the first time run value.",
 			tags: ["Auth"],
 		},
 	})
