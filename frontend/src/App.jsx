@@ -55,6 +55,7 @@ import ErrorScreen from "./components/ErrorScreen.jsx";
 import Login from "./components/Login.jsx";
 import { Button } from "./components/Buttons.jsx";
 import { Brand } from "./components/Brand.jsx";
+import { Mark } from "./components/Mark.jsx";
 
 // The two sheets load on first open: most visits only look at the wall.
 const ResultsModal = lazy(() => import("./components/ResultsModal.jsx"));
