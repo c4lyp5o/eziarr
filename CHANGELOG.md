@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-22
+
 ### Changed
 - On phones and tablets (below 1024px) the top bar stays pinned while the page scrolls, as in ezllm, instead of scrolling away with the content.
 - Dependencies updated, Docker image on oven/bun 1.4.5, Biome pinned at the repo root, and React Compiler restored under @vitejs/plugin-react 6.
@@ -218,7 +220,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Custom UI Modals:** Replaced native browser alerts with modals.
 - **Settings Credentials Management:** Users can now update their admin username and password directly from the Settings UI.
 - **Test Suite:** Added Vitest suites covering the Auth Lifecycle, SQLite IPC Queue, external *Arr mocking, and Security utilities.
-
 
 ### Changed
 - **MVC Refactor:** Shattered the backend monolith into a scalable architecture using `/routes`, `/services`, `/models`, and `/plugins`.
