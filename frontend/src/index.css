@@ -324,7 +324,14 @@
 		z-index: 50;
 		background: var(--overlay);
 	}
+	/* Mobile top bar stays put while the page scrolls, as in ezllm: a
+	   48px bar with its own ground so content slides under it. Sticky
+	   rather than fixed, so nothing below needs a top offset. */
 	.ez-topbar {
+		position: sticky;
+		top: 0;
+		z-index: 30;
+		background: var(--ground);
 		margin-left: 0;
 		padding: 0 16px;
 		height: 48px;

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- On phones and tablets (below 1024px) the top bar stays pinned while the page scrolls, as in ezllm, instead of scrolling away with the content.
+- Dependencies updated, Docker image on oven/bun 1.4.5, Biome pinned at the repo root, and React Compiler restored under @vitejs/plugin-react 6.
+
 ## [1.6.0] - 2026-11-17
 
 ### Changed
@@ -160,7 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Download size cap raised from 2 GiB to 5 GiB.
 - Docs: README rewritten for 1.4 (Docker Compose setup, configuration,
   security, upgrade notes) with new screenshots; DEVELOPER.md brought up to
-  date; new CONTRIBUTING.md and AGENTS.md (CLAUDE.md imports it).
+  date; new DEVELOPER.md and AGENTS.md (CLAUDE.md imports it).
 - Tests run with `bun test` (Vitest removed) against a throwaway database;
   the data directories can be moved with `EZIARR_DB_DIR`, `EZIARR_LOG_DIR`
   and `EZIARR_DOWNLOAD_DIR`. CI runs the tests and the frontend build.

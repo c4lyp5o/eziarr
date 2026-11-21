@@ -30,7 +30,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           # Same Bun as the Docker image (Dockerfile) runs in production.
-          bun-version: 1.4.3
+          bun-version: 1.4.5
 
       - name: 📦 Install dependencies
         run: bun install --frozen-lockfile
@@ -53,14 +53,16 @@ jobs:
       - name: 🥟 Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.5
 
       - name: 📦 Install dependencies
         run: bun install --frozen-lockfile
 
-      # Lint and formatting (biome.json); never writes in CI.
+      # Lint and formatting; Biome is pinned at the repo root and
+      # frontend/biome.json is a nested config. Never writes in CI.
       - name: 🧹 Lint
-        run: bunx biome ci
+        working-directory: .
+        run: bun install --frozen-lockfile && bunx biome ci frontend
 
       - name: 🧪 Unit tests
         run: bun run test:unit

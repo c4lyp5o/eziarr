@@ -1,7 +1,7 @@
 # ============================
 # Stage 1: Client Builder
 # ============================
-FROM oven/bun:1.4.3-alpine AS builder
+FROM oven/bun:1.4.5-alpine AS builder
 WORKDIR /app
 
 # Cache dependencies first (speeds up rebuilds)
@@ -16,7 +16,7 @@ RUN cd frontend && bun run build
 # ============================
 # Stage 2: Production
 # ============================
-FROM oven/bun:1.4.3-alpine
+FROM oven/bun:1.4.5-alpine
 WORKDIR /app
 
 # Install system deps

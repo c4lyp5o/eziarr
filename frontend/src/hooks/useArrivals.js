@@ -15,8 +15,9 @@ const supported = () => typeof Notification !== "undefined";
 const notify = async (title, body) => {
 	// Android shows notifications only through a service worker.
 	const reg = await navigator.serviceWorker?.getRegistration?.();
-	if (reg) return reg.showNotification(title, { body, icon: "/icon-192.png" });
-	new Notification(title, { body, icon: "/icon-192.png" });
+	if (reg)
+		return reg.showNotification(title, { body, icon: "/icons/icon-192.png" });
+	new Notification(title, { body, icon: "/icons/icon-192.png" });
 };
 
 /**

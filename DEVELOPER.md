@@ -1,6 +1,6 @@
 # Eziarr Developer Documentation
 
-How Eziarr is put together. For setting up a dev environment, the branch flow and what a PR needs, see [CONTRIBUTING.md](CONTRIBUTING.md); for the traps that have bitten this codebase before, see [AGENTS.md](AGENTS.md).
+How Eziarr is put together. For setting up a dev environment, the branch flow and what a PR needs, see [DEVELOPER.md](DEVELOPER.md#contributing); for the traps that have bitten this codebase before, see [AGENTS.md](AGENTS.md).
 
 ## 🏗️ Architecture
 
@@ -164,3 +164,97 @@ Two stages on `oven/bun:1.4.3-alpine`: build the UI, then install the backend (`
 - **One writer per log file.** `deadslog` tracks file size within each process, so the server writes `general.log` and the worker `worker.log`.
 - **Telegram** is your own account: the session is a `StringSession` in `settings`, created by the in-app login (code, then 2FA if enabled).
 - **Passwords** are hashed with Bun's Argon2 (`Bun.password`).
+
+## Commands
+
+| Task | Command |
+| --- | --- |
+| Install every package | `bun run install` |
+| Run the dev servers | `bun run dev` |
+| Run the test suite | `bun run test` |
+| Lint with Biome | `bun run lint` |
+| Apply Biome's safe fixes | `bun run lint:fix` |
+| Build the frontend | `bun run build:client` |
+| Start in production (PM2 where configured) | `bun run start` |
+
+`bun run test` runs the backend suite; `cd frontend && bun run test:unit` the frontend units; `cd frontend && bun run smoke` a real-browser smoke test after a build.
+
+## Linting
+
+[Biome](https://biomejs.dev) 2.6.8 is the only linter. It is pinned at the repo root, so run it from there: `bun run lint` checks, `bun run lint:fix` applies safe fixes. Configuration is `biome.json`; the root config only lints, while `frontend/biome.json` (a nested config) also enforces formatting there, and CI runs `bunx biome ci frontend`. CI runs the same command.
+
+## Branches and releases
+
+There are two long-lived branches:
+
+| Branch | Role |
+| --- | --- |
+| `development` | Integration branch. Branch from it (`feat/…`, `fix/…`, `chore/…`) and open every PR against it. |
+| `master` | Released code. Only `development` is merged into it, by PR. |
+
+No other long-lived branches (`main`, `dev`, `staging`, …) are kept; delete feature branches once merged.
+
+To release: bump the version in `package.json`, `backend/package.json` and `frontend/package.json`, move the `[Unreleased]` notes in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`, then merge `development` into `master`. Every push to `master` runs `docker-publish.yml`, pushing `calypso666/eziarr:<version>` and `:latest` to Docker Hub. Smoke-test a built image after changing the Dockerfile or the Bun version (AGENTS.md rule 10).
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org) (`fix(scope): …`) with a body that explains why. Add a `CHANGELOG.md` line under `[Unreleased]` for anything a user would notice. Every behaviour change needs a test; a bug fix needs one that fails without the fix.
+
+## Docker
+
+The image is built from `Dockerfile` on `oven/bun:1.4.5-alpine`. Keep the Bun version there and `bun-version` in `.github/workflows/` in step, and smoke-test a locally built image (`docker build -t eziarr .`) after changing either.
+
+## Contributing
+
+Thanks for helping. This page covers running Eziarr locally, how changes flow into a release, and what a pull request needs. How the code is organised is in [DEVELOPER.md](DEVELOPER.md).
+
+### Running it locally
+
+You need [Bun](https://bun.sh) 1.4 and, to try it end to end, at least one of Radarr, Sonarr or Lidarr.
+
+```bash
+bun run install        # backend + frontend dependencies
+bun run dev            # server, worker and Vite together
+```
+
+- The UI runs on <http://localhost:3000> (Vite, proxying `/api` to the server on port 5000).
+- On first start the server prints a setup code in the terminal. To skip it in development, start with a password instead: `EZIARR_PASSWORD=devpassword bun run dev`.
+- Data lives in `db/`, `logs/` and `downloads/` at the repo root; delete `db/` to start over.
+
+### Before you open a pull request
+
+```bash
+cd backend  && bun test              # all backend tests
+bunx biome ci frontend              # Biome (from the root): lint + formatting
+cd frontend && bun run build         # the UI still builds
+cd frontend && bun run smoke         # the built UI in headless Chrome
+```
+
+CI runs the same checks on every pull request.
+
+- **Tests come with the change.** A bug fix gets a test that fails without it; a feature gets tests for its behaviour. Mock external services (`vi.mock("axios", …)`); never call a real *Arr from a test.
+- **Tests stand alone.** They run against a throwaway database (the preload in `tests/setup.js` sees to that), but every file shares it: clean up rows you create, and don't rely on another test running first. `bun test --randomize` should pass.
+- **Format with Biome** from the root: `bunx biome check --write frontend`.
+- **Add a line to `CHANGELOG.md`** under `## [Unreleased]` for anything a user would notice.
+- **Keep a pull request to one change.** Separate refactors from behaviour changes, and dependency bumps from both.
+
+
+### Commit messages
+
+[Conventional Commits](https://www.conventionalcommits.org), as in the existing history:
+
+```
+fix(import): scan the downloaded FILE path, not the drop folder
+
+Why the change was needed and what it does, wrapped at ~72 columns.
+```
+
+Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `style`, `build`, `ci`, `chore`. The scope is the area (`import`, `sync`, `settings`, `ui`, `security`, …).
+
+### Dependencies
+
+- Update one dependency, or one closely related group, per change, and say why.
+- Prefer releases that are at least a week old; brand-new releases are where regressions and compromised packages show up first.
+- Commit the lockfile and read its diff. CI and the Docker build install with `--frozen-lockfile`, so the lockfile is what ships.
+
+### Reporting security issues
+
+Please don't open a public issue for a vulnerability. Use GitHub's private vulnerability reporting (the repository's **Security** tab → **Report a vulnerability**), or email `calypso[at]calypsocloud.one`. Include what an attacker can do and how to reproduce it.
