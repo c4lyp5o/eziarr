@@ -95,7 +95,7 @@ bun run build:client      # builds the UI into client/
 bun start                 # runs the server and worker under PM2
 ```
 
-For development, see [CONTRIBUTING.md](CONTRIBUTING.md).
+For development, see [DEVELOPER.md](DEVELOPER.md#contributing).
 
 ## ⚙️ Configuration
 
@@ -135,7 +135,7 @@ Other settings (*Arr connections, Prowlarr, Telegram, sync and hunter intervals,
 - **Download sources are SSRF-guarded:** URLs must be http(s), may not resolve to private, loopback, link-local, multicast or reserved addresses (including IPv4 hidden inside IPv6 forms), are re-checked at connect time, and redirects aren't followed.
 - Eziarr works over plain `http://` on a LAN. If you expose it to the internet, put it behind an HTTPS reverse proxy.
 
-Found a security problem? Please report it privately; see [CONTRIBUTING.md](CONTRIBUTING.md#reporting-security-issues).
+Found a security problem? Please report it privately; see [DEVELOPER.md](DEVELOPER.md#reporting-security-issues).
 
 ## ⬆️ Upgrading to 1.5
 
@@ -152,3 +152,7 @@ The full list is in the [CHANGELOG](CHANGELOG.md).
 ## License
 
 [MIT](LICENSE.md)
+
+## Development
+
+Setup, commands, tests, linting and the `development` → `master` release flow are in [DEVELOPER.md](DEVELOPER.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md).

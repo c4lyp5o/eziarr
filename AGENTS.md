@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for AI coding agents (and humans in a hurry) working on Eziarr. Architecture is in [DEVELOPER.md](DEVELOPER.md); workflow and PR requirements are in [CONTRIBUTING.md](CONTRIBUTING.md).
+Guidance for AI coding agents (and humans in a hurry) working on Eziarr. Architecture is in [DEVELOPER.md](DEVELOPER.md); workflow and PR requirements are in [DEVELOPER.md](DEVELOPER.md#contributing).
 
 ## Commands
 
@@ -10,7 +10,7 @@ Guidance for AI coding agents (and humans in a hurry) working on Eziarr. Archite
 | Dev (server + worker + UI) | `bun run dev` — UI on :3000, API on :5000; `EZIARR_PASSWORD=devpassword` skips the setup code |
 | Backend tests | `cd backend && bun test` (`--randomize` to catch order dependence) |
 | One test file | `cd backend && bun test tests/import.test.js` |
-| Frontend lint + format check | `cd frontend && bun run check` (`bunx biome check --write` to fix) |
+| Lint + format check | `bun run lint` at the root; `bunx biome ci frontend` for the frontend's formatting (`bunx biome check --write frontend` to fix) |
 | Frontend build | `cd frontend && bun run build` (writes `../client`) |
 | Frontend unit tests | `cd frontend && bun run test:unit` |
 | Browser smoke test | `cd frontend && bun run smoke` (after a build; needs Chrome, `CHROME_BIN` to pick one) |
