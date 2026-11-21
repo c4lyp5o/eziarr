@@ -17,10 +17,13 @@
 		"start": "pm2-runtime start ecosystem.config.js --env production",
 		"stop": "pm2 stop all",
 		"restart": "pm2 restart all",
-		"logs": "pm2 monit"
+		"logs": "pm2 monit",
+		"lint": "biome lint .",
+		"lint:fix": "biome lint --write ."
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
-		"concurrently": "^10.0.7"
+		"concurrently": "^10.0.7",
+		"@biomejs/biome": "2.6.8"
 	}
 }

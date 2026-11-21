@@ -6,8 +6,6 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "vite build",
-		"lint": "biome lint",
-		"check": "biome check",
 		"smoke": "bun test tests/smoke.test.js",
 		"test:unit": "bun test tests/unit",
 		"preview": "vite preview"
@@ -26,7 +24,6 @@
 		"three": "0.187.0"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.6.8",
 		"@types/react": "^19.3.0",
 		"@types/react-dom": "^19.3.0",
 		"@vitejs/plugin-react": "^6.3.0",
