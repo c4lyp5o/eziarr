@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- On phones and tablets (below 1024px) the top bar stays pinned while the page scrolls, as in ezllm, instead of scrolling away with the content.
+- Dependencies updated, Docker image on oven/bun 1.4.5, Biome pinned at the repo root, and React Compiler restored under @vitejs/plugin-react 6.
+
 ## [1.6.0] - 2026-11-17
 
 ### Changed
