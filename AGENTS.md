@@ -24,6 +24,7 @@ Guidance for AI coding agents working on eziarr, one of the ez* self-hosted apps
 
 - **Bun for everything**, never npm or node. The Bun version in `Dockerfile` (`oven/bun:x.y.z`) and every `bun-version:` in `.github/workflows/` must match.
 - ESM, tabs, double quotes, semicolons. Minimal, task-scoped diffs; don't reformat files you didn't change. Comments explain why, not what.
+- **Docs**: `README.md`, `DEVELOPER.md`, `CHANGELOG.md`, `AGENTS.md`, `CLAUDE.md`, plus `LICENSE` (MIT) in public repos; nothing else. No roadmaps, plans or TODO lists in the repo; they live with the owner.
 - **Biome is the only linter**, pinned at the repo root: `bun run lint`, `bun run lint:fix`. No ESLint or Prettier. Markdown is not run through Biome.
 - **Frontend**: React + Vite + Tailwind 4 in the ez house style (shared `src/ez/` kit and tokens; ezllm is the reference). Colours come from tokens, never raw palette classes. Motion animates transform and opacity only.
 - **Brand**: every header, sidebar and sign-in shows `<Brand name="ezname" scope="…" />` (in `src/ez/`): the ez icon at 20px, the lowercase name, an optional scope. App names are always lowercase (`eziarr`, never `Eziarr`), in UI and docs.
