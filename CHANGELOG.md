@@ -7,13 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- Header, sidebar and sign-in use the shared ez `Brand`: the ez icon and the lowercase name.
-- The name is lowercase everywhere: page title, install name, screens, API docs and logs say `eziarr`.
-
 ## [1.6.1] - 2026-11-22
 
 ### Changed
+- Header, sidebar and sign-in use the shared ez `Brand`: the ez icon and the lowercase name.
+- The name is lowercase everywhere: page title, install name, screens, API docs and logs say `eziarr`.
 - On phones and tablets (below 1024px) the top bar stays pinned while the page scrolls, as in ezllm, instead of scrolling away with the content.
 - Dependencies updated, Docker image on oven/bun 1.4.5, Biome pinned at the repo root, and React Compiler restored under @vitejs/plugin-react 6.
 
