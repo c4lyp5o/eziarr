@@ -6,7 +6,9 @@ export function Brand({ name, scope, size = 20 }) {
 	return (
 		<span className="flex min-w-0 items-center gap-2.5 text-ink">
 			<Mark size={size} className="flex-none" />
-			<strong className="text-[15px] font-semibold tracking-[-0.01em]">{name}</strong>
+			<strong className="text-[15px] font-semibold tracking-[-0.01em]">
+				{name}
+			</strong>
 			{scope && (
 				<span className="truncate border-l border-control pl-3 text-xs text-muted">
 					{scope}

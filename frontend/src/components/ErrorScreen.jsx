@@ -15,8 +15,8 @@ const ErrorScreen = () => {
 				transition={spring}
 			>
 				<div className="mb-8">
-				<Brand name="eziarr" />
-			</div>
+					<Brand name="eziarr" />
+				</div>
 				<div className="bg-surface rounded-[20px] p-6">
 					<h1 className="flex items-center gap-2 text-base font-semibold text-ink">
 						<CircleAlert size={18} className="text-negative" />
