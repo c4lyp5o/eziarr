@@ -33,7 +33,7 @@ vi.mock("axios", () => {
 });
 
 // The production drop folder is /app/downloads, mapped to the Windows share
-// D:\Eziarr. Measured on Radarr 6.4.4 (2026-10-04): a FILE-path scan imports
+// D:\eziarr. Measured on Radarr 6.4.4 (2026-10-04): a FILE-path scan imports
 // the single file; a folder-path scan completes but silently imports nothing.
 const CONTAINER_FILE = "/app/downloads/Tiada Tajuk (2019).mp4";
 
@@ -41,10 +41,10 @@ describe("Import: scan command shape", () => {
 	beforeEach(() => setSetting("pathMapRemote", ""));
 
 	it("Should target the file path, translated to the remote share", () => {
-		setSetting("pathMapRemote", "D:\\Eziarr");
+		setSetting("pathMapRemote", "D:\\eziarr");
 
 		expect(translatePath(CONTAINER_FILE)).toBe(
-			"D:\\Eziarr\\Tiada Tajuk (2019).mp4",
+			"D:\\eziarr\\Tiada Tajuk (2019).mp4",
 		);
 
 		const payload = buildScanCommand({
@@ -52,7 +52,7 @@ describe("Import: scan command shape", () => {
 			serviceId: 2099,
 			filePath: CONTAINER_FILE,
 		});
-		expect(payload.path).toBe("D:\\Eziarr\\Tiada Tajuk (2019).mp4");
+		expect(payload.path).toBe("D:\\eziarr\\Tiada Tajuk (2019).mp4");
 	});
 
 	// Regression guard for the 2026-10-03 outage (Tiada Tajuk + Keluang Man):
@@ -122,7 +122,7 @@ describe("Import: scan command shape", () => {
 describe("Import: triggerArrImport posts the translated file path", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		setSetting("pathMapRemote", "D:\\Eziarr");
+		setSetting("pathMapRemote", "D:\\eziarr");
 		axios.post.mockResolvedValue({ data: { status: "queued" } });
 	});
 
@@ -148,7 +148,7 @@ describe("Import: triggerArrImport posts the translated file path", () => {
 			importMode: "Move",
 			movieId: 2099,
 		});
-		expect(body.path).toBe("D:\\Eziarr\\Tiada Tajuk (2019).mp4");
+		expect(body.path).toBe("D:\\eziarr\\Tiada Tajuk (2019).mp4");
 		expect(opts.headers["X-Api-Key"]).toBe("secret");
 	});
 });

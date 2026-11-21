@@ -1,10 +1,10 @@
-# Eziarr Developer Documentation
+# eziarr Developer Documentation
 
-How Eziarr is put together. For setting up a dev environment, the branch flow and what a PR needs, see [DEVELOPER.md](DEVELOPER.md#contributing); for the traps that have bitten this codebase before, see [AGENTS.md](AGENTS.md).
+How eziarr is put together. For setting up a dev environment, the branch flow and what a PR needs, see [DEVELOPER.md](DEVELOPER.md#contributing); for the traps that have bitten this codebase before, see [AGENTS.md](AGENTS.md).
 
 ## 🏗️ Architecture
 
-Eziarr is two Bun processes run by PM2 (`ecosystem.config.js`), sharing one SQLite database in WAL mode:
+eziarr is two Bun processes run by PM2 (`ecosystem.config.js`), sharing one SQLite database in WAL mode:
 
 ```
             browser (React SPA, served from client/)
@@ -204,7 +204,7 @@ The image is built from `Dockerfile` on `oven/bun:1.4.5-alpine`. Keep the Bun ve
 
 ## Contributing
 
-Thanks for helping. This page covers running Eziarr locally, how changes flow into a release, and what a pull request needs. How the code is organised is in [DEVELOPER.md](DEVELOPER.md).
+Thanks for helping. This page covers running eziarr locally, how changes flow into a release, and what a pull request needs. How the code is organised is in [DEVELOPER.md](DEVELOPER.md).
 
 ### Running it locally
 

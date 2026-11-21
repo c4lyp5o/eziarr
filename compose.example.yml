@@ -1,4 +1,4 @@
-# Eziarr with Docker Compose. Copy to compose.yml, adjust the paths, then:
+# eziarr with Docker Compose. Copy to compose.yml, adjust the paths, then:
 #   docker compose up -d && docker logs eziarr   # read the first-start setup code
 #
 # Volumes:

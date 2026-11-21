@@ -24,8 +24,10 @@ Guidance for AI coding agents working on eziarr, one of the ez* self-hosted apps
 
 - **Bun for everything**, never npm or node. The Bun version in `Dockerfile` (`oven/bun:x.y.z`) and every `bun-version:` in `.github/workflows/` must match.
 - ESM, tabs, double quotes, semicolons. Minimal, task-scoped diffs; don't reformat files you didn't change. Comments explain why, not what.
+- **Docs**: `README.md`, `DEVELOPER.md`, `CHANGELOG.md`, `AGENTS.md`, `CLAUDE.md`, plus `LICENSE` (MIT) in public repos; nothing else. No roadmaps, plans or TODO lists in the repo; they live with the owner.
 - **Biome is the only linter**, pinned at the repo root: `bun run lint`, `bun run lint:fix`. No ESLint or Prettier. Markdown is not run through Biome.
 - **Frontend**: React + Vite + Tailwind 4 in the ez house style (shared `src/ez/` kit and tokens; ezllm is the reference). Colours come from tokens, never raw palette classes. Motion animates transform and opacity only.
+- **Brand**: every header, sidebar and sign-in shows `<Brand name="ezname" scope="…" />` (in `src/ez/`): the ez icon at 20px, the lowercase name, an optional scope. App names are always lowercase (`eziarr`, never `Eziarr`), in UI and docs.
 - **Icons**: every app uses the shared ez icon from ezconv: `public/icons/icon-192.png` and `icon-512.png`, linked as `rel="icon"` and `rel="apple-touch-icon"` and used in any web manifest.
 - **React Compiler** runs through `@rolldown/plugin-babel` with `reactCompilerPreset()`. `@vitejs/plugin-react` 6 has no `babel` option; passing one silently disables the compiler.
 
@@ -63,7 +65,7 @@ Run the lint, tests and build listed under **This repo** and report the numbers.
 
 ### Repo guide (kept from the previous AGENTS.md)
 
-Guidance for AI coding agents (and humans in a hurry) working on Eziarr. Architecture is in [DEVELOPER.md](DEVELOPER.md); workflow and PR requirements are in [DEVELOPER.md](DEVELOPER.md#contributing).
+Guidance for AI coding agents (and humans in a hurry) working on eziarr. Architecture is in [DEVELOPER.md](DEVELOPER.md); workflow and PR requirements are in [DEVELOPER.md](DEVELOPER.md#contributing).
 
 ### Commands
 
@@ -107,4 +109,4 @@ Use Bun, not npm/node, for everything. There is no Vitest package: `bun test` pr
 ### Working on this machine
 
 - Stop background processes you started **by PID or task ID**. Don't `pkill -f` by pattern: other services here (including Docker containers) match patterns like `server.js`.
-- Don't point tests or scripts at a running Eziarr instance; build an image and run it on a spare port, or start `bun index.js` with the `EZIARR_*_DIR` variables set to a temp directory.
+- Don't point tests or scripts at a running eziarr instance; build an image and run it on a spare port, or start `bun index.js` with the `EZIARR_*_DIR` variables set to a temp directory.

@@ -17,7 +17,7 @@ for (const [env, dir] of [
 }
 
 // Tests that import index.js start the real server; let the OS pick a free
-// port so a run never collides with an Eziarr already listening on 5000.
+// port so a run never collides with an eziarr already listening on 5000.
 process.env.PORT ??= "0";
 
 // Registered from the preload, this runs once after every test file.

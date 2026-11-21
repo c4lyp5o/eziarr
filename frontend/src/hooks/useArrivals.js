@@ -23,11 +23,11 @@ const notify = async (title, body) => {
 /**
  * Titles that finished: seen on the way at some point in this session and
  * now gone from the missing list. The two rarely change together (an *Arr
- * drops a title from its queue when it imports it; Eziarr's list catches up
+ * drops a title from its queue when it imports it; eziarr's list catches up
  * at its next sync), so every title seen downloading is remembered until it
  * leaves the list. Each one gets a toast, and a system notification when
  * the user turned them on and the tab is in the background. Works only
- * while Eziarr is open somewhere: there is no push server.
+ * while eziarr is open somewhere: there is no push server.
  */
 export const useArrivals = ({ missing, queueByItem, ready, onArrive }) => {
 	const [enabled, setEnabled] = useState(readPref);

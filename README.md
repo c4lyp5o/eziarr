@@ -1,10 +1,10 @@
-# Eziarr
+# eziarr
 
 **Find and grab what Radarr, Sonarr and Lidarr are still missing.**
 
-Eziarr sits beside your *Arr stack. It lists every missing movie, episode and album in one place, keeps asking your indexers for them, and when the indexers come up empty it searches the places they don't look (Telegram channels, the Internet Archive and open directories), downloads what you pick, and hands the file to the right *Arr to import.
+eziarr sits beside your *Arr stack. It lists every missing movie, episode and album in one place, keeps asking your indexers for them, and when the indexers come up empty it searches the places they don't look (Telegram channels, the Internet Archive and open directories), downloads what you pick, and hands the file to the right *Arr to import.
 
-![The Eziarr poster wall: every missing title, with live download state](assets/dashboard.png)
+![The eziarr poster wall: every missing title, with live download state](assets/dashboard.png)
 
 ## ✨ Features
 
@@ -12,14 +12,14 @@ Eziarr sits beside your *Arr stack. It lists every missing movie, episode and al
 - **A series is one card.** When several episodes of a show are missing, they fold into one card: search them all at once, or open the episode list.
 - **"Not out yet" kept apart.** Titles that haven't been released (or have no date) get their own filter, so "missing" means something a search can find.
 - **Act on many at once.** Select titles and search for, or stop monitoring, all of them in one go.
-- **Live download state on every title.** Each poster shows whether it's downloading (with real progress), queued or stalled, updated as it happens. When a download finishes you get a toast, and, if you turn them on, a system notification while Eziarr is in the background.
+- **Live download state on every title.** Each poster shows whether it's downloading (with real progress), queued or stalled, updated as it happens. When a download finishes you get a toast, and, if you turn them on, a system notification while eziarr is in the background.
 - **Install it as an app** on your phone or desktop (over HTTPS).
 - **Hunter.** A background worker re-searches old missing items on your indexers on a schedule.
 - **Deep search** when the indexers fail:
   - **Indexers** via Prowlarr, with a **force grab** that temporarily lifts quality-profile, language and queue restrictions to push a release through. Each release shows what its name says (resolution, source, codec, HDR, audio), its peers, grabs and age, and warnings for camera rips, dead torrents and files too small to be real; the same release on several indexers is one row.
-  - **Telegram** (your own account over MTProto, so large files work). One search covers every channel you've joined, and each result says which channel it's from. The search box is editable, and Eziarr also tries the other ways a name gets written ("5 cm" and "5cm", "Part 2" and "Part II") and the alternate titles your *Arr knows, then ranks files by how well they match.
+  - **Telegram** (your own account over MTProto, so large files work). One search covers every channel you've joined, and each result says which channel it's from. The search box is editable, and eziarr also tries the other ways a name gets written ("5 cm" and "5cm", "Part 2" and "Part II") and the alternate titles your *Arr knows, then ranks files by how well they match.
   - **Internet Archive** and **open directories** (Apache/Nginx listings).
-- **Auto-import.** Downloads are renamed the way the *Arr expects ("Title (Year).ext", "Series S01E02.ext") and imported with a targeted scan. For movies, Eziarr checks with Radarr that the file really landed before calling it done.
+- **Auto-import.** Downloads are renamed the way the *Arr expects ("Title (Year).ext", "Series S01E02.ext") and imported with a targeted scan. For movies, eziarr checks with Radarr that the file really landed before calling it done.
 - **Keeps running when an *Arr doesn't.** If one *Arr is down, the rest of the wall still loads and the UI says which service isn't answering.
 
 | | |
@@ -73,7 +73,7 @@ Then:
 
    ```
    ┌───────────────────────────────────────────────┐
-   │ First start: set the Eziarr password          │
+   │ First start: set the eziarr password          │
    │ setup code  ZF38-JKBJ                         │
    └───────────────────────────────────────────────┘
    ```
@@ -81,7 +81,7 @@ Then:
 2. Open `http://<your-server>:5000`, enter the code and choose a password (8+ characters).
 3. In **Configuration**, add Radarr, Sonarr and/or Lidarr (URL + API key; **Test** checks each one), and optionally Prowlarr and Telegram.
 
-Eziarr then syncs your missing lists and starts hunting.
+eziarr then syncs your missing lists and starts hunting.
 
 To skip the setup code, set `EZIARR_PASSWORD` (or `EZIARR_PASSWORD_FILE`) before the first start.
 
@@ -101,16 +101,16 @@ For development, see [DEVELOPER.md](DEVELOPER.md#contributing).
 
 ### Path mapping (Docker vs. your *Arrs)
 
-Eziarr downloads into `/app/downloads` inside its container and then asks the *Arr to import that path. If the *Arr runs elsewhere (on the host, another container or a Windows box), it sees that folder under a different path, and the import finds nothing.
+eziarr downloads into `/app/downloads` inside its container and then asks the *Arr to import that path. If the *Arr runs elsewhere (on the host, another container or a Windows box), it sees that folder under a different path, and the import finds nothing.
 
-Mount a folder both can reach to `/app/downloads`, then set **Configuration → Path Translation → *Arr Remote Path** to where the *Arr sees that same folder, for example `D:\Eziarr` or `/data/eziarr`. Eziarr rewrites the path (including slashes for Windows) before asking for the import.
+Mount a folder both can reach to `/app/downloads`, then set **Configuration → Path Translation → *Arr Remote Path** to where the *Arr sees that same folder, for example `D:\eziarr` or `/data/eziarr`. eziarr rewrites the path (including slashes for Windows) before asking for the import.
 
 ### Environment variables
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `EZIARR_PASSWORD` / `EZIARR_PASSWORD_FILE` | unset | Sets the password on first start and skips the setup code. Ignored once a password exists. |
-| `TRUST_PROXY` | `0` | How many reverse proxies sit in front of Eziarr. Set it (usually `1`) behind nginx, Traefik or Caddy; leave it unset otherwise. |
+| `TRUST_PROXY` | `0` | How many reverse proxies sit in front of eziarr. Set it (usually `1`) behind nginx, Traefik or Caddy; leave it unset otherwise. |
 | `COOKIE_SECURE` | auto | Force `true`/`false` for the `Secure` cookie flag (auto: on when the request came in over HTTPS). |
 | `JWT_SECRET` | generated | Session signing key; generated and stored on first start when unset. |
 | `TZ` | `Asia/Kuala_Lumpur` | Time zone for logs and schedules. |
@@ -133,13 +133,13 @@ Other settings (*Arr connections, Prowlarr, Telegram, sync and hunter intervals,
 - **Sessions** are HttpOnly, `SameSite=Strict` cookies with a short-lived access token and a refresh token (1 day, or 30 with "keep me signed in"). Changing the password signs out every other browser and device.
 - **Login is rate limited** to 10 attempts a minute per client. Behind a reverse proxy, set `TRUST_PROXY` so clients are told apart by their real address. Without it, `X-Forwarded-For` is ignored, because any client can send it.
 - **Download sources are SSRF-guarded:** URLs must be http(s), may not resolve to private, loopback, link-local, multicast or reserved addresses (including IPv4 hidden inside IPv6 forms), are re-checked at connect time, and redirects aren't followed.
-- Eziarr works over plain `http://` on a LAN. If you expose it to the internet, put it behind an HTTPS reverse proxy.
+- eziarr works over plain `http://` on a LAN. If you expose it to the internet, put it behind an HTTPS reverse proxy.
 
 Found a security problem? Please report it privately; see [DEVELOPER.md](DEVELOPER.md#reporting-security-issues).
 
 ## ⬆️ Upgrading to 1.5
 
-Nothing to change. The wall now follows a live event stream (`/api/v1/missing/stream`) instead of polling every 10 seconds. Traefik and Caddy pass it through as is; nginx honours the `X-Accel-Buffering: no` header Eziarr sends. If a proxy holds the stream back anyway, the page notices and goes back to polling.
+Nothing to change. The wall now follows a live event stream (`/api/v1/missing/stream`) instead of polling every 10 seconds. Traefik and Caddy pass it through as is; nginx honours the `X-Accel-Buffering: no` header eziarr sends. If a proxy holds the stream back anyway, the page notices and goes back to polling.
 
 ## ⬆️ Upgrading to 1.4
 
@@ -151,7 +151,7 @@ The full list is in the [CHANGELOG](CHANGELOG.md).
 
 ## License
 
-[MIT](LICENSE.md)
+[MIT](LICENSE)
 
 ## Development
 

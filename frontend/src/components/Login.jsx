@@ -7,7 +7,7 @@ import { ui } from "../ui/styles";
 import { spring } from "../ui/motion";
 
 import { Button } from "./Buttons";
-import { Mark } from "./Mark";
+import { Brand } from "./Brand";
 
 const PosterDrift = lazy(() => import("./PosterDrift"));
 
@@ -54,9 +54,8 @@ const Frame = ({ title, subtitle, children }) => (
 			animate={{ opacity: 1, y: 0 }}
 			transition={spring}
 		>
-			<div className="flex items-center gap-2 mb-8 text-ink">
-				<Mark size={28} />
-				<span className="text-lg font-semibold tracking-[-0.01em]">eziarr</span>
+			<div className="mb-8">
+				<Brand name="eziarr" />
 			</div>
 			<h1 className="text-xl font-semibold text-ink">{title}</h1>
 			<p className="text-sm text-muted mt-1 mb-6">{subtitle}</p>
@@ -127,7 +126,7 @@ const SetUpInitialUserAndPassword = ({ onClose }) => {
 							autoFocus
 						/>
 						<p className="text-xs text-faint mt-2">
-							Printed in the server log when Eziarr starts:{" "}
+							Printed in the server log when eziarr starts:{" "}
 							<span className="text-muted">docker logs eziarr</span>. It changes
 							on every restart.
 						</p>

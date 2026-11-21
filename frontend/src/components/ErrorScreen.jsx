@@ -3,7 +3,7 @@ import { RefreshCw, CircleAlert } from "lucide-react";
 
 import { spring } from "../ui/motion";
 import { Button } from "./Buttons";
-import { Mark } from "./Mark";
+import { Brand } from "./Brand";
 
 const ErrorScreen = () => {
 	return (
@@ -14,16 +14,13 @@ const ErrorScreen = () => {
 				animate={{ opacity: 1, y: 0 }}
 				transition={spring}
 			>
-				<div className="flex items-center gap-2 mb-8 text-ink">
-					<Mark size={28} />
-					<span className="text-lg font-semibold tracking-[-0.01em]">
-						Eziarr
-					</span>
+				<div className="mb-8">
+					<Brand name="eziarr" />
 				</div>
 				<div className="bg-surface rounded-[20px] p-6">
 					<h1 className="flex items-center gap-2 text-base font-semibold text-ink">
 						<CircleAlert size={18} className="text-negative" />
-						Can't reach the Eziarr server
+						Can't reach the eziarr server
 					</h1>
 					<p className="text-sm text-muted mt-2">
 						The page loaded, but the API didn't answer. Check that the server is

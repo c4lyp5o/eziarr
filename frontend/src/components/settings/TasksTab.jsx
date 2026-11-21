@@ -9,7 +9,7 @@ export default function TasksTab({ tasks, taskIsLoading }) {
 				<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
 					<Activity size={48} className="mb-4 opacity-50 text-faint" />
 					<h3 className="text-lg font-semibold text-ink">No Active Tasks</h3>
-					<p className="text-sm mt-2 max-w-sm">Eziarr is currently idle.</p>
+					<p className="text-sm mt-2 max-w-sm">eziarr is currently idle.</p>
 				</div>
 			) : taskIsLoading ? (
 				<div className="flex flex-col items-center justify-center flex-1 text-center text-faint">
