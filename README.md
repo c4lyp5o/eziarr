@@ -65,7 +65,7 @@ services:
     restart: unless-stopped
 ```
 
-The container runs as uid 100 / gid 101, so the three mounted folders must be writable by it. It has a built-in health check on `/api/v1`.
+The container runs as uid 1000 (the `bun` user), so the three mounted folders must be writable by it. Upgrading from 1.6.0 or earlier (uid 100): run `sudo chown -R 1000:1000` on the `db` and `logs` folders once. It has a built-in health check on `/api/v1`.
 
 Then:
 

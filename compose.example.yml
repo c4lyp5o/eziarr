@@ -6,7 +6,7 @@
 #   /app/logs       general.log (server), worker.log, hunter.log; rotated at 5 MB.
 #   /app/downloads  where downloads land. Your *Arrs must be able to read it too;
 #                   set Settings -> Path Translation to the path THEY see it at.
-# The container runs as uid 100 / gid 101; those paths must be writable by it.
+# The container runs as uid 1000 (bun); those paths must be writable by it.
 
 services:
   eziarr:
