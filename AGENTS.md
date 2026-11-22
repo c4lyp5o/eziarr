@@ -17,7 +17,8 @@ Guidance for AI coding agents working on eziarr, one of the ez* self-hosted apps
 
 - `development` is the integration branch. Branch from it (`feat/…`, `fix/…`, `chore/…`) and open every PR against it.
 - `master` is released code. Only `development` merges into it, by PR. There is no `main`, `dev` or `staging`.
-- Release (only with the owner's OK): bump every `package.json` version, move `[Unreleased]` in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`, merge `development` into `master`. Merging to `master` publishes the image.
+- Release (only with the owner's OK): bump every `package.json` version, move `[Unreleased]` in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`, merge `development` into `master`. Merging to `master` publishes `:<version>`, `:latest` and `:sha-<commit>`; a `vX.Y.Z` tag is optional and adds a GitHub Release.
+- CI is two workflows in every repo: `test.yml` (lint, tests, build, image booted and healthy; PRs and `development`) and `publish.yml` (runs `test.yml`, then publishes; byte-identical across repos except `IMAGE`). `development` publishes nothing. Optional release files come from `scripts/release-assets.sh`.
 - Conventional Commits (`fix(scope): …`) with a body that says why. User-visible changes get a `CHANGELOG.md` line under `[Unreleased]`.
 
 ### Stack and style
@@ -38,7 +39,8 @@ Guidance for AI coding agents working on eziarr, one of the ez* self-hosted apps
 
 ### Docker
 
-- Images run unprivileged as `bun` (uid 1000). Every writable directory (data, uploads, logs) is created and `chown`ed in the `Dockerfile`; never write to a relative path.
+- One Dockerfile shape in every repo (the ez standard): a `build` stage on `oven/bun:x.y.z-alpine` for the frontend, then an Alpine runtime with OCI labels, `--production --frozen-lockfile --ignore-scripts`, `USER bun` (uid 1000) and `HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s --retries=3 CMD wget -qO- "http://127.0.0.1:${PORT}<health>"`. Static apps use `nginx-unprivileged` with the same healthcheck.
+- No root processes at runtime: no crond or root entrypoints. Schedule recurring jobs inside the app. Every writable directory (data, uploads, logs) is created and `chown`ed in the `Dockerfile`; never write to a relative path.
 - Configuration comes from the environment at runtime (`env_file` in compose). Never `COPY .env`.
 - After changing the `Dockerfile`, the Bun version or a dependency, build the image and boot it with throwaway config. Tests don't load every entry point (workers especially).
 
