@@ -1,14 +1,15 @@
 # ez standard publish workflow (identical in every ez repo apart from IMAGE).
-#   push to master  -> test, then :latest, :<package.json version>, :sha-<commit>
-#   push tag vX.Y.Z -> test, check the tag matches package.json, then :<version>
-#                      and a GitHub Release with the CHANGELOG section (plus
-#                      scripts/release-assets.sh output when the repo has one)
-# development publishes nothing.
+#   push to development -> test, then :development and :sha-<commit> (never
+#                          :latest or a version, so it can't replace a release)
+#   push to master      -> test, then :latest, :<package.json version>, :sha-<commit>
+#   push tag vX.Y.Z     -> test, check the tag matches package.json, then :<version>
+#                          and a GitHub Release with the CHANGELOG section (plus
+#                          scripts/release-assets.sh output when the repo has one)
 name: publish
 
 on:
   push:
-    branches: [master]
+    branches: [master, development]
     tags: ["v*.*.*"]
   workflow_dispatch:
 
@@ -28,6 +29,8 @@ jobs:
 
   publish:
     needs: test
+    # A manual run from any other branch tests but never publishes.
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' || github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -53,27 +56,20 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=raw,value=${{ steps.v.outputs.version }}
+            type=raw,value=${{ steps.v.outputs.version }},enable=${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
-            type=sha,prefix=sha-,format=short,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=development,enable=${{ github.ref == 'refs/heads/development' }}
+            type=sha,prefix=sha-,format=short,enable=${{ github.ref_type == 'branch' }}
 
       - name: 🐳 Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
       - name: 🔑 Log in to GHCR
-        if: startsWith(env.IMAGE, 'ghcr.io/')
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 🔑 Log in to Docker Hub
-        if: startsWith(env.IMAGE, 'docker.io/')
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: 🛠️ Build & push
         uses: docker/build-push-action@v7
