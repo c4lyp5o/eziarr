@@ -35,6 +35,8 @@ jobs:
     permissions:
       contents: write
       packages: write
+    outputs:
+      version: ${{ steps.v.outputs.version }}
     steps:
       - name: 🧾 Checkout source
         uses: actions/checkout@v7
@@ -111,15 +113,39 @@ jobs:
           files: release-assets/*
           fail_on_unmatched_files: false
 
+  # One message per run to the NTFY_URL topic (docker_builds), covering the
+  # tests as well as the publish, so a red test run is reported too.
+  notify:
+    needs: [test, publish]
+    if: always() && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' || github.ref_type == 'tag')
+    runs-on: ubuntu-latest
+    steps:
       - name: 🔔 Notify ntfy
-        if: always()
         env:
           NTFY_URL: ${{ secrets.NTFY_URL }}
+          APP: ${{ github.event.repository.name }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          TEST: ${{ needs.test.result }}
+          PUBLISH: ${{ needs.publish.result }}
+          VERSION: ${{ needs.publish.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ -n "$NTFY_URL" ]; then
-            curl -fsS \
-              -H "Title: Publish ${{ job.status }}: ${{ env.IMAGE }}:${{ steps.v.outputs.version }}" \
-              -H "Tags: ${{ job.status == 'success' && 'white_check_mark' || 'x' }},rocket" \
-              -d "Ref: ${{ github.ref_name }} | Commit: ${{ github.sha }}" \
-              "$NTFY_URL" || true
+          [ -n "$NTFY_URL" ] || { echo "NTFY_URL not set; skipping"; exit 0; }
+          case "$REF" in
+            development) tags=":development" ;;
+            master) tags=":latest, :$VERSION" ;;
+            *) tags=":$VERSION + GitHub Release" ;;
+          esac
+          if [ "$PUBLISH" = success ]; then
+            title="✅ $APP $REF published"; prio=default; emoji=white_check_mark
+            body="$IMAGE $tags (${SHA:0:7})"
+          elif [ "$TEST" != success ]; then
+            title="❌ $APP $REF: tests failed"; prio=high; emoji=x
+            body="Nothing published (${SHA:0:7})"
+          else
+            title="❌ $APP $REF: publish failed"; prio=high; emoji=x
+            body="Tests passed, image push failed (${SHA:0:7})"
           fi
+          curl -fsS -H "Title: $title" -H "Priority: $prio" -H "Tags: $emoji,whale" \
+            -H "Click: $RUN_URL" -d "$body" "$NTFY_URL" >/dev/null || echo "::warning::ntfy post failed"
