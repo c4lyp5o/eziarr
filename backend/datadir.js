@@ -19,7 +19,11 @@ export function keepLegacy(
 	{ dir = false, warn = console.warn } = {},
 ) {
 	if (hasState(preferred, dir)) return preferred;
-	const old = legacy.find((p) => p && p !== preferred && hasState(p, dir));
+	// An old file or folder that exists is still in use. Folders count even when
+	// empty: the image never creates the old ones, so one only exists when it is
+	// mounted, and new data must keep going there rather than into an unmounted
+	// /data that is lost on the next recreate.
+	const old = legacy.find((p) => p && p !== preferred && existsSync(p));
 	if (!old) return preferred;
 	warn(
 		`[data] still using ${old}; move it to ${preferred} (see CHANGELOG, "Upgrading").`,
