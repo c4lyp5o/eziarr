@@ -47,7 +47,7 @@ eziarr is two Bun processes run by PM2 (`ecosystem.config.js`), sharing one SQLi
 | --- | --- |
 | `index.js` | Entry point: Elysia app, error handling, the two route guards (auth routes; protected routes), static UI, first-boot setup. |
 | `worker.js` | Worker entry point: schedules sync, hunter, queue processing and the sweeper; runs a download job end to end. |
-| `config.js` | Defaults and paths (`DOWNLOAD_DIR`, `DB_DIR`, `LOG_DIR`, overridable by env) and `MAX_DOWNLOAD_BYTES` (5 GiB). |
+| `config.js` | Defaults and paths (`DATA_DIR` for all state, plus `DOWNLOAD_DIR`, `DB_DIR`, `LOG_DIR`, overridable by env) and `MAX_DOWNLOAD_BYTES` (5 GiB). |
 | `db.js` | Schema and every query. Nothing else talks SQL. |
 | `arr.js` | `arr(config, service)`: the one way to call an *Arr. Applies the base URL, API version (v3 Radarr/Sonarr, v1 Lidarr/Prowlarr) and API key. |
 | `sync.js` | Pages each *Arr's full missing list and applies it in one transaction; never cleans up from a partial list. |
