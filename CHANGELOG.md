@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.6.1] - 2026-11-22
 
 ### Changed
+- **Images move to GHCR:** `ghcr.io/c4lyp5o/eziarr` (`:latest`, `:<version>`). Docker Hub `calypso666/eziarr` is no longer updated; change `image:` in your compose file.
 - The Docker image follows the ez standard: Alpine, runs as the unprivileged `bun` user (uid 1000), and a `HEALTHCHECK` that reports healthy within seconds of start.
 - CI is two workflows, `test.yml` and `publish.yml`. Merging to `master` publishes `:<version>`, `:latest` and `:sha-<commit>` after the tests (and an image boot check) pass; a `vX.Y.Z` tag is optional and adds a GitHub Release.
 - **Upgrade note:** the container now runs as uid 1000 (`bun`), not uid 100. Before starting the new image, run `sudo chown -R 1000:1000` on the mounted `db` and `logs` folders.

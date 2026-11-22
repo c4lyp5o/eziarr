@@ -10,7 +10,7 @@
 
 services:
   eziarr:
-    image: calypso666/eziarr:1.4.0   # or :latest
+    image: ghcr.io/c4lyp5o/eziarr:latest   # or a version, e.g. :1.6.1
     container_name: eziarr
     restart: unless-stopped
     ports:
@@ -32,7 +32,7 @@ services:
 #
 # services:
 #   eziarr:
-#     image: calypso666/eziarr:1.4.0
+#     image: ghcr.io/c4lyp5o/eziarr:latest
 #     container_name: eziarr
 #     restart: unless-stopped
 #     networks: [traefik_default]

@@ -156,7 +156,7 @@ Response schemas are enforced: Elysia **drops fields a response model doesn't de
 
 Two stages on `oven/bun:1.4.5-alpine` (the ez standard Dockerfile): build the UI, then install the backend (`--production --frozen-lockfile --ignore-scripts`) and run as the non-root `bun` user (uid 1000) under `pm2-runtime`. A `HEALTHCHECK` fetches `/api/v1` with wget. `compose.example.yml` is the reference deployment; `backend/.env.example` lists every environment variable.
 
-`--ignore-scripts` matters. Bun 1.4 runs `bufferutil`/`utf-8-validate`'s native build by default; on Alpine it fails (no musl prebuilds, no compiler) and Bun then deletes both packages, so the Telegram client can't load and the server crashes on boot. Without the script they fall back to pure JS. Pushing to `main` publishes `calypso666/eziarr:<version>` and `:latest`.
+`--ignore-scripts` matters. Bun 1.4 runs `bufferutil`/`utf-8-validate`'s native build by default; on Alpine it fails (no musl prebuilds, no compiler) and Bun then deletes both packages, so the Telegram client can't load and the server crashes on boot. Without the script they fall back to pure JS.
 
 ## 🛠️ Notes
 
@@ -194,7 +194,7 @@ There are two long-lived branches:
 
 No other long-lived branches (`main`, `dev`, `staging`, …) are kept; delete feature branches once merged.
 
-To release: bump the version in `package.json`, `backend/package.json` and `frontend/package.json`, move the `[Unreleased]` notes in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`, then merge `development` into `master`. Every push to `master` runs `publish.yml`: `test.yml` first, then `calypso666/eziarr:<version>`, `:latest` and `:sha-<commit>` (Docker Hub). Tagging `vX.Y.Z` afterwards is optional: it checks the tag matches `package.json`, pushes `:<version>` and creates a GitHub Release from that version's changelog section. `development` publishes nothing.
+To release: bump the version in `package.json`, `backend/package.json` and `frontend/package.json`, move the `[Unreleased]` notes in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`, then merge `development` into `master`. Every push to `master` runs `publish.yml`: `test.yml` first, then `ghcr.io/c4lyp5o/eziarr:<version>`, `:latest` and `:sha-<commit>`. Tagging `vX.Y.Z` afterwards is optional: it checks the tag matches `package.json`, pushes `:<version>` and creates a GitHub Release from that version's changelog section. `development` publishes nothing.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org) (`fix(scope): …`) with a body that explains why. Add a `CHANGELOG.md` line under `[Unreleased]` for anything a user would notice. Every behaviour change needs a test; a bug fix needs one that fails without the fix.
 
