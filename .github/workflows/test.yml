@@ -1,19 +1,16 @@
-name: Test
+# ez standard test workflow: lint, tests and build, plus the Docker image
+# built, booted and healthy. Runs on PRs; pushes to development and master
+# run it through publish.yml, before anything is published.
+name: test
 
 on:
-  push:
-    branches:
-      - master
-      - development
   pull_request:
+    branches: [development, master]
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: test-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   backend:
@@ -24,51 +21,70 @@ jobs:
         working-directory: backend
     steps:
       - name: 🧾 Checkout source
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v7
       - name: 🥟 Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          # Same Bun as the Docker image (Dockerfile) runs in production.
-          bun-version: 1.4.3
-
+          bun-version: 1.4.5
       - name: 📦 Install dependencies
         run: bun install --frozen-lockfile
-
-      # bunfig.toml preloads tests/setup.js, so tests use a throwaway
-      # database, log and download directory.
-      - name: 🧪 Run tests
+      - name: 🧪 Tests
         run: bun test
 
   frontend:
-    name: Frontend lint & build
+    name: Frontend lint, tests, build & smoke
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
       - name: 🧾 Checkout source
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v7
       - name: 🥟 Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
-
+          bun-version: 1.4.5
       - name: 📦 Install dependencies
         run: bun install --frozen-lockfile
-
-      # Lint and formatting (biome.json); never writes in CI.
-      - name: 🧹 Lint
-        run: bunx biome ci
-
+      - name: 🧹 Lint & format
+        working-directory: .
+        run: bun install --frozen-lockfile && bunx biome ci frontend
       - name: 🧪 Unit tests
         run: bun run test:unit
-
       - name: 🏗️ Build
         run: bun run build
-
-      # The built UI against tests/mock-api.js in the runner's Chrome:
-      # sign-in, the wall, grouping, filters, selection, the live stream.
       - name: 🌐 Browser smoke test
         run: bun run smoke
+
+  docker:
+    name: Docker image (build, boot, healthy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🧾 Checkout source
+        uses: actions/checkout@v7
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: 🛠️ Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: eziarr:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: 🔬 Boot and wait for healthy
+        run: |
+          set -euo pipefail
+          docker run -d --name app eziarr:ci
+          status=starting
+          for _ in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Running}}' app)" = true ] || { echo "::error::container exited"; exit 1; }
+            status=$(docker inspect -f '{{.State.Health.Status}}' app)
+            [ "$status" = healthy ] && break
+            sleep 2
+          done
+          test "$status" = healthy
+          test "$(docker exec app id -u)" = "1000"
+      - name: 🧾 Container logs
+        if: always()
+        run: docker logs app || true

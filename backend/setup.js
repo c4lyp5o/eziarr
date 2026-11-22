@@ -63,7 +63,7 @@ const passwordFromEnv = () => {
 const banner = (code) => {
 	const url = `http://<this-host>:${process.env.PORT || 5000}`;
 	const lines = [
-		"First start: set the Eziarr password",
+		"First start: set the eziarr password",
 		"",
 		`open        ${url}`,
 		`setup code  ${code}`,

@@ -212,7 +212,7 @@ const isIpDisallowed = (ip) => {
 	return true;
 };
 
-// How many reverse proxies in front of Eziarr we trust to append to
+// How many reverse proxies in front of eziarr we trust to append to
 // X-Forwarded-For (TRUST_PROXY, default 0). With none, the header is ignored:
 // any client can send it, so trusting it by default let anyone pick their own
 // rate-limit bucket.

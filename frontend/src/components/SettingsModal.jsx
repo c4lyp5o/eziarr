@@ -42,7 +42,7 @@ const NoServicesConfiguredModal = ({
 	>
 		<div className="px-5 sm:px-6 pb-5">
 			<p className="text-sm text-muted">
-				Radarr, Sonarr and Lidarr are all empty, so Eziarr will have nothing to
+				Radarr, Sonarr and Lidarr are all empty, so eziarr will have nothing to
 				look for until you add one.
 			</p>
 			<div className="flex justify-end gap-2 mt-5">

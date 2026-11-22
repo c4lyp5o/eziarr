@@ -1,9 +1,10 @@
-import path from "node:path";
+import { mkdirSync } from "node:fs";
 import { Database } from "bun:sqlite";
-import { DEFAULT_SETTINGS, DB_DIR } from "./config";
+import { DB_DIR, DB_PATH, DEFAULT_SETTINGS } from "./config";
 import { generalLogger as logger } from "./logger";
 
-const dbPath = path.join(DB_DIR, "eziarr.sqlite");
+const dbPath = DB_PATH;
+mkdirSync(DB_DIR, { recursive: true });
 
 const db = new Database(dbPath, { create: true });
 

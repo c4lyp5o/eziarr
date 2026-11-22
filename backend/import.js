@@ -12,7 +12,7 @@ const scanCommandName = (service) => {
 /**
  * Ask the *Arr to import the file we just downloaded.
  *
- * `path` must be the FILE path (D:\Eziarr\Title (Year).ext), NOT the drop
+ * `path` must be the FILE path (D:\eziarr\Title (Year).ext), NOT the drop
  * folder. Measured on Radarr 6.4.4 (2026-10-04, live production):
  *   - file-path DownloadedMoviesScan -> imports the single file, hasFile
  *     flips true, Move consumes it out of the drop folder.

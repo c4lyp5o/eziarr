@@ -38,7 +38,7 @@ export const MissingRoutes = new Elysia({ prefix: "/api/v1/missing" })
 		detail: {
 			summary: "Force Grab an Item with Fixes",
 			description:
-				"Attempt to grab a movie/episode via Prowlarr. If rejected due to profile, language, or queue, Eziarr will temporarily drop the item's restrictions, push the download, and instantly restore the item to its original state.",
+				"Attempt to grab a movie/episode via Prowlarr. If rejected due to profile, language, or queue, eziarr will temporarily drop the item's restrictions, push the download, and instantly restore the item to its original state.",
 			tags: ["*Arr Integration"],
 		},
 	})

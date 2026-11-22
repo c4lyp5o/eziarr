@@ -1,7 +1,7 @@
 export function Mark({ size = 24, className = "" }) {
 	return (
 		<img
-			src="/ez-icon.png"
+			src="/icons/icon-192.png"
 			alt=""
 			width={size}
 			height={size}

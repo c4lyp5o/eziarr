@@ -29,7 +29,7 @@ describe("External Service Integrations (*Arr & Prowlarr)", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		resetQueueCache();
-		// The unified queue includes Eziarr's own download queue; start each
+		// The unified queue includes eziarr's own download queue; start each
 		// case from an empty one so counts don't depend on other test files.
 		const db = new Database(path.join(DB_DIR, "eziarr.sqlite"));
 		db.run("DELETE FROM download_queue");

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-22
+
+### Upgrading
+Everything now lives in one folder, `/data` (`DATA_DIR`): `eziarr.sqlite` and `logs/`. Downloads stay at `/app/downloads`.
+
+1. Stop the container.
+2. Put `eziarr.sqlite` (with any `-wal`/`-shm` files, from your old `/app/db` folder) in one host folder; logs can start fresh.
+3. `sudo chown -R 1000:1000` that folder (the image now runs as uid 1000, not 100).
+4. Mount it as `- ./eziarr/data:/data` instead of the `/app/db` and `/app/logs` volumes, change `image:` to `ghcr.io/c4lyp5o/eziarr`, and start it.
+
+If you skip step 2, the app keeps using the old database and logs a warning, so nothing is lost.
+
+### Changed
+- Logs go to the console (`docker logs`) and to rotating files in `$DATA_DIR/logs` (`general.log`, `worker.log`, `hunter.log`): 5 MB per file, 3 files kept. Each process writes its own file.
+- All state lives under one folder, `DATA_DIR` (`/data` in the image, `data/` when run from source), declared as a Docker volume. See **Upgrading**.
+- **Images move to GHCR:** `ghcr.io/c4lyp5o/eziarr` (`:latest`, `:<version>`). Docker Hub `calypso666/eziarr` is no longer updated; change `image:` in your compose file.
+- The Docker image follows the ez standard: Alpine, runs as the unprivileged `bun` user (uid 1000), and a `HEALTHCHECK` that reports healthy within seconds of start.
+- CI is two workflows, `test.yml` and `publish.yml`. Merging to `master` publishes `:<version>`, `:latest` and `:sha-<commit>` after the tests (and an image boot check) pass; a `vX.Y.Z` tag is optional and adds a GitHub Release.
+- Every push to `development` publishes `:development` and `:sha-<commit>` after the tests, so unreleased changes can be tried without touching `master`.
+- **Upgrade note:** the container now runs as uid 1000 (`bun`), not uid 100. Before starting the new image, run `sudo chown -R 1000:1000` on the mounted `db` and `logs` folders.
+- `test.yml` now gates publishing; before, an image could publish while the tests were still running.
+- Header, sidebar and sign-in use the shared ez `Brand`: the ez icon and the lowercase name.
+- The name is lowercase everywhere: page title, install name, screens, API docs and logs say `eziarr`.
+- On phones and tablets (below 1024px) the top bar stays pinned while the page scrolls, as in ezllm, instead of scrolling away with the content.
+- Dependencies updated, Docker image on oven/bun 1.4.5, Biome pinned at the repo root, and React Compiler restored under @vitejs/plugin-react 6.
+
 ## [1.6.0] - 2026-11-17
 
 ### Changed
@@ -160,7 +186,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Download size cap raised from 2 GiB to 5 GiB.
 - Docs: README rewritten for 1.4 (Docker Compose setup, configuration,
   security, upgrade notes) with new screenshots; DEVELOPER.md brought up to
-  date; new CONTRIBUTING.md and AGENTS.md (CLAUDE.md imports it).
+  date; new DEVELOPER.md and AGENTS.md (CLAUDE.md imports it).
 - Tests run with `bun test` (Vitest removed) against a throwaway database;
   the data directories can be moved with `EZIARR_DB_DIR`, `EZIARR_LOG_DIR`
   and `EZIARR_DOWNLOAD_DIR`. CI runs the tests and the frontend build.
@@ -214,7 +240,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Custom UI Modals:** Replaced native browser alerts with modals.
 - **Settings Credentials Management:** Users can now update their admin username and password directly from the Settings UI.
 - **Test Suite:** Added Vitest suites covering the Auth Lifecycle, SQLite IPC Queue, external *Arr mocking, and Security utilities.
-
 
 ### Changed
 - **MVC Refactor:** Shattered the backend monolith into a scalable architecture using `/routes`, `/services`, `/models`, and `/plugins`.

@@ -3,7 +3,7 @@ import { Elysia, t } from "elysia";
 export const HealthRoute = new Elysia({ name: "HealthRoute" }).get(
 	"/api/v1",
 	() => {
-		return { success: true, message: "Eziarr API is Running" };
+		return { success: true, message: "eziarr API is Running" };
 	},
 	{
 		response: t.Object({

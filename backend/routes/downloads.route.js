@@ -8,7 +8,7 @@ export const DownloadsRoutes = new Elysia({ prefix: "/api/v1/downloads" })
 		detail: {
 			summary: "Get Unified Download Queue",
 			description:
-				"Returns Eziarr pending/retry/downloading jobs mixed with active *Arr client downloads.",
+				"Returns eziarr pending/retry/downloading jobs mixed with active *Arr client downloads.",
 			tags: ["Settings", "General"],
 		},
 	})

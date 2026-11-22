@@ -1,70 +1,42 @@
-# ============================
-# Stage 1: Client Builder
-# ============================
-FROM oven/bun:1.4.3-alpine AS builder
-WORKDIR /app
+# ez standard Dockerfile: a build stage for the frontend bundle, then an Alpine
+# runtime that runs as the unprivileged `bun` user (uid 1000) with a wget
+# healthcheck. Keep the Bun version in step with `bun-version` in .github/workflows.
 
-# Cache dependencies first (speeds up rebuilds)
-# The lockfile pins exactly what CI tested.
+# ---- build: frontend bundle ----
+FROM oven/bun:1.4.5-alpine AS build
+WORKDIR /app
 COPY frontend/package.json frontend/bun.lock ./frontend/
 RUN cd frontend && bun install --frozen-lockfile
-
-# Copy source and build
+COPY package.json ./
 COPY frontend ./frontend
 RUN cd frontend && bun run build
 
-# ============================
-# Stage 2: Production
-# ============================
-FROM oven/bun:1.4.3-alpine
+# ---- runtime ----
+FROM oven/bun:1.4.5-alpine
+ARG APP_VERSION=dev
+LABEL org.opencontainers.image.title="eziarr" \
+	org.opencontainers.image.source="https://github.com/c4lyp5o/eziarr" \
+	org.opencontainers.image.licenses="MIT" \
+	org.opencontainers.image.version="$APP_VERSION"
+RUN apk add --no-cache tzdata
+ENV TZ=Asia/Kuala_Lumpur \
+	NODE_ENV=production \
+	HOST=0.0.0.0 \
+	PORT=5000 \
+	DATA_DIR=/data
 WORKDIR /app
-
-# Install system deps
-RUN apk add --no-cache tzdata curl
-ENV TZ=Asia/Kuala_Lumpur
-
-# Non-root user that runs the service (this app downloads untrusted media)
-RUN addgroup -S eziarr && adduser -S eziarr -G eziarr -h /home/eziarr
-# Bun global bins for the app user (pm2 is installed below as eziarr,
-# because /root/.bun is unreachable once we drop privileges)
-ENV PATH="/home/eziarr/.bun/bin:${PATH}"
-
-# Copy backend and install deps
-# --ignore-scripts: Bun 1.4 runs bufferutil/utf-8-validate's native build
-# by default; on Alpine it fails (no musl prebuilds, no compiler) and Bun
-# then DELETES both packages, so the Telegram client can't load. Without the
-# script they install as-is and fall back to their pure-JS code, as on Bun
-# 1.3. No backend dependency needs an install script.
+# pm2-runtime supervises the processes; installed as root into /opt/bun, run as bun.
+ENV BUN_INSTALL=/opt/bun PATH="/opt/bun/bin:${PATH}"
+RUN bun add -g pm2
 COPY backend/package.json backend/bun.lock ./backend/
 RUN cd backend && bun install --production --frozen-lockfile --ignore-scripts
-
-# Copy backend source code
 COPY backend ./backend
-
-# Copy main package.json and the pm2 config (.env is never copied: it's in
-# .dockerignore; configure the container with environment variables)
-COPY package.json ./
-COPY ecosystem.config.js ./
-
-# Copy built client bundle
-COPY --from=builder /app/client ./client
-
-# Writable runtime directories (db, downloads, logs) owned by the app user
-RUN mkdir -p /app/db /app/downloads /app/logs \
-	&& chown -R eziarr:eziarr /app
-
-USER eziarr
-
-# Install PM2 as the app user so it runs without root. The oven/bun image
-# pins BUN_INSTALL_BIN=/usr/local/bin (root-owned), so redirect the global
-# bin dir to a user-writable dir that is already on PATH above.
-RUN BUN_INSTALL_BIN=/home/eziarr/.bun/bin bun add -g pm2
-
+COPY package.json ecosystem.config.js ./
+COPY --from=build /app/client ./client
+RUN mkdir -p /data /data/logs /app/downloads && chown -R bun:bun /data /data/logs /app/downloads
+USER bun
+VOLUME ["/data"]
 EXPOSE 5000
-
-# /api/v1 is the public health route. Shell form so PORT can move it.
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-	CMD curl -fsS -m 5 "http://localhost:${PORT:-5000}/api/v1" || exit 1
-
-# If you use PM2 ecosystem
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s --retries=3 \
+	CMD wget -qO- "http://127.0.0.1:${PORT}/api/v1" >/dev/null || exit 1
 CMD ["bun", "start"]

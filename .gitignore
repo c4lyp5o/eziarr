@@ -39,3 +39,6 @@ logs/*.log
 
 # design inspection output (taste-skill)
 .taste-skill
+
+# runtime state (DATA_DIR default when run from source)
+/data/

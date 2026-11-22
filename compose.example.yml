@@ -1,16 +1,16 @@
-# Eziarr with Docker Compose. Copy to compose.yml, adjust the paths, then:
+# eziarr with Docker Compose. Copy to compose.yml, adjust the paths, then:
 #   docker compose up -d && docker logs eziarr   # read the first-start setup code
 #
 # Volumes:
-#   /app/db         settings, queue and history (SQLite). Back this up.
-#   /app/logs       general.log (server), worker.log, hunter.log; rotated at 5 MB.
+#   /data           eziarr.sqlite (settings, queue, history; back this up) and
+#                   logs/ (general.log, worker.log, hunter.log; rotated at 5 MB).
 #   /app/downloads  where downloads land. Your *Arrs must be able to read it too;
 #                   set Settings -> Path Translation to the path THEY see it at.
-# The container runs as uid 100 / gid 101; those paths must be writable by it.
+# The container runs as uid 1000 (bun); those paths must be writable by it.
 
 services:
   eziarr:
-    image: calypso666/eziarr:1.4.0   # or :latest
+    image: ghcr.io/c4lyp5o/eziarr:latest   # or a version, e.g. :1.7.0
     container_name: eziarr
     restart: unless-stopped
     ports:
@@ -20,8 +20,7 @@ services:
       # Skip the setup code by setting the password on first start (8+ chars):
       # - EZIARR_PASSWORD_FILE=/run/secrets/eziarr_password
     volumes:
-      - ./eziarr/db:/app/db
-      - ./eziarr/logs:/app/logs
+      - ./eziarr/data:/data
       - /path/your/arrs/can/read:/app/downloads
 
 # ---------------------------------------------------------------------------
@@ -32,7 +31,7 @@ services:
 #
 # services:
 #   eziarr:
-#     image: calypso666/eziarr:1.4.0
+#     image: ghcr.io/c4lyp5o/eziarr:latest
 #     container_name: eziarr
 #     restart: unless-stopped
 #     networks: [traefik_default]
@@ -40,8 +39,7 @@ services:
 #       - TZ=Asia/Kuala_Lumpur
 #       - TRUST_PROXY=1
 #     volumes:
-#       - ./eziarr/db:/app/db
-#       - ./eziarr/logs:/app/logs
+#       - ./eziarr/data:/data
 #       - /path/your/arrs/can/read:/app/downloads
 #     labels:
 #       - "traefik.enable=true"

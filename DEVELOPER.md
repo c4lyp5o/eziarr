@@ -1,10 +1,10 @@
-# Eziarr Developer Documentation
+# eziarr Developer Documentation
 
-How Eziarr is put together. For setting up a dev environment, the branch flow and what a PR needs, see [CONTRIBUTING.md](CONTRIBUTING.md); for the traps that have bitten this codebase before, see [AGENTS.md](AGENTS.md).
+How eziarr is put together. For setting up a dev environment, the branch flow and what a PR needs, see [DEVELOPER.md](DEVELOPER.md#contributing); for the traps that have bitten this codebase before, see [AGENTS.md](AGENTS.md).
 
 ## 🏗️ Architecture
 
-Eziarr is two Bun processes run by PM2 (`ecosystem.config.js`), sharing one SQLite database in WAL mode:
+eziarr is two Bun processes run by PM2 (`ecosystem.config.js`), sharing one SQLite database in WAL mode:
 
 ```
             browser (React SPA, served from client/)
@@ -47,7 +47,7 @@ Eziarr is two Bun processes run by PM2 (`ecosystem.config.js`), sharing one SQLi
 | --- | --- |
 | `index.js` | Entry point: Elysia app, error handling, the two route guards (auth routes; protected routes), static UI, first-boot setup. |
 | `worker.js` | Worker entry point: schedules sync, hunter, queue processing and the sweeper; runs a download job end to end. |
-| `config.js` | Defaults and paths (`DOWNLOAD_DIR`, `DB_DIR`, `LOG_DIR`, overridable by env) and `MAX_DOWNLOAD_BYTES` (5 GiB). |
+| `config.js` | Defaults and paths (`DATA_DIR` for all state, plus `DOWNLOAD_DIR`, `DB_DIR`, `LOG_DIR`, overridable by env) and `MAX_DOWNLOAD_BYTES` (5 GiB). |
 | `db.js` | Schema and every query. Nothing else talks SQL. |
 | `arr.js` | `arr(config, service)`: the one way to call an *Arr. Applies the base URL, API version (v3 Radarr/Sonarr, v1 Lidarr/Prowlarr) and API key. |
 | `sync.js` | Pages each *Arr's full missing list and applies it in one transaction; never cleans up from a partial list. |
@@ -150,13 +150,13 @@ Response schemas are enforced: Elysia **drops fields a response model doesn't de
 - Test files share one process and one database: clean up rows you create, and don't depend on another file or test having run first. `bun test --randomize` should pass.
 - **Frontend unit tests** (`bun run test:unit` in `frontend/`): pure helpers such as the release-name parser.
 - **Browser smoke test** (`frontend/tests/smoke.test.js`, `bun run smoke` after `bun run build`): starts `tests/mock-api.js` (a mock of the API with 600 titles) and `vite preview`, then drives Chrome over the DevTools protocol (`tests/cdp.js`; set `CHROME_BIN` if Chrome isn't on the path). It covers sign-in, the virtualized wall, series cards, filters, sorting, shortcuts, select mode and a download finishing over the stream. The mock is also handy for UI work: `bun tests/mock-api.js` and `bun run dev` (see the header of the file for its switches).
-- CI (`.github/workflows/test.yml`) runs on pushes to `main`/`staging`/`dev` and on PRs: backend tests, then `biome ci`, the frontend build and the smoke test, on Bun 1.4.3 with `--frozen-lockfile`.
+- CI (`.github/workflows/test.yml`) runs on pull requests (and through `publish.yml` before every publish): backend tests, then `biome ci`, the unit tests, the frontend build and the smoke test, on Bun 1.4.5 with `--frozen-lockfile`, plus the image built, booted and checked healthy. `publish.yml` runs it before every publish.
 
 ## 🐳 Docker
 
-Two stages on `oven/bun:1.4.3-alpine`: build the UI, then install the backend (`--production --frozen-lockfile --ignore-scripts`) and run as the non-root `eziarr` user (uid 100, gid 101) under `pm2-runtime`. A `HEALTHCHECK` curls `/api/v1`. `compose.example.yml` is the reference deployment; `backend/.env.example` lists every environment variable.
+Two stages on `oven/bun:1.4.5-alpine` (the ez standard Dockerfile): build the UI, then install the backend (`--production --frozen-lockfile --ignore-scripts`) and run as the non-root `bun` user (uid 1000) under `pm2-runtime`. A `HEALTHCHECK` fetches `/api/v1` with wget. `compose.example.yml` is the reference deployment; `backend/.env.example` lists every environment variable.
 
-`--ignore-scripts` matters. Bun 1.4 runs `bufferutil`/`utf-8-validate`'s native build by default; on Alpine it fails (no musl prebuilds, no compiler) and Bun then deletes both packages, so the Telegram client can't load and the server crashes on boot. Without the script they fall back to pure JS. Pushing to `main` publishes `calypso666/eziarr:<version>` and `:latest`.
+`--ignore-scripts` matters. Bun 1.4 runs `bufferutil`/`utf-8-validate`'s native build by default; on Alpine it fails (no musl prebuilds, no compiler) and Bun then deletes both packages, so the Telegram client can't load and the server crashes on boot. Without the script they fall back to pure JS.
 
 ## 🛠️ Notes
 
@@ -164,3 +164,97 @@ Two stages on `oven/bun:1.4.3-alpine`: build the UI, then install the backend (`
 - **One writer per log file.** `deadslog` tracks file size within each process, so the server writes `general.log` and the worker `worker.log`.
 - **Telegram** is your own account: the session is a `StringSession` in `settings`, created by the in-app login (code, then 2FA if enabled).
 - **Passwords** are hashed with Bun's Argon2 (`Bun.password`).
+
+## Commands
+
+| Task | Command |
+| --- | --- |
+| Install every package | `bun run install` |
+| Run the dev servers | `bun run dev` |
+| Run the test suite | `bun run test` |
+| Lint with Biome | `bun run lint` |
+| Apply Biome's safe fixes | `bun run lint:fix` |
+| Build the frontend | `bun run build:client` |
+| Start in production (PM2 where configured) | `bun run start` |
+
+`bun run test` runs the backend suite; `cd frontend && bun run test:unit` the frontend units; `cd frontend && bun run smoke` a real-browser smoke test after a build.
+
+## Linting
+
+[Biome](https://biomejs.dev) 2.6.8 is the only linter. It is pinned at the repo root, so run it from there: `bun run lint` checks, `bun run lint:fix` applies safe fixes. Configuration is `biome.json`; the root config only lints, while `frontend/biome.json` (a nested config) also enforces formatting there, and CI runs `bunx biome ci frontend`. CI runs the same command.
+
+## Branches and releases
+
+There are two long-lived branches:
+
+| Branch | Role |
+| --- | --- |
+| `development` | Integration branch. Branch from it (`feat/…`, `fix/…`, `chore/…`) and open every PR against it. |
+| `master` | Released code. Only `development` is merged into it, by PR. |
+
+No other long-lived branches (`main`, `dev`, `staging`, …) are kept; delete feature branches once merged.
+
+To release: bump the version in `package.json`, `backend/package.json` and `frontend/package.json`, move the `[Unreleased]` notes in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`, then merge `development` into `master`. Every push to `master` runs `publish.yml`: `test.yml` first, then `ghcr.io/c4lyp5o/eziarr:<version>`, `:latest` and `:sha-<commit>`. Tagging `vX.Y.Z` afterwards is optional: it checks the tag matches `package.json`, pushes `:<version>` and creates a GitHub Release from that version's changelog section. Every push to `development` publishes `ghcr.io/c4lyp5o/eziarr:development` and `:sha-<commit>` after the tests, for trying unreleased changes in a separate container; it never touches `:latest` or a version tag.
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org) (`fix(scope): …`) with a body that explains why. Add a `CHANGELOG.md` line under `[Unreleased]` for anything a user would notice. Every behaviour change needs a test; a bug fix needs one that fails without the fix.
+
+## Docker
+
+The image follows the ez standard Dockerfile: a Bun stage builds the frontend, then `oven/bun:1.4.5-alpine` runs the app as `bun` (uid 1000) with a `HEALTHCHECK` on `/api/v1`. Keep the Bun version in step with `bun-version` in `.github/workflows/`. `test.yml` builds the image, boots it and waits for healthy; do the same locally (`docker build -t eziarr .`, then `docker run`) after changing the Dockerfile.
+
+## Contributing
+
+Thanks for helping. This page covers running eziarr locally, how changes flow into a release, and what a pull request needs. How the code is organised is in [DEVELOPER.md](DEVELOPER.md).
+
+### Running it locally
+
+You need [Bun](https://bun.sh) 1.4 and, to try it end to end, at least one of Radarr, Sonarr or Lidarr.
+
+```bash
+bun run install        # backend + frontend dependencies
+bun run dev            # server, worker and Vite together
+```
+
+- The UI runs on <http://localhost:3000> (Vite, proxying `/api` to the server on port 5000).
+- On first start the server prints a setup code in the terminal. To skip it in development, start with a password instead: `EZIARR_PASSWORD=devpassword bun run dev`.
+- Data lives in `db/`, `logs/` and `downloads/` at the repo root; delete `db/` to start over.
+
+### Before you open a pull request
+
+```bash
+cd backend  && bun test              # all backend tests
+bunx biome ci frontend              # Biome (from the root): lint + formatting
+cd frontend && bun run build         # the UI still builds
+cd frontend && bun run smoke         # the built UI in headless Chrome
+```
+
+CI runs the same checks on every pull request.
+
+- **Tests come with the change.** A bug fix gets a test that fails without it; a feature gets tests for its behaviour. Mock external services (`vi.mock("axios", …)`); never call a real *Arr from a test.
+- **Tests stand alone.** They run against a throwaway database (the preload in `tests/setup.js` sees to that), but every file shares it: clean up rows you create, and don't rely on another test running first. `bun test --randomize` should pass.
+- **Format with Biome** from the root: `bunx biome check --write frontend`.
+- **Add a line to `CHANGELOG.md`** under `## [Unreleased]` for anything a user would notice.
+- **Keep a pull request to one change.** Separate refactors from behaviour changes, and dependency bumps from both.
+
+
+### Commit messages
+
+[Conventional Commits](https://www.conventionalcommits.org), as in the existing history:
+
+```
+fix(import): scan the downloaded FILE path, not the drop folder
+
+Why the change was needed and what it does, wrapped at ~72 columns.
+```
+
+Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `style`, `build`, `ci`, `chore`. The scope is the area (`import`, `sync`, `settings`, `ui`, `security`, …).
+
+### Dependencies
+
+- Update one dependency, or one closely related group, per change, and say why.
+- Prefer releases that are at least a week old; brand-new releases are where regressions and compromised packages show up first.
+- Commit the lockfile and read its diff. CI and the Docker build install with `--frozen-lockfile`, so the lockfile is what ships.
+
+### Reporting security issues
+
+Please don't open a public issue for a vulnerability. Use GitHub's private vulnerability reporting (the repository's **Security** tab → **Report a vulnerability**), or email `calypso[at]calypsocloud.one`. Include what an attacker can do and how to reproduce it.
