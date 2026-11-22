@@ -59,13 +59,12 @@ services:
       - TZ=Asia/Kuala_Lumpur
       # - TRUST_PROXY=1        # only behind a reverse proxy, see below
     volumes:
-      - ./eziarr/db:/app/db
-      - ./eziarr/logs:/app/logs
+      - ./eziarr/data:/data
       - /path/your/arrs/can/read:/app/downloads
     restart: unless-stopped
 ```
 
-The container runs as uid 1000 (the `bun` user), so the three mounted folders must be writable by it. Upgrading from 1.6.0 or earlier (uid 100): run `sudo chown -R 1000:1000` on the `db` and `logs` folders once. It has a built-in health check on `/api/v1`.
+The container runs as uid 1000 (the `bun` user), so the three mounted folders must be writable by it. Upgrading from 1.6 or earlier (uid 100, separate `db`/`logs` volumes): see **Upgrading** under 1.7.0 in [CHANGELOG.md](CHANGELOG.md). It has a built-in health check on `/api/v1`.
 
 Then:
 
@@ -115,7 +114,8 @@ Mount a folder both can reach to `/app/downloads`, then set **Configuration → 
 | `JWT_SECRET` | generated | Session signing key; generated and stored on first start when unset. |
 | `TZ` | `Asia/Kuala_Lumpur` | Time zone for logs and schedules. |
 | `PORT` | `5000` | HTTP port. |
-| `EZIARR_DB_DIR`, `EZIARR_LOG_DIR`, `EZIARR_DOWNLOAD_DIR` | `/app/db`, `/app/logs`, `/app/downloads` | Move the data directories (mainly for tests and non-Docker installs). |
+| `DATA_DIR` | `/data` | All state: `eziarr.sqlite` and `logs/` |
+| `EZIARR_DB_DIR`, `EZIARR_LOG_DIR`, `EZIARR_DOWNLOAD_DIR` | `$DATA_DIR`, `$DATA_DIR/logs`, `/app/downloads` | Move the data directories (mainly for tests and non-Docker installs). |
 
 Other settings (*Arr connections, Prowlarr, Telegram, sync and hunter intervals, path translation) live on the Configuration page.
 
