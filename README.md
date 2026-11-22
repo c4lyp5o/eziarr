@@ -51,7 +51,7 @@ eziarr sits beside your *Arr stack. It lists every missing movie, episode and al
 # docker-compose.yml
 services:
   eziarr:
-    image: calypso666/eziarr:latest
+    image: ghcr.io/c4lyp5o/eziarr:latest
     container_name: eziarr
     ports:
       - "5000:5000"

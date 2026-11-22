@@ -1,13 +1,11 @@
 # ez standard test workflow: lint, tests and build, plus the Docker image
-# built, booted and healthy. Runs on PRs and on pushes to development;
-# publish.yml calls it before every publish.
+# built, booted and healthy. Runs on PRs; pushes to development and master
+# run it through publish.yml, before anything is published.
 name: test
 
 on:
   pull_request:
     branches: [development, master]
-  push:
-    branches: [development]
   workflow_call:
   workflow_dispatch:
 

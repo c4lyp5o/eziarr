@@ -18,7 +18,7 @@ Guidance for AI coding agents working on eziarr, one of the ez* self-hosted apps
 - `development` is the integration branch. Branch from it (`feat/…`, `fix/…`, `chore/…`) and open every PR against it.
 - `master` is released code. Only `development` merges into it, by PR. There is no `main`, `dev` or `staging`.
 - Release (only with the owner's OK): bump every `package.json` version, move `[Unreleased]` in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`, merge `development` into `master`. Merging to `master` publishes `:<version>`, `:latest` and `:sha-<commit>`; a `vX.Y.Z` tag is optional and adds a GitHub Release.
-- CI is two workflows in every repo: `test.yml` (lint, tests, build, image booted and healthy; PRs and `development`) and `publish.yml` (runs `test.yml`, then publishes; byte-identical across repos except `IMAGE`). `development` publishes nothing. Optional release files come from `scripts/release-assets.sh`.
+- CI is two workflows in every repo: `test.yml` (lint, tests, build, image booted and healthy; on PRs) and `publish.yml` (runs `test.yml`, then publishes; byte-identical across repos except `IMAGE`). Pushes to `development` publish `:development` and `:sha-<commit>` only, never `:latest` or a version; run a dev image as a separate container with its own data, not in place of the live one. Optional release files come from `scripts/release-assets.sh`.
 - Conventional Commits (`fix(scope): …`) with a body that says why. User-visible changes get a `CHANGELOG.md` line under `[Unreleased]`.
 
 ### Stack and style

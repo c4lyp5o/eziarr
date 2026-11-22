@@ -150,13 +150,13 @@ Response schemas are enforced: Elysia **drops fields a response model doesn't de
 - Test files share one process and one database: clean up rows you create, and don't depend on another file or test having run first. `bun test --randomize` should pass.
 - **Frontend unit tests** (`bun run test:unit` in `frontend/`): pure helpers such as the release-name parser.
 - **Browser smoke test** (`frontend/tests/smoke.test.js`, `bun run smoke` after `bun run build`): starts `tests/mock-api.js` (a mock of the API with 600 titles) and `vite preview`, then drives Chrome over the DevTools protocol (`tests/cdp.js`; set `CHROME_BIN` if Chrome isn't on the path). It covers sign-in, the virtualized wall, series cards, filters, sorting, shortcuts, select mode and a download finishing over the stream. The mock is also handy for UI work: `bun tests/mock-api.js` and `bun run dev` (see the header of the file for its switches).
-- CI (`.github/workflows/test.yml`) runs on pull requests and pushes to `development`: backend tests, then `biome ci`, the unit tests, the frontend build and the smoke test, on Bun 1.4.5 with `--frozen-lockfile`, plus the image built, booted and checked healthy. `publish.yml` runs it before every publish.
+- CI (`.github/workflows/test.yml`) runs on pull requests (and through `publish.yml` before every publish): backend tests, then `biome ci`, the unit tests, the frontend build and the smoke test, on Bun 1.4.5 with `--frozen-lockfile`, plus the image built, booted and checked healthy. `publish.yml` runs it before every publish.
 
 ## 🐳 Docker
 
 Two stages on `oven/bun:1.4.5-alpine` (the ez standard Dockerfile): build the UI, then install the backend (`--production --frozen-lockfile --ignore-scripts`) and run as the non-root `bun` user (uid 1000) under `pm2-runtime`. A `HEALTHCHECK` fetches `/api/v1` with wget. `compose.example.yml` is the reference deployment; `backend/.env.example` lists every environment variable.
 
-`--ignore-scripts` matters. Bun 1.4 runs `bufferutil`/`utf-8-validate`'s native build by default; on Alpine it fails (no musl prebuilds, no compiler) and Bun then deletes both packages, so the Telegram client can't load and the server crashes on boot. Without the script they fall back to pure JS. Pushing to `main` publishes `calypso666/eziarr:<version>` and `:latest`.
+`--ignore-scripts` matters. Bun 1.4 runs `bufferutil`/`utf-8-validate`'s native build by default; on Alpine it fails (no musl prebuilds, no compiler) and Bun then deletes both packages, so the Telegram client can't load and the server crashes on boot. Without the script they fall back to pure JS.
 
 ## 🛠️ Notes
 
@@ -194,7 +194,7 @@ There are two long-lived branches:
 
 No other long-lived branches (`main`, `dev`, `staging`, …) are kept; delete feature branches once merged.
 
-To release: bump the version in `package.json`, `backend/package.json` and `frontend/package.json`, move the `[Unreleased]` notes in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`, then merge `development` into `master`. Every push to `master` runs `publish.yml`: `test.yml` first, then `calypso666/eziarr:<version>`, `:latest` and `:sha-<commit>` (Docker Hub). Tagging `vX.Y.Z` afterwards is optional: it checks the tag matches `package.json`, pushes `:<version>` and creates a GitHub Release from that version's changelog section. `development` publishes nothing.
+To release: bump the version in `package.json`, `backend/package.json` and `frontend/package.json`, move the `[Unreleased]` notes in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`, then merge `development` into `master`. Every push to `master` runs `publish.yml`: `test.yml` first, then `ghcr.io/c4lyp5o/eziarr:<version>`, `:latest` and `:sha-<commit>`. Tagging `vX.Y.Z` afterwards is optional: it checks the tag matches `package.json`, pushes `:<version>` and creates a GitHub Release from that version's changelog section. Every push to `development` publishes `ghcr.io/c4lyp5o/eziarr:development` and `:sha-<commit>` after the tests, for trying unreleased changes in a separate container; it never touches `:latest` or a version tag.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org) (`fix(scope): …`) with a body that explains why. Add a `CHANGELOG.md` line under `[Unreleased]` for anything a user would notice. Every behaviour change needs a test; a bug fix needs one that fails without the fix.
 
