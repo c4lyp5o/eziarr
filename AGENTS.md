@@ -2,7 +2,7 @@
 
 Guidance for AI coding agents working on eziarr, one of the ez* self-hosted apps. **ez rules** are shared by every ez repo; **This repo** is specific to eziarr. Humans: [DEVELOPER.md](DEVELOPER.md) has the same commands with more context.
 
-<!-- ez-standard:start v1 — shared by every ez repo; edit the copy in the Hermes ez-series skill and re-sync, not this block. -->
+<!-- ez-standard:start v2 — shared by every ez repo; edit the copy in the Hermes ez-series skill and re-sync, not this block. -->
 ## ez rules (shared by every ez repo)
 
 ### Ground rules
@@ -31,6 +31,17 @@ Guidance for AI coding agents working on eziarr, one of the ez* self-hosted apps
 - **Brand**: every header, sidebar and sign-in shows `<Brand name="ezname" scope="…" />` (in `src/ez/`): the ez icon at 20px, the lowercase name, an optional scope. App names are always lowercase (`eziarr`, never `Eziarr`), in UI and docs.
 - **Icons**: every app uses the shared ez icon from ezconv: `public/icons/icon-192.png` and `icon-512.png`, linked as `rel="icon"` and `rel="apple-touch-icon"` and used in any web manifest.
 - **React Compiler** runs through `@rolldown/plugin-babel` with `reactCompilerPreset()`. `@vitejs/plugin-react` 6 has no `babel` option; passing one silently disables the compiler.
+
+### Writing docs
+
+User docs are easy, straightforward and for everyone. The models are ezllm's [README](https://github.com/c4lyp5o/ezllm/blob/development/README.md), [bridge pages](https://github.com/c4lyp5o/ezllm/tree/development/docs/bridges) and [troubleshooting page](https://github.com/c4lyp5o/ezllm/blob/development/docs/bridges/troubleshooting.md). Open one and match it.
+
+- **Structure**: one page or section, one job, titled with the task ("Turn on ChatGPT"). What you need, then numbered steps that start with a verb, then what success looks like ("You should see …"), then links for "Not working?" and "How it works". When setups differ, let the reader pick one up front and skip the rest. Troubleshooting is a table: *the log says* / *do this*.
+- **Tone**: talk to "you" in plain words. Explain a term the first time. Say what a step costs or changes. State a warning as a fact with its reason, right where it matters. No hype, jokes or apologies.
+- **Cadence**: short sentences, one idea each; paragraphs of one to three lines. Say what a block does, then show the block. Each block is one action that pastes whole, with no comments inside. Cut any sentence that does not help with the next step.
+- **Scope**: describe the current version only. Reasons, limits and measurements go in reference docs, not in the steps.
+- **Examples** use neutral names (`acme`, `my-app`, `example.com`, `/home/you`), never anyone's real setup.
+- **Before it ships**: run every command as printed; match UI labels and log lines word for word; check that links resolve.
 
 ### Dependencies
 
